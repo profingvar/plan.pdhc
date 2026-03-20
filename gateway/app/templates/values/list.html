@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Values — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Values</h1>
+  <a href="{{ url_for('values_web.create_value') }}" class="btn btn-primary"><i data-lucide="plus"></i> New Value</a>
+</div>
+
+<div class="card">
+  {% if pagination.items %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Display Text</th>
+          <th>Version</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in pagination.items %}
+        <tr>
+          <td><a href="{{ url_for('values_web.view_value', guid=v.guid) }}">{{ v.value_name }}</a></td>
+          <td>{{ v.value_display_text or '—' }}</td>
+          <td>{{ v.vers_number }}</td>
+          <td>{{ v.date_created.strftime('%Y-%m-%d') if v.date_created else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pagination.pages > 1 %}
+  <div class="pagination">
+    {% for p in pagination.iter_pages() %}
+      {% if p %}
+        <a href="?page={{ p }}" {% if p == pagination.page %}class="active"{% endif %}>{{ p }}</a>
+      {% else %}
+        <span>...</span>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="empty-state">
+    <p>No values yet.</p>
+    <a href="{{ url_for('values_web.create_value') }}" class="btn btn-primary"><i data-lucide="plus"></i> Create First Value</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

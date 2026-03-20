@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}New Concept — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>New Concept</h1>
+</div>
+
+<div class="card">
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="concept_name">Name *</label>
+        <input type="text" id="concept_name" name="concept_name" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label for="concept_display_text">Display Text</label>
+        <input type="text" id="concept_display_text" name="concept_display_text" class="form-control">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="canonical_lib">Canonical Library *</label>
+      <select id="canonical_lib" name="canonical_lib" class="form-control" required>
+        <option value="">Select...</option>
+        {% for lib in canonical_libs %}
+        <option value="{{ lib.guid }}">{{ lib.canonical_lib_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="canonical_refnumber">Canonical Reference Number</label>
+      <input type="text" id="canonical_refnumber" name="canonical_refnumber" class="form-control">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="concept_type">Concept Type</label>
+        <select id="concept_type" name="concept_type" class="form-control">
+          <option value="">None</option>
+          {% for ct in concept_types %}
+          <option value="{{ ct.guid }}">{{ ct.concept_type_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="response_type">Response Type</label>
+        <select id="response_type" name="response_type" class="form-control">
+          <option value="">None</option>
+          {% for rt in response_types %}
+          <option value="{{ rt.guid }}">{{ rt.response_type_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="unit">Unit</label>
+        <select id="unit" name="unit" class="form-control">
+          <option value="">None</option>
+          {% for u in units %}
+          <option value="{{ u.guid }}">{{ u.unit_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="valueset">ValueSet</label>
+        <select id="valueset" name="valueset" class="form-control">
+          <option value="">None</option>
+          {% for vs in valuesets %}
+          <option value="{{ vs.guid }}">{{ vs.valueset_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="range_low">Range Low</label>
+        <input type="number" step="any" id="range_low" name="range_low" class="form-control">
+      </div>
+      <div class="form-group">
+        <label for="range_high">Range High</label>
+        <input type="number" step="any" id="range_high" name="range_high" class="form-control">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="concept_explain">Explanation</label>
+      <textarea id="concept_explain" name="concept_explain" class="form-control" rows="3"></textarea>
+    </div>
+
+    <div class="button-group">
+      <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i> Create Concept</button>
+      <a href="{{ url_for('concepts_web.list_concepts') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

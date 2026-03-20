@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Concepts — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Concepts</h1>
+  <a href="{{ url_for('concepts_web.create_concept') }}" class="btn btn-primary"><i data-lucide="plus"></i> New Concept</a>
+</div>
+
+<div class="card">
+  {% if pagination.items %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Display Text</th>
+          <th>Status</th>
+          <th>Version</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in pagination.items %}
+        <tr>
+          <td><a href="{{ url_for('concepts_web.view_concept', guid=c.guid) }}">{{ c.concept_name }}</a></td>
+          <td>{{ c.concept_display_text or '—' }}</td>
+          <td><span class="badge badge-{{ 'success' if c.status == 'active' else 'warning' }}">{{ c.status }}</span></td>
+          <td>{{ c.vers_number }}</td>
+          <td>{{ c.date_created.strftime('%Y-%m-%d') if c.date_created else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pagination.pages > 1 %}
+  <div class="pagination">
+    {% for p in pagination.iter_pages() %}
+      {% if p %}
+        <a href="?page={{ p }}" {% if p == pagination.page %}class="active"{% endif %}>{{ p }}</a>
+      {% else %}
+        <span>...</span>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="empty-state">
+    <p>No concepts yet.</p>
+    <a href="{{ url_for('concepts_web.create_concept') }}" class="btn btn-primary"><i data-lucide="plus"></i> Create First Concept</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Units — PDHC PlanDef Builder{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Units</h1>
+  <a href="{{ url_for('lookup_web.create_unit') }}" class="btn btn-primary"><i data-lucide="plus"></i> New Unit</a>
+</div>
+<div class="card">
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Display Text</th><th>Author</th><th>Version</th></tr></thead>
+      <tbody>
+        {% for i in items %}
+        <tr>
+          <td><a href="{{ url_for('lookup_web.view_unit', guid=i.guid) }}">{{ i.unit_name }}</a></td>
+          <td>{{ i.unit_display_text or '—' }}</td>
+          <td>{{ i.author or '—' }}</td>
+          <td>{{ i.vers_number }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><p>No units yet.</p>
+    <a href="{{ url_for('lookup_web.create_unit') }}" class="btn btn-primary"><i data-lucide="plus"></i> Create First</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

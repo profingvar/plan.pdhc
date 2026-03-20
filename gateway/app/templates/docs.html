@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Documentation — PDHC PlanDef Builder{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Documentation</h1>
+    <p class="lead">Project documentation and API reference</p>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>API Reference</h2>
+    <p class="text-muted mb-2">Complete REST API documentation with examples for all 68 endpoints.</p>
+    <div class="button-group">
+      <a href="{{ url_for('main.download_doc', filename='api_reference.md') }}" class="btn btn-primary btn-sm"><i data-lucide="download"></i> Download</a>
+      <a href="{{ url_for('main.api_docs_json') }}" class="btn btn-secondary btn-sm"><i data-lucide="code"></i> JSON</a>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Database Schema</h2>
+    <p class="text-muted mb-2">All 17 tables with column types, sample data, GUIDs, and foreign key map.</p>
+    <div class="button-group">
+      <a href="{{ url_for('main.download_doc', filename='db_schema_snapshot.md') }}" class="btn btn-primary btn-sm"><i data-lucide="download"></i> Download</a>
+    </div>
+  </div>
+</div>
+
+<h2 class="mt-6">All Documents</h2>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Document</th>
+          <th>Description</th>
+          <th>Size</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in docs %}
+        <tr>
+          <td><code>{{ doc.filename }}</code></td>
+          <td>{{ doc.description }}</td>
+          <td class="text-muted">{{ doc.size }}</td>
+          <td>
+            <a href="{{ url_for('main.download_doc', filename=doc.filename) }}" class="btn btn-secondary btn-sm"><i data-lucide="download"></i></a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2 class="mt-6">API Access</h2>
+<div class="card">
+  <p class="mb-1">Documents are also available via the API:</p>
+  <p><code>GET /api/v1/docs</code> — list all documents</p>
+  <p><code>GET /api/v1/docs/&lt;filename&gt;</code> — download a specific document</p>
+  <p class="mt-2"><code>GET /api/v1/capability-statement</code> — machine-readable capability statement</p>
+  <p><code>GET /api/v1/endpoints</code> — flat list of all API endpoints</p>
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ item.canonical_lib_name }} — PDHC PlanDef Builder{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Edit Canonical Library</h1></div>
+<div class="card">
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="canonical_lib_name">Name *</label>
+        <input type="text" id="canonical_lib_name" name="canonical_lib_name" class="form-control" value="{{ item.canonical_lib_name }}" required>
+      </div>
+      <div class="form-group">
+        <label for="canonical_lib_display_text">Display Text</label>
+        <input type="text" id="canonical_lib_display_text" name="canonical_lib_display_text" class="form-control" value="{{ item.canonical_lib_display_text or '' }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="canonical_lib_url">URL</label>
+      <input type="url" id="canonical_lib_url" name="canonical_lib_url" class="form-control" value="{{ item.canonical_lib_url or '' }}">
+    </div>
+    <div class="form-group">
+      <label for="author">Author</label>
+      <input type="text" id="author" name="author" class="form-control" value="{{ item.author or '' }}">
+    </div>
+    <div class="button-group">
+      <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Save Changes</button>
+      <a href="{{ url_for('lookup_web.view_canonical_lib', guid=item.guid) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

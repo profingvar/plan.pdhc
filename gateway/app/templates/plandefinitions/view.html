@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ plandef.title }} — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ plandef.title }}</h1>
+  <div class="button-group-sm">
+    <a href="{{ url_for('plandefinitions_web.builder', plandef_id=plandef.fhir_id) }}" class="btn btn-secondary btn-sm"><i data-lucide="pencil"></i> Edit</a>
+    <a href="{{ url_for('plandefinitions_web.export_plandef', fhir_id=plandef.fhir_id) }}" class="btn btn-secondary btn-sm"><i data-lucide="download"></i> Export FHIR JSON</a>
+    <form method="post" action="{{ url_for('plandefinitions_web.delete_plandef', fhir_id=plandef.fhir_id) }}" onsubmit="return confirm('Delete this PlanDefinition?')">
+      <button type="submit" class="btn btn-danger btn-sm"><i data-lucide="trash-2"></i> Delete</button>
+    </form>
+    <a href="{{ url_for('plandefinitions_web.list_plandefs') }}" class="btn btn-secondary btn-sm"><i data-lucide="arrow-left"></i> Back</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="detail-grid">
+    <span class="detail-label">FHIR ID</span>
+    <span class="detail-value monospace">{{ plandef.fhir_id }}</span>
+
+    <span class="detail-label">GUID</span>
+    <span class="detail-value monospace">{{ plandef.guid }}</span>
+
+    <span class="detail-label">Name</span>
+    <span class="detail-value">{{ plandef.name or '—' }}</span>
+
+    <span class="detail-label">Status</span>
+    <span class="detail-value"><span class="badge badge-{{ 'success' if plandef.status == 'active' else 'warning' }}">{{ plandef.status }}</span></span>
+
+    <span class="detail-label">Version</span>
+    <span class="detail-value">{{ plandef.version or '—' }}</span>
+
+    <span class="detail-label">Type</span>
+    <span class="detail-value">{{ plandef.type or '—' }}</span>
+
+    <span class="detail-label">Subject Type</span>
+    <span class="detail-value">{{ plandef.subject_type or '—' }}</span>
+
+    <span class="detail-label">Publisher</span>
+    <span class="detail-value">{{ plandef.publisher or '—' }}</span>
+
+    <span class="detail-label">Author</span>
+    <span class="detail-value">{{ plandef.author or '—' }}</span>
+
+    <span class="detail-label">Created</span>
+    <span class="detail-value">{{ plandef.date_created.strftime('%Y-%m-%d %H:%M') if plandef.date_created else '—' }}</span>
+  </div>
+
+  {% if plandef.description %}
+  <div class="section-divider">
+    <span class="detail-label">Description</span>
+    <p class="mt-1">{{ plandef.description }}</p>
+  </div>
+  {% endif %}
+
+  {% if plandef.purpose %}
+  <div class="section-divider">
+    <span class="detail-label">Purpose</span>
+    <p class="mt-1">{{ plandef.purpose }}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

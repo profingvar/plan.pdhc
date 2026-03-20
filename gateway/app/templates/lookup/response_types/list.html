@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Response Types — PDHC PlanDef Builder{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Response Types</h1>
+  <a href="{{ url_for('lookup_web.create_response_type') }}" class="btn btn-primary"><i data-lucide="plus"></i> New Response Type</a>
+</div>
+<div class="card">
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Display Text</th><th>Author</th><th>Version</th></tr></thead>
+      <tbody>
+        {% for i in items %}
+        <tr>
+          <td><a href="{{ url_for('lookup_web.view_response_type', guid=i.guid) }}">{{ i.response_type_name }}</a></td>
+          <td>{{ i.response_type_display_text or '—' }}</td>
+          <td>{{ i.author or '—' }}</td>
+          <td>{{ i.vers_number }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><p>No response types yet.</p>
+    <a href="{{ url_for('lookup_web.create_response_type') }}" class="btn btn-primary"><i data-lucide="plus"></i> Create First</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

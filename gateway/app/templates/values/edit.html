@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ value.value_name }} — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Edit Value</h1>
+</div>
+
+<div class="card">
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="value_name">Name *</label>
+        <input type="text" id="value_name" name="value_name" class="form-control" value="{{ value.value_name }}" required>
+      </div>
+      <div class="form-group">
+        <label for="value_display_text">Display Text</label>
+        <input type="text" id="value_display_text" name="value_display_text" class="form-control" value="{{ value.value_display_text or '' }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="canonical_refnumber">Reference Number</label>
+        <input type="text" id="canonical_refnumber" name="canonical_refnumber" class="form-control" value="{{ value.canonical_refnumber or '' }}">
+      </div>
+      <div class="form-group">
+        <label for="author">Author</label>
+        <input type="text" id="author" name="author" class="form-control" value="{{ value.author or '' }}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="value_explanation">Explanation</label>
+      <textarea id="value_explanation" name="value_explanation" class="form-control" rows="3">{{ value.value_explanation or '' }}</textarea>
+    </div>
+
+    <div class="button-group">
+      <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Save Changes</button>
+      <a href="{{ url_for('values_web.view_value', guid=value.guid) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

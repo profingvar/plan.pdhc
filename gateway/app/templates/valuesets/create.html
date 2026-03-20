@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}New ValueSet — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>New ValueSet</h1>
+</div>
+
+<div class="card">
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="valueset_name">Name *</label>
+        <input type="text" id="valueset_name" name="valueset_name" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label for="valueset_display_text">Display Text</label>
+        <input type="text" id="valueset_display_text" name="valueset_display_text" class="form-control">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="canonical_lib">Canonical Library *</label>
+      <select id="canonical_lib" name="canonical_lib" class="form-control" required>
+        <option value="">Select...</option>
+        {% for lib in canonical_libs %}
+        <option value="{{ lib.guid }}">{{ lib.canonical_lib_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="canonical_refnumber">Reference Number</label>
+        <input type="text" id="canonical_refnumber" name="canonical_refnumber" class="form-control">
+      </div>
+      <div class="form-group">
+        <label for="author">Author</label>
+        <input type="text" id="author" name="author" class="form-control">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="valueset_explanation">Explanation</label>
+      <textarea id="valueset_explanation" name="valueset_explanation" class="form-control" rows="3"></textarea>
+    </div>
+
+    <div class="button-group">
+      <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i> Create ValueSet</button>
+      <a href="{{ url_for('valuesets_web.list_valuesets') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ item.unit_name }} — PDHC PlanDef Builder{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ item.unit_name }}</h1>
+  <div class="button-group-sm">
+    <a href="{{ url_for('lookup_web.edit_unit', guid=item.guid) }}" class="btn btn-secondary btn-sm"><i data-lucide="pencil"></i> Edit</a>
+    <form method="post" action="{{ url_for('lookup_web.delete_unit', guid=item.guid) }}" onsubmit="return confirm('Delete this unit?')">
+      <button type="submit" class="btn btn-danger btn-sm"><i data-lucide="trash-2"></i> Delete</button>
+    </form>
+    <a href="{{ url_for('lookup_web.list_units') }}" class="btn btn-secondary btn-sm"><i data-lucide="arrow-left"></i> Back</a>
+  </div>
+</div>
+<div class="card">
+  <div class="detail-grid">
+    <span class="detail-label">GUID</span><span class="detail-value monospace">{{ item.guid }}</span>
+    <span class="detail-label">Display Text</span><span class="detail-value">{{ item.unit_display_text or '—' }}</span>
+    <span class="detail-label">Author</span><span class="detail-value">{{ item.author or '—' }}</span>
+    <span class="detail-label">Version</span><span class="detail-value">{{ item.vers_number }}</span>
+    <span class="detail-label">Created</span><span class="detail-value">{{ item.date_created.strftime('%Y-%m-%d %H:%M') if item.date_created else '—' }}</span>
+  </div>
+</div>
+{% endblock %}

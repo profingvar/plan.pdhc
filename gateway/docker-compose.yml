@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16
+    container_name: pdhc_db
+    restart: unless-stopped
+    ports:
+      - "9031:5432"
+    env_file:
+      - .env
+    volumes:
+      - pdhc_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pdhc_app
+    restart: unless-stopped
+    ports:
+      - "9030:9030"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../:/project-docs:ro
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+
+volumes:
+  pdhc_pgdata:

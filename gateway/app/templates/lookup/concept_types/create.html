@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}New Concept Type — PDHC PlanDef Builder{% endblock %}
+{% block content %}
+<div class="page-header"><h1>New Concept Type</h1></div>
+<div class="card">
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="concept_type_name">Name *</label>
+        <input type="text" id="concept_type_name" name="concept_type_name" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label for="concept_type_display_text">Display Text</label>
+        <input type="text" id="concept_type_display_text" name="concept_type_display_text" class="form-control">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="author">Author</label>
+      <input type="text" id="author" name="author" class="form-control">
+    </div>
+    <div class="button-group">
+      <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i> Create</button>
+      <a href="{{ url_for('lookup_web.list_concept_types') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

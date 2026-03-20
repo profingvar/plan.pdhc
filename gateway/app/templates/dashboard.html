@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>PDHC PlanDef Builder</h1>
+</div>
+
+<h2>Core Resources</h2>
+<div class="dash-grid">
+  <a class="dash-card" href="{{ url_for('concepts_web.list_concepts') }}">
+    <i data-lucide="book-open"></i>
+    <div class="count">{{ counts.concepts }}</div>
+    <h2>Concepts</h2>
+    <p>Clinical concepts with terminology bindings, response types, and value ranges.</p>
+  </a>
+
+  <a class="dash-card" href="{{ url_for('values_web.list_values') }}">
+    <i data-lucide="tag"></i>
+    <div class="count">{{ counts.value_count }}</div>
+    <h2>Values</h2>
+    <p>Individual coded values from canonical libraries.</p>
+  </a>
+
+  <a class="dash-card" href="{{ url_for('valuesets_web.list_valuesets') }}">
+    <i data-lucide="layers"></i>
+    <div class="count">{{ counts.valuesets }}</div>
+    <h2>ValueSets</h2>
+    <p>Grouped collections of values with sort ordering.</p>
+  </a>
+
+  <a class="dash-card" href="{{ url_for('plandefinitions_web.list_plandefs') }}">
+    <i data-lucide="clipboard-list"></i>
+    <div class="count">{{ counts.plandefinitions }}</div>
+    <h2>PlanDefinitions</h2>
+    <p>FHIR R5 care plan templates.</p>
+  </a>
+</div>
+
+<h2 class="mt-8">Terminology &amp; Lookup Tables</h2>
+<div class="dash-grid">
+  <a class="dash-card" href="{{ url_for('lookup_web.list_canonical_libs') }}">
+    <i data-lucide="library"></i>
+    <div class="count">{{ counts.canonical_libs }}</div>
+    <h2>Canonical Libraries</h2>
+    <p>SNOMED CT, LOINC, ICD-10 and other code systems.</p>
+  </a>
+
+  <a class="dash-card" href="{{ url_for('lookup_web.list_concept_types') }}">
+    <i data-lucide="shapes"></i>
+    <div class="count">{{ counts.concept_types }}</div>
+    <h2>Concept Types</h2>
+    <p>Classification of concepts (observation, procedure, etc.).</p>
+  </a>
+
+  <a class="dash-card" href="{{ url_for('lookup_web.list_response_types') }}">
+    <i data-lucide="list-checks"></i>
+    <div class="count">{{ counts.response_types }}</div>
+    <h2>Response Types</h2>
+    <p>How concepts are answered (numeric, single choice, text, etc.).</p>
+  </a>
+
+  <a class="dash-card" href="{{ url_for('lookup_web.list_units') }}">
+    <i data-lucide="ruler"></i>
+    <div class="count">{{ counts.units }}</div>
+    <h2>Units</h2>
+    <p>Measurement units (kg, mmHg, mmol/L, etc.).</p>
+  </a>
+</div>
+{% endblock %}

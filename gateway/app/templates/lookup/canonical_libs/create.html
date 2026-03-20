@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}New Canonical Library — PDHC PlanDef Builder{% endblock %}
+{% block content %}
+<div class="page-header"><h1>New Canonical Library</h1></div>
+<div class="card">
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="canonical_lib_name">Name *</label>
+        <input type="text" id="canonical_lib_name" name="canonical_lib_name" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label for="canonical_lib_display_text">Display Text</label>
+        <input type="text" id="canonical_lib_display_text" name="canonical_lib_display_text" class="form-control">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="canonical_lib_url">URL</label>
+      <input type="url" id="canonical_lib_url" name="canonical_lib_url" class="form-control" placeholder="http://snomed.info/sct">
+    </div>
+    <div class="form-group">
+      <label for="author">Author</label>
+      <input type="text" id="author" name="author" class="form-control">
+    </div>
+    <div class="button-group">
+      <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i> Create</button>
+      <a href="{{ url_for('lookup_web.list_canonical_libs') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

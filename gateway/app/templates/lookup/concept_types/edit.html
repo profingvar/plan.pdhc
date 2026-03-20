@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ item.concept_type_name }} — PDHC PlanDef Builder{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Edit Concept Type</h1></div>
+<div class="card">
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="concept_type_name">Name *</label>
+        <input type="text" id="concept_type_name" name="concept_type_name" class="form-control" value="{{ item.concept_type_name }}" required>
+      </div>
+      <div class="form-group">
+        <label for="concept_type_display_text">Display Text</label>
+        <input type="text" id="concept_type_display_text" name="concept_type_display_text" class="form-control" value="{{ item.concept_type_display_text or '' }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="author">Author</label>
+      <input type="text" id="author" name="author" class="form-control" value="{{ item.author or '' }}">
+    </div>
+    <div class="button-group">
+      <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Save Changes</button>
+      <a href="{{ url_for('lookup_web.view_concept_type', guid=item.guid) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+# Virtual environment
+venv/
+gateway/venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Secrets
+.env
+gateway/.env
+
+# macOS
+.DS_Store
+
+# Test results
+results/
+
+# Previous prototype (Rule 14)
+_obs_gateway_repo/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# SQLite test databases
+instance/
+gateway/instance/
