@@ -198,8 +198,8 @@ class ValueSet(db.Model):
                                          primaryjoin='ValueSet.canonical_lib == CanonicalLib.guid')
     values = db.relationship('ValueSetValue', backref='valueset_rel', lazy='dynamic')
 
-    def to_dict(self):
-        return {
+    def to_dict(self, include_values=True):
+        d = {
             'guid': self.guid,
             'canonical_lib': self.canonical_lib,
             'canonical_refnumber': self.canonical_refnumber,
@@ -210,6 +210,19 @@ class ValueSet(db.Model):
             'vers_number': self.vers_number,
             'date_created': self.date_created.isoformat() if self.date_created else None,
         }
+        if include_values:
+            links = ValueSetValue.query.filter_by(
+                valueset_guid=self.guid
+            ).order_by(ValueSetValue.sort_order).all()
+            values = []
+            for link in links:
+                val = ValueCatalog.query.filter_by(guid=link.value_guid).first()
+                if val:
+                    v = val.to_dict()
+                    v['sort_order'] = link.sort_order
+                    values.append(v)
+            d['values'] = values
+        return d
 
 
 class ValueSetValue(db.Model):

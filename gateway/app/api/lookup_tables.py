@@ -214,7 +214,7 @@ def list_valuesets():
         page=page, per_page=per_page, error_out=False
     )
     return jsonify({
-        'items': [i.to_dict() for i in pagination.items],
+        'items': [i.to_dict(include_values=False) for i in pagination.items],
         'total': pagination.total,
         'page': pagination.page,
         'per_page': pagination.per_page,
@@ -244,6 +244,24 @@ def create_valueset():
         author=_sanitize(data.get('author')),
     )
     db.session.add(item)
+    db.session.flush()
+
+    # Accept values with sort_order during creation
+    values_list = data.get('values', [])
+    for idx, entry in enumerate(values_list, start=1):
+        value_guid = entry.get('value_guid') if isinstance(entry, dict) else entry
+        if not value_guid or not _is_valid_uuid(value_guid):
+            continue
+        if not ValueCatalog.query.filter_by(guid=value_guid).first():
+            continue
+        sort_order = entry.get('sort_order', idx) if isinstance(entry, dict) else idx
+        link = ValueSetValue(
+            valueset_guid=item.guid,
+            value_guid=value_guid,
+            sort_order=sort_order,
+        )
+        db.session.add(link)
+
     db.session.commit()
     return jsonify(item.to_dict()), 201
 

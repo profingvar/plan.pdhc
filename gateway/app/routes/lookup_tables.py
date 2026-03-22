@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from app.api.auth import sso_login_required
 from app import db
 from app.models.concept_models import (
     CanonicalLib, ConceptType, ResponseType, Unit, PlanDefType, IntendedUse,
@@ -17,7 +17,7 @@ def list_canonical_libs():
 
 
 @lookup_web_bp.route('/canonical-libs/create', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def create_canonical_lib():
     if request.method == 'POST':
         name = request.form.get('canonical_lib_name', '').strip()
@@ -47,7 +47,7 @@ def view_canonical_lib(guid):
 
 
 @lookup_web_bp.route('/canonical-libs/<guid>/edit', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def edit_canonical_lib(guid):
     item = CanonicalLib.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
@@ -63,7 +63,7 @@ def edit_canonical_lib(guid):
 
 
 @lookup_web_bp.route('/canonical-libs/<guid>/delete', methods=['POST'])
-@login_required
+@sso_login_required
 def delete_canonical_lib(guid):
     item = CanonicalLib.query.filter_by(guid=guid).first_or_404()
     db.session.delete(item)
@@ -81,7 +81,7 @@ def list_units():
 
 
 @lookup_web_bp.route('/units/create', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def create_unit():
     if request.method == 'POST':
         name = request.form.get('unit_name', '').strip()
@@ -110,7 +110,7 @@ def view_unit(guid):
 
 
 @lookup_web_bp.route('/units/<guid>/edit', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def edit_unit(guid):
     item = Unit.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
@@ -125,7 +125,7 @@ def edit_unit(guid):
 
 
 @lookup_web_bp.route('/units/<guid>/delete', methods=['POST'])
-@login_required
+@sso_login_required
 def delete_unit(guid):
     item = Unit.query.filter_by(guid=guid).first_or_404()
     db.session.delete(item)
@@ -143,7 +143,7 @@ def list_response_types():
 
 
 @lookup_web_bp.route('/response-types/create', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def create_response_type():
     if request.method == 'POST':
         name = request.form.get('response_type_name', '').strip()
@@ -172,7 +172,7 @@ def view_response_type(guid):
 
 
 @lookup_web_bp.route('/response-types/<guid>/edit', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def edit_response_type(guid):
     item = ResponseType.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
@@ -187,7 +187,7 @@ def edit_response_type(guid):
 
 
 @lookup_web_bp.route('/response-types/<guid>/delete', methods=['POST'])
-@login_required
+@sso_login_required
 def delete_response_type(guid):
     item = ResponseType.query.filter_by(guid=guid).first_or_404()
     db.session.delete(item)
@@ -205,7 +205,7 @@ def list_concept_types():
 
 
 @lookup_web_bp.route('/concept-types/create', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def create_concept_type():
     if request.method == 'POST':
         name = request.form.get('concept_type_name', '').strip()
@@ -234,7 +234,7 @@ def view_concept_type(guid):
 
 
 @lookup_web_bp.route('/concept-types/<guid>/edit', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def edit_concept_type(guid):
     item = ConceptType.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
@@ -249,7 +249,7 @@ def edit_concept_type(guid):
 
 
 @lookup_web_bp.route('/concept-types/<guid>/delete', methods=['POST'])
-@login_required
+@sso_login_required
 def delete_concept_type(guid):
     item = ConceptType.query.filter_by(guid=guid).first_or_404()
     db.session.delete(item)

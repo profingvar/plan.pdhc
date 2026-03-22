@@ -7,7 +7,7 @@
 </div>
 
 <div class="card">
-  <form method="post">
+  <form method="post" id="create-form">
     <div class="form-row">
       <div class="form-group">
         <label for="valueset_name">Name *</label>
@@ -45,10 +45,94 @@
       <textarea id="valueset_explanation" name="valueset_explanation" class="form-control" rows="3"></textarea>
     </div>
 
+    <div class="section-divider">
+      <h2 class="section-heading">Values</h2>
+      <p class="text-muted">Select values and assign order numbers.</p>
+    </div>
+
+    <div class="form-group">
+      <label for="add-value-select">Add value</label>
+      <div class="inline-form">
+        <select id="add-value-select" class="form-control">
+          <option value="">Select a value...</option>
+          {% for v in all_values %}
+          <option value="{{ v.guid }}" data-name="{{ v.value_name }}" data-display="{{ v.value_display_text or '' }}">{{ v.value_name }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" id="btn-add-value" class="btn btn-primary"><i data-lucide="plus"></i> Add</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="values-table">
+        <thead>
+          <tr>
+            <th>Order #</th>
+            <th>Value Name</th>
+            <th>Display Text</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="values-body">
+        </tbody>
+      </table>
+    </div>
+
     <div class="button-group">
       <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i> Create ValueSet</button>
       <a href="{{ url_for('valuesets_web.list_valuesets') }}" class="btn btn-secondary">Cancel</a>
     </div>
   </form>
 </div>
+
+<script>
+(function() {
+  var tbody = document.getElementById('values-body');
+  var select = document.getElementById('add-value-select');
+  var btnAdd = document.getElementById('btn-add-value');
+  var counter = 0;
+
+  function renumber() {
+    var rows = tbody.querySelectorAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+      var inp = rows[i].querySelector('input[type="number"]');
+      if (inp && !inp.dataset.edited) inp.value = i + 1;
+    }
+  }
+
+  btnAdd.addEventListener('click', function() {
+    var opt = select.options[select.selectedIndex];
+    if (!opt || !opt.value) return;
+    var guid = opt.value;
+
+    // prevent duplicates
+    if (tbody.querySelector('input[data-guid="' + guid + '"]')) return;
+
+    counter++;
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' +
+        '<input type="hidden" name="value_guids" value="' + guid + '" data-guid="' + guid + '">' +
+        '<input type="number" name="sort_order_' + guid + '" value="' + counter + '" class="form-control" min="1" step="1">' +
+      '</td>' +
+      '<td>' + opt.dataset.name + '</td>' +
+      '<td>' + (opt.dataset.display || '—') + '</td>' +
+      '<td><button type="button" class="btn btn-danger btn-sm btn-remove"><i data-lucide="x"></i></button></td>';
+    tbody.appendChild(tr);
+
+    // re-init lucide icons in new row
+    if (window.lucide) lucide.createIcons();
+
+    select.selectedIndex = 0;
+  });
+
+  tbody.addEventListener('click', function(e) {
+    var btn = e.target.closest('.btn-remove');
+    if (!btn) return;
+    btn.closest('tr').remove();
+    counter = tbody.querySelectorAll('tr').length;
+    renumber();
+  });
+})();
+</script>
 {% endblock %}

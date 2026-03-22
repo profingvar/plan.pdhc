@@ -25,6 +25,16 @@
       <li class="nav-separator"></li>
       <li><a href="{{ url_for('main.docs_page') }}" {% if request.endpoint and 'docs' in request.endpoint %}class="active"{% endif %}>Docs</a></li>
     </ul>
+    <div class="nav-auth">
+      {% if session.get('sso_user') %}
+        <span class="nav-user">{{ session['sso_user'].get('email', session['sso_user'].get('user_guid', '')[:8]) }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="nav-btn nav-btn-logout">Logout</a>
+      {% elif config.get('AUTH_DISABLED') %}
+        <span class="nav-user">local-admin</span>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}" class="nav-btn nav-btn-login">Login</a>
+      {% endif %}
+    </div>
   </nav>
 
   <div class="container-wide">

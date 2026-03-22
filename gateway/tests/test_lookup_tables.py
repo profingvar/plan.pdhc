@@ -1,17 +1,17 @@
 import pytest
-from tests.conftest import get_auth_header
+from tests.conftest import set_sso_session, SAMPLE_ACCESS_BLOB
 
 
 class TestCanonicalLibs:
     def test_crud_cycle(self, client):
-        headers = get_auth_header(client)
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)
 
         # Create
         resp = client.post('/api/v1/canonical-libs', json={
             'canonical_lib_name': 'SNOMED CT',
             'canonical_lib_display_text': 'SNOMED Clinical Terms',
             'canonical_lib_url': 'http://snomed.info/sct',
-        }, headers=headers)
+        })
         assert resp.status_code == 201
         guid = resp.get_json()['guid']
 
@@ -28,12 +28,12 @@ class TestCanonicalLibs:
         # Update
         resp = client.put(f'/api/v1/canonical-libs/{guid}', json={
             'canonical_lib_display_text': 'Updated display',
-        }, headers=headers)
+        })
         assert resp.status_code == 200
         assert resp.get_json()['vers_number'] == 2
 
         # Delete
-        resp = client.delete(f'/api/v1/canonical-libs/{guid}', headers=headers)
+        resp = client.delete(f'/api/v1/canonical-libs/{guid}')
         assert resp.status_code == 200
 
         # Verify gone
@@ -41,13 +41,13 @@ class TestCanonicalLibs:
         assert resp.status_code == 404
 
     def test_duplicate_name(self, client):
-        headers = get_auth_header(client)
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)
         client.post('/api/v1/canonical-libs', json={
             'canonical_lib_name': 'LOINC',
-        }, headers=headers)
+        })
         resp = client.post('/api/v1/canonical-libs', json={
             'canonical_lib_name': 'LOINC',
-        }, headers=headers)
+        })
         assert resp.status_code == 409
 
     def test_invalid_uuid(self, client):
@@ -63,41 +63,41 @@ class TestCanonicalLibs:
 
 class TestConceptTypes:
     def test_crud_cycle(self, client):
-        headers = get_auth_header(client)
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)
         resp = client.post('/api/v1/concept-types', json={
             'concept_type_name': 'observation',
-        }, headers=headers)
+        })
         assert resp.status_code == 201
         guid = resp.get_json()['guid']
 
         resp = client.get(f'/api/v1/concept-types/{guid}')
         assert resp.status_code == 200
 
-        resp = client.delete(f'/api/v1/concept-types/{guid}', headers=headers)
+        resp = client.delete(f'/api/v1/concept-types/{guid}')
         assert resp.status_code == 200
 
 
 class TestResponseTypes:
     def test_crud_cycle(self, client):
-        headers = get_auth_header(client)
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)
         resp = client.post('/api/v1/response-types', json={
             'response_type_name': 'quantity',
-        }, headers=headers)
+        })
         assert resp.status_code == 201
         guid = resp.get_json()['guid']
 
-        resp = client.delete(f'/api/v1/response-types/{guid}', headers=headers)
+        resp = client.delete(f'/api/v1/response-types/{guid}')
         assert resp.status_code == 200
 
 
 class TestUnits:
     def test_crud_cycle(self, client):
-        headers = get_auth_header(client)
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)
         resp = client.post('/api/v1/units', json={
             'unit_name': 'mmHg',
-        }, headers=headers)
+        })
         assert resp.status_code == 201
         guid = resp.get_json()['guid']
 
-        resp = client.delete(f'/api/v1/units/{guid}', headers=headers)
+        resp = client.delete(f'/api/v1/units/{guid}')
         assert resp.status_code == 200

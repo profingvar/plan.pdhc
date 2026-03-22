@@ -1,6 +1,6 @@
 import json
 import pytest
-from tests.conftest import get_auth_header
+from tests.conftest import set_sso_session, SAMPLE_ACCESS_BLOB
 
 
 class TestFHIRPlanDefinitionAPI:

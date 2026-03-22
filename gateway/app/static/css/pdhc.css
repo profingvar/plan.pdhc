@@ -58,6 +58,21 @@ nav {
 .nav-links a:hover { background: rgba(255,255,255,0.15); text-decoration: none; }
 .nav-links a.active { background: rgba(255,255,255,0.2); }
 .nav-separator { width: 1px; height: 1rem; background: rgba(255,255,255,0.3); }
+.nav-auth { display: flex; align-items: center; gap: 0.6rem; margin-left: auto; flex-shrink: 0; }
+.nav-user { color: rgba(255,255,255,0.8); font-size: 0.85em; }
+.nav-btn {
+  display: inline-block;
+  padding: 0.3rem 0.9rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+}
+.nav-btn-login { background: white; color: var(--primary); }
+.nav-btn-login:hover { background: rgba(255,255,255,0.85); color: var(--primary-dark); text-decoration: none; }
+.nav-btn-logout { background: rgba(255,255,255,0.15); color: white; }
+.nav-btn-logout:hover { background: rgba(255,255,255,0.25); text-decoration: none; }
 
 /* Layout */
 .container { max-width: 960px; margin: 0 auto; padding: 1.25rem 1.25rem 2.5rem; }

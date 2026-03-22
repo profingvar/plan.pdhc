@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from app.api.auth import sso_login_required
 from app import db
 from app.models.concept_models import ValueSet, ValueSetValue, ValueCatalog, CanonicalLib
 from app.services.name_uniqueness import NameUniquenessService
@@ -17,7 +17,7 @@ def list_valuesets():
 
 
 @valuesets_web_bp.route('/create', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def create_valueset():
     if request.method == 'POST':
         name = request.form.get('valueset_name', '').strip()
@@ -46,12 +46,29 @@ def create_valueset():
             author=request.form.get('author'),
         )
         db.session.add(vs)
+        db.session.flush()
+
+        # Add selected values with sort orders
+        value_guids = request.form.getlist('value_guids')
+        for idx, vg in enumerate(value_guids, start=1):
+            if not vg:
+                continue
+            order = request.form.get(f'sort_order_{vg}', type=int) or idx
+            link = ValueSetValue(
+                valueset_guid=vs.guid,
+                value_guid=vg,
+                sort_order=order,
+            )
+            db.session.add(link)
+
         db.session.commit()
         flash('ValueSet created.', 'success')
-        return redirect(url_for('valuesets_web.list_valuesets'))
+        return redirect(url_for('valuesets_web.view_valueset', guid=vs.guid))
 
+    all_values = ValueCatalog.query.order_by(ValueCatalog.value_name).all()
     return render_template('valuesets/create.html',
-                           canonical_libs=CanonicalLib.query.all())
+                           canonical_libs=CanonicalLib.query.all(),
+                           all_values=all_values)
 
 
 @valuesets_web_bp.route('/<guid>')
@@ -71,7 +88,7 @@ def view_valueset(guid):
 
 
 @valuesets_web_bp.route('/<guid>/edit', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def edit_valueset(guid):
     vs = ValueSet.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
@@ -89,7 +106,7 @@ def edit_valueset(guid):
 
 
 @valuesets_web_bp.route('/<guid>/delete', methods=['POST'])
-@login_required
+@sso_login_required
 def delete_valueset(guid):
     vs = ValueSet.query.filter_by(guid=guid).first_or_404()
     ValueSetValue.query.filter_by(valueset_guid=guid).delete()
@@ -100,7 +117,7 @@ def delete_valueset(guid):
 
 
 @valuesets_web_bp.route('/<guid>/add-value', methods=['POST'])
-@login_required
+@sso_login_required
 def add_value_to_set(guid):
     vs = ValueSet.query.filter_by(guid=guid).first_or_404()
     value_guid = request.form.get('value_guid')
@@ -131,7 +148,7 @@ def add_value_to_set(guid):
 
 
 @valuesets_web_bp.route('/<guid>/update-sort', methods=['POST'])
-@login_required
+@sso_login_required
 def update_sort_order(guid):
     ValueSet.query.filter_by(guid=guid).first_or_404()
     members = ValueSetValue.query.filter_by(valueset_guid=guid).all()
@@ -145,7 +162,7 @@ def update_sort_order(guid):
 
 
 @valuesets_web_bp.route('/<guid>/remove-value/<value_guid>', methods=['POST'])
-@login_required
+@sso_login_required
 def remove_value_from_set(guid, value_guid):
     ValueSetValue.query.filter_by(
         valueset_guid=guid, value_guid=value_guid

@@ -21,6 +21,8 @@ DOCS_CATALOG = {
     'pdhc_markdown_layout_standard.md': 'Markdown formatting standard',
     'changed_files.md': 'Registry of all created and edited files',
     'nginx_implement_server19March.md': 'Nginx reverse proxy deployment template',
+    'sso_technical_manual.md': 'SSO integration — technical architecture, handshake flow, configuration',
+    'sso_user_guide.md': 'SSO login — user guide for logging in and permissions',
 }
 
 

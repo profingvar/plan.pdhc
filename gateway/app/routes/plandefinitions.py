@@ -2,7 +2,7 @@ import json
 import re
 from datetime import date, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required
+from app.api.auth import sso_login_required
 from app import db
 from app.models.fhir_models import PlanDefinition
 from app.models.activity_models import (
@@ -53,7 +53,7 @@ def _build_existing_data(plandef):
 
 
 @plandef_web_bp.route('/builder')
-@login_required
+@sso_login_required
 def builder():
     plandef_id = request.args.get('plandef_id')
     plandef = None
@@ -82,7 +82,7 @@ def builder():
 
 
 @plandef_web_bp.route('/create', methods=['POST'])
-@login_required
+@sso_login_required
 def create_plandef():
     title = request.form.get('title', '').strip()
     if not title:
@@ -227,7 +227,7 @@ def view_plandef(fhir_id):
 
 
 @plandef_web_bp.route('/<fhir_id>/edit', methods=['POST'])
-@login_required
+@sso_login_required
 def edit_plandef(fhir_id):
     plandef = PlanDefinition.query.filter_by(fhir_id=fhir_id).first_or_404()
 
@@ -342,7 +342,7 @@ def edit_plandef(fhir_id):
 
 
 @plandef_web_bp.route('/<fhir_id>/delete', methods=['POST'])
-@login_required
+@sso_login_required
 def delete_plandef(fhir_id):
     plandef = PlanDefinition.query.filter_by(fhir_id=fhir_id).first_or_404()
 

@@ -16,6 +16,10 @@ def app():
     os.environ['BOOTSTRAP_SU_USERNAME'] = 'admin'
     os.environ['BOOTSTRAP_SU_PASSWORD'] = 'admin123'
     os.environ['AUTH_DISABLED'] = 'false'  # Tests validate auth behavior
+    os.environ['SSO_BASE_URL'] = 'http://sso-test:9000'
+    os.environ['SSO_CLIENT_ID'] = 'test-client-id'
+    os.environ['SSO_CLIENT_SECRET'] = 'test-client-secret'
+    os.environ['SSO_CALLBACK_URL'] = 'http://localhost:9030/api/v1/auth/callback'
 
     application = create_app(testing=True)
     application.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
@@ -54,12 +58,61 @@ def db_session(app):
         _db.session.rollback()
 
 
-def get_auth_header(client):
-    """Helper: login as bootstrap admin and return auth header."""
-    resp = client.post('/api/v1/auth/login', json={
-        'username': 'admin',
-        'password': 'admin123',
-    })
-    data = resp.get_json()
-    token = data['access_token']
-    return {'Authorization': f'Bearer {token}'}
+# Sample SSO access blob for testing
+SAMPLE_ACCESS_BLOB = {
+    'user_guid': 'test-guid-1234',
+    'email': 'doctor@hospital.se',
+    'user_type': 'professional',
+    'is_su_admin': False,
+    'professional_guid': 'prof-guid-5678',
+    'professional_role': 'doctor',
+    'fhir_resource_type': 'Practitioner',
+    'organization_ids': ['org-guid-0001'],
+    'groups': [{
+        'group_guid': 'grp-guid-0001',
+        'group_name': 'Planning Team',
+        'group_type': 'planning',
+        'status': 'approved',
+        'is_admin': False,
+    }],
+    'effective_phases': ['planning'],
+}
+
+SAMPLE_SU_BLOB = {
+    'user_guid': 'su-guid-0001',
+    'email': 'admin@pdhc.se',
+    'user_type': 'professional',
+    'is_su_admin': True,
+    'professional_guid': 'prof-guid-su',
+    'professional_role': 'doctor',
+    'fhir_resource_type': 'Practitioner',
+    'organization_ids': [],
+    'groups': [],
+    'effective_phases': [],
+}
+
+SAMPLE_READONLY_BLOB = {
+    'user_guid': 'ro-guid-0001',
+    'email': 'viewer@hospital.se',
+    'user_type': 'professional',
+    'is_su_admin': False,
+    'professional_guid': 'prof-guid-ro',
+    'professional_role': 'nurse',
+    'fhir_resource_type': 'Practitioner',
+    'organization_ids': ['org-guid-0001'],
+    'groups': [{
+        'group_guid': 'grp-guid-0002',
+        'group_name': 'Analysis Team',
+        'group_type': 'analysis',
+        'status': 'approved',
+        'is_admin': False,
+    }],
+    'effective_phases': ['analysis'],  # No 'planning' phase
+}
+
+
+def set_sso_session(client, blob):
+    """Helper: set SSO access blob in the test client session."""
+    with client.session_transaction() as sess:
+        sess['sso_user'] = blob
+        sess['sso_token'] = 'mock-jwt-token'

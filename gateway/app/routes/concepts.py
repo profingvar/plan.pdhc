@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from app.api.auth import sso_login_required
 from app import db
 from app.models.concept_models import (
     Concept, CanonicalLib, ConceptType, ResponseType, Unit, ValueSet,
@@ -19,7 +19,7 @@ def list_concepts():
 
 
 @concepts_web_bp.route('/create', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def create_concept():
     if request.method == 'POST':
         name = request.form.get('concept_name', '').strip()

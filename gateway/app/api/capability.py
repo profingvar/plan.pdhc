@@ -114,6 +114,9 @@ ENDPOINTS = [
     # Documentation
     _endpoint('GET', '/docs', False, 'List all available documentation files'),
     _endpoint('GET', '/docs/<filename>', False, 'Download a documentation file'),
+
+    # FHIR Capability
+    _endpoint('GET', '/metadata', False, 'FHIR R5 CapabilityStatement resource'),
 ]
 
 
@@ -121,7 +124,6 @@ ENDPOINTS = [
 def capability_statement():
     resources = {}
     for ep in ENDPOINTS:
-        # Group by resource (first path segment after /api/v1/)
         path = ep['path'].replace(BASE + '/', '')
         resource = path.split('/')[0]
         if resource not in resources:
@@ -138,10 +140,11 @@ def capability_statement():
         'fhir_version': 'R5',
         'format': ['json'],
         'authentication': {
-            'type': 'JWT Bearer',
+            'type': 'SSO (sso.pdhc.se)',
             'login': f'{BASE}/auth/login',
-            'refresh': f'{BASE}/auth/refresh',
-            'note': 'Read endpoints are public. Write endpoints require JWT with read_write or admin role.',
+            'callback': f'{BASE}/auth/callback',
+            'note': 'Authentication delegated to sso.pdhc.se via SSO handshake. '
+                    'Read endpoints are public. Write endpoints require "planning" phase access.',
         },
         'rate_limiting': {
             'default': '200 requests/minute per IP',
@@ -149,13 +152,193 @@ def capability_statement():
             'headers': ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
         },
         'roles': {
-            'read_only': 'Can read all resources',
-            'read_write': 'Can read and write all resources',
-            'admin': 'Full access including user management',
+            'read_only': 'Any authenticated SSO user — can read all resources',
+            'read_write': 'Professional with "planning" phase — can read and write all resources',
+            'admin': 'SSO SU admin — full access',
         },
         'resources': resources,
         'total_endpoints': len(ENDPOINTS),
     }), 200
+
+
+@capability_bp.route('/metadata', methods=['GET'])
+def fhir_capability_statement():
+    """FHIR R5-conformant CapabilityStatement resource."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    return jsonify({
+        'resourceType': 'CapabilityStatement',
+        'id': 'pdhc-plandef-builder',
+        'url': 'https://plan.pdhc.se/api/v1/metadata',
+        'version': API_VERSION,
+        'name': 'PDHCPlanDefBuilderCapabilityStatement',
+        'title': 'PDHC PlanDef Builder — FHIR Capability Statement',
+        'status': 'active',
+        'experimental': False,
+        'date': now,
+        'publisher': 'PDHC',
+        'contact': [{
+            'name': 'PDHC Development',
+        }],
+        'description': (
+            'FHIR R5 capability statement for the PDHC PlanDefinition Builder. '
+            'This server manages clinical concepts, values, valuesets, and '
+            'FHIR R5 PlanDefinition resources for care plan authoring.'
+        ),
+        'kind': 'instance',
+        'software': {
+            'name': 'PDHC PlanDef Builder',
+            'version': API_VERSION,
+        },
+        'implementation': {
+            'description': 'PDHC PlanDef Builder production instance',
+            'url': 'https://plan.pdhc.se',
+        },
+        'fhirVersion': '5.0.0',
+        'format': ['json'],
+        'rest': [{
+            'mode': 'server',
+            'documentation': (
+                'RESTful FHIR R5 server with PlanDefinition read/search support. '
+                'Full CRUD is available via the /api/v1/plandefinitions endpoints. '
+                'Authentication uses JWT Bearer tokens. Read endpoints are public. '
+                'Write endpoints require read_write or admin role. '
+                'Rate limit: 200 requests/minute per IP.'
+            ),
+            'security': {
+                'cors': True,
+                'service': [{
+                    'coding': [{
+                        'system': 'http://terminology.hl7.org/CodeSystem/restful-security-service',
+                        'code': 'OAuth',
+                        'display': 'OAuth',
+                    }],
+                    'text': 'SSO via sso.pdhc.se — JWT Bearer token',
+                }],
+                'description': (
+                    'Authentication delegated to sso.pdhc.se via SSO handshake (H1-H4). '
+                    'Users are redirected to sso.pdhc.se/login and receive a JWT on callback. '
+                    'Authorization uses SSO access blob: "planning" phase required for writes. '
+                    'Read operations are public.'
+                ),
+            },
+            'resource': [
+                {
+                    'type': 'PlanDefinition',
+                    'profile': 'http://hl7.org/fhir/StructureDefinition/PlanDefinition',
+                    'documentation': (
+                        'FHIR R5 PlanDefinition resources. Created and edited via the '
+                        'builder UI or CRUD API. Exposed as read-only FHIR resources '
+                        'with searchset Bundle support.'
+                    ),
+                    'interaction': [
+                        {
+                            'code': 'read',
+                            'documentation': 'GET /api/v1/PlanDefinition/{fhir_id}',
+                        },
+                        {
+                            'code': 'search-type',
+                            'documentation': 'GET /api/v1/PlanDefinition',
+                        },
+                    ],
+                    'versioning': 'versioned',
+                    'readHistory': False,
+                    'updateCreate': False,
+                    'searchParam': [
+                        {
+                            'name': 'status',
+                            'type': 'token',
+                            'documentation': 'Filter by status (draft | active | retired)',
+                        },
+                        {
+                            'name': 'title',
+                            'type': 'string',
+                            'documentation': 'Search by title (case-insensitive, contains)',
+                        },
+                        {
+                            'name': '_count',
+                            'type': 'number',
+                            'documentation': 'Number of results per page (default 20)',
+                        },
+                        {
+                            'name': '_offset',
+                            'type': 'number',
+                            'documentation': 'Starting offset for pagination',
+                        },
+                    ],
+                    'operation': [
+                        {
+                            'name': 'expand',
+                            'definition': 'https://plan.pdhc.se/api/v1/PlanDefinition/{fhir_id}/$expand',
+                            'documentation': 'Force regeneration of FHIR JSON from current relational data.',
+                        },
+                    ],
+                },
+                {
+                    'type': 'ValueSet',
+                    'profile': 'http://hl7.org/fhir/StructureDefinition/ValueSet',
+                    'documentation': (
+                        'ValueSets are managed via /api/v1/valuesets (custom CRUD, not FHIR format). '
+                        'Each ValueSet contains ordered Values from the values catalog.'
+                    ),
+                    'interaction': [
+                        {
+                            'code': 'read',
+                            'documentation': 'GET /api/v1/valuesets/{guid}',
+                        },
+                        {
+                            'code': 'search-type',
+                            'documentation': 'GET /api/v1/valuesets',
+                        },
+                        {
+                            'code': 'create',
+                            'documentation': 'POST /api/v1/valuesets (requires auth)',
+                        },
+                        {
+                            'code': 'update',
+                            'documentation': 'PUT /api/v1/valuesets/{guid} (requires auth)',
+                        },
+                        {
+                            'code': 'delete',
+                            'documentation': 'DELETE /api/v1/valuesets/{guid} (requires auth)',
+                        },
+                    ],
+                },
+                {
+                    'type': 'CodeSystem',
+                    'profile': 'http://hl7.org/fhir/StructureDefinition/CodeSystem',
+                    'documentation': (
+                        'Canonical libraries (terminology authorities like SNOMED CT, LOINC, ICD-10) '
+                        'are managed via /api/v1/canonical-libs. Concepts reference these as their '
+                        'code system binding.'
+                    ),
+                    'interaction': [
+                        {
+                            'code': 'read',
+                            'documentation': 'GET /api/v1/canonical-libs/{guid}',
+                        },
+                        {
+                            'code': 'search-type',
+                            'documentation': 'GET /api/v1/canonical-libs',
+                        },
+                        {
+                            'code': 'create',
+                            'documentation': 'POST /api/v1/canonical-libs (requires auth)',
+                        },
+                        {
+                            'code': 'update',
+                            'documentation': 'PUT /api/v1/canonical-libs/{guid} (requires auth)',
+                        },
+                        {
+                            'code': 'delete',
+                            'documentation': 'DELETE /api/v1/canonical-libs/{guid} (requires auth)',
+                        },
+                    ],
+                },
+            ],
+        }],
+    }), 200, {'Content-Type': 'application/fhir+json'}
 
 
 @capability_bp.route('/endpoints', methods=['GET'])

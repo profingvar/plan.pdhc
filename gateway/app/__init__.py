@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -30,8 +31,15 @@ def create_app(testing=False):
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
-    jwt.init_app(app)
     limiter.init_app(app)
+
+    # Flask-JWT-Extended only needed when AUTH_DISABLED (local dev uses local JWT).
+    # In production, SSO issues tokens — we validate via /api/auth/me/service.
+    if app.config.get('AUTH_DISABLED'):
+        jwt.init_app(app)
+
+    # Session config for SSO token storage
+    app.permanent_session_lifetime = timedelta(hours=24)
 
     # When auth is disabled (local dev), Flask-Login treats every request
     # as authenticated so @login_required passes through.
@@ -93,6 +101,12 @@ def create_app(testing=False):
 
     from app.routes.plandefinitions import plandef_web_bp
     app.register_blueprint(plandef_web_bp)
+
+    # Health endpoint (required by SSO service registry)
+    @app.route('/api/health')
+    def health():
+        from flask import jsonify
+        return jsonify({'status': 'ok'}), 200
 
     # Bootstrap superuser on first run
     with app.app_context():

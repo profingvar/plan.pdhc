@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from app.api.auth import sso_login_required
 from app import db
 from app.models.concept_models import ValueCatalog, CanonicalLib
 from app.services.name_uniqueness import NameUniquenessService
@@ -17,7 +17,7 @@ def list_values():
 
 
 @values_web_bp.route('/create', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def create_value():
     if request.method == 'POST':
         name = request.form.get('value_name', '').strip()
@@ -61,7 +61,7 @@ def view_value(guid):
 
 
 @values_web_bp.route('/<guid>/edit', methods=['GET', 'POST'])
-@login_required
+@sso_login_required
 def edit_value(guid):
     value = ValueCatalog.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
@@ -79,7 +79,7 @@ def edit_value(guid):
 
 
 @values_web_bp.route('/<guid>/delete', methods=['POST'])
-@login_required
+@sso_login_required
 def delete_value(guid):
     value = ValueCatalog.query.filter_by(guid=guid).first_or_404()
     db.session.delete(value)
