@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Produce Form — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Produce Form</h1>
+  <a href="{{ url_for('forms_web.list_forms') }}" class="btn btn-secondary btn-sm"><i data-lucide="arrow-left"></i> Back to list</a>
+</div>
+
+<div class="card">
+  <form method="post" id="produce-form">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="title">Form Title *</label>
+        <input type="text" id="title" name="title" class="form-control" required
+               placeholder="e.g. Blood Pressure Monitoring">
+      </div>
+      <div class="form-group">
+        <label for="status">Initial Status</label>
+        <select id="status" name="status" class="form-control">
+          <option value="draft" selected>Draft</option>
+          <option value="active">Active</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" class="form-control" rows="2"
+                placeholder="Optional description of this form"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Source *</label>
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <button type="button" class="btn btn-primary btn-sm source-tab active" data-target="concepts-source">
+          <i data-lucide="book-open"></i> Pick Concepts
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm source-tab" data-target="plandef-source">
+          <i data-lucide="clipboard-list"></i> From PlanDefinition
+        </button>
+      </div>
+    </div>
+
+    <!-- Concepts picker -->
+    <div id="concepts-source" class="source-panel">
+      <div class="form-group">
+        <label>Filter concepts</label>
+        <input type="text" id="concept-search" class="form-control" placeholder="Type to filter by name...">
+      </div>
+      <div class="card" style="max-height: 300px; overflow-y: auto; padding: 0.5rem;">
+        <table style="margin: 0;">
+          <thead>
+            <tr>
+              <th style="width: 2rem;"></th>
+              <th>Concept Name</th>
+              <th>Response Type</th>
+              <th>Code</th>
+            </tr>
+          </thead>
+          <tbody id="concept-list">
+            {% for c in concepts %}
+            <tr class="concept-row">
+              <td><input type="checkbox" name="concept_guids" value="{{ c.guid }}"></td>
+              <td>{{ c.concept_name }}</td>
+              <td>{{ c.response_type_rel.response_type_name if c.response_type_rel else '—' }}</td>
+              <td><code>{{ c.canonical_refnumber or '—' }}</code></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top: 0.3rem; color: var(--text-muted); font-size: 0.9em;">
+        <span id="selected-count">0</span> concepts selected
+      </p>
+    </div>
+
+    <!-- PlanDefinition picker -->
+    <div id="plandef-source" class="source-panel" style="display: none;">
+      <div class="form-group">
+        <label for="plandefinition_guid">Select PlanDefinition</label>
+        <select id="plandefinition_guid" name="plandefinition_guid" class="form-control">
+          <option value="">— Select a PlanDefinition —</option>
+          {% for pd in plandefinitions %}
+          <option value="{{ pd.guid }}">{{ pd.title }} ({{ pd.status }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.9em;">
+        All concepts referenced by the selected PlanDefinition will be resolved automatically.
+        Title and description will be inherited from the PlanDefinition unless overridden above.
+      </p>
+    </div>
+
+    <input type="hidden" id="source_type" name="source_type" value="concept_guids">
+
+    <div class="button-group" style="margin-top: 1rem;">
+      <button type="submit" class="btn btn-primary"><i data-lucide="file-plus"></i> Produce Form</button>
+      <a href="{{ url_for('forms_web.list_forms') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Source tab switching
+  document.querySelectorAll('.source-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.source-tab').forEach(b => {
+        b.classList.remove('active');
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-secondary');
+      });
+      btn.classList.add('active');
+      btn.classList.remove('btn-secondary');
+      btn.classList.add('btn-primary');
+
+      document.querySelectorAll('.source-panel').forEach(p => p.style.display = 'none');
+      document.getElementById(btn.dataset.target).style.display = 'block';
+
+      const st = document.getElementById('source_type');
+      st.value = btn.dataset.target === 'plandef-source' ? 'plandefinition' : 'concept_guids';
+    });
+  });
+
+  // Concept search filter
+  document.getElementById('concept-search').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.concept-row').forEach(row => {
+      const name = row.children[1].textContent.toLowerCase();
+      row.style.display = name.includes(q) ? '' : 'none';
+    });
+  });
+
+  // Selected count
+  document.querySelectorAll('input[name="concept_guids"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const count = document.querySelectorAll('input[name="concept_guids"]:checked').length;
+      document.getElementById('selected-count').textContent = count;
+    });
+  });
+
+  // Form validation
+  document.getElementById('produce-form').addEventListener('submit', function(e) {
+    const sourceType = document.getElementById('source_type').value;
+    if (sourceType === 'concept_guids') {
+      const checked = document.querySelectorAll('input[name="concept_guids"]:checked');
+      if (checked.length === 0) {
+        e.preventDefault();
+        alert('Select at least one concept.');
+      }
+    } else {
+      const pd = document.getElementById('plandefinition_guid').value;
+      if (!pd) {
+        e.preventDefault();
+        alert('Select a PlanDefinition.');
+      }
+    }
+  });
+
+  lucide.createIcons();
+</script>
+{% endblock %}

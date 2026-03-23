@@ -15,7 +15,23 @@
       {% endif %}
     </p>
   </div>
-  <a href="{{ url_for('forms_web.list_forms') }}" class="btn btn-secondary btn-sm">Back to list</a>
+  <div class="button-group-sm">
+    {% if form.status == 'draft' %}
+    <form method="post" action="{{ url_for('forms_web.publish_form', form_guid=form.form_guid) }}" style="display: inline;">
+      <input type="hidden" name="version" value="{{ form.version }}">
+      <button type="submit" class="btn btn-success btn-sm"><i data-lucide="check"></i> Publish</button>
+    </form>
+    {% endif %}
+    {% if form.status == 'active' %}
+    <form method="post" action="{{ url_for('forms_web.retire_form', form_guid=form.form_guid) }}"
+          onsubmit="return confirm('Retire this form version? It will no longer appear in active listings.')" style="display: inline;">
+      <input type="hidden" name="version" value="{{ form.version }}">
+      <button type="submit" class="btn btn-danger btn-sm"><i data-lucide="archive"></i> Retire</button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('forms_web.produce_form') }}" class="btn btn-primary btn-sm"><i data-lucide="file-plus"></i> New Form</a>
+    <a href="{{ url_for('forms_web.list_forms') }}" class="btn btn-secondary btn-sm"><i data-lucide="arrow-left"></i> Back</a>
+  </div>
 </div>
 
 <div class="grid-2">
