@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ form.title }} — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ form.title }}</h1>
+    <p class="lead">v{{ form.version }} &middot;
+      {% if form.status == 'active' %}
+        <span class="badge badge-success">Active</span>
+      {% elif form.status == 'draft' %}
+        <span class="badge badge-warning">Draft</span>
+      {% else %}
+        <span class="badge badge-danger">Retired</span>
+      {% endif %}
+    </p>
+  </div>
+  <a href="{{ url_for('forms_web.list_forms') }}" class="btn btn-secondary btn-sm">Back to list</a>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Details</h2>
+    <div class="detail-grid">
+      <span class="detail-label">Form GUID</span>
+      <span class="detail-value"><code>{{ form.form_guid }}</code></span>
+      <span class="detail-label">Version</span>
+      <span class="detail-value">{{ form.version }}</span>
+      <span class="detail-label">Status</span>
+      <span class="detail-value">{{ form.status }}</span>
+      <span class="detail-label">Description</span>
+      <span class="detail-value">{{ form.description or '—' }}</span>
+      <span class="detail-label">Fingerprint</span>
+      <span class="detail-value"><code>{{ (form.content_fingerprint or '—')[:16] }}...</code></span>
+      <span class="detail-label">Created</span>
+      <span class="detail-value">{{ form.created_at.strftime('%Y-%m-%d %H:%M UTC') if form.created_at else '—' }}</span>
+      <span class="detail-label">Updated</span>
+      <span class="detail-value">{{ form.updated_at.strftime('%Y-%m-%d %H:%M UTC') if form.updated_at else '—' }}</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Version History</h2>
+    {% if all_versions %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Status</th>
+            <th>Responses</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in all_versions %}
+          <tr{% if v.version == form.version %} style="background: var(--code-bg);"{% endif %}>
+            <td>
+              {% if v.version == form.version %}
+                <strong>v{{ v.version }}</strong>
+              {% else %}
+                <a href="{{ url_for('forms_web.form_detail', form_guid=form.form_guid, version=v.version) }}">v{{ v.version }}</a>
+              {% endif %}
+            </td>
+            <td>
+              {% if v.status == 'active' %}<span class="badge badge-success">Active</span>
+              {% elif v.status == 'draft' %}<span class="badge badge-warning">Draft</span>
+              {% else %}<span class="badge badge-danger">Retired</span>{% endif %}
+            </td>
+            <td>{{ response_counts.get(v.version, 0) }}</td>
+            <td>{{ v.created_at.strftime('%Y-%m-%d') if v.created_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mt-2">
+  <h2>FHIR JSON Preview</h2>
+  <pre style="background: var(--code-bg); padding: 0.75rem; border-radius: 5px; overflow-x: auto; font-size: 0.9em; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; max-height: 400px;">{{ form.fhir_json | tojson(indent=2) }}</pre>
+</div>
+{% endblock %}

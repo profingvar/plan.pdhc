@@ -29,6 +29,9 @@ class Config:
     SSO_CLIENT_SECRET = os.environ.get('SSO_CLIENT_SECRET', '')
     SSO_CALLBACK_URL = os.environ.get('SSO_CALLBACK_URL', 'http://localhost:9030/callback')
 
+    # Forms builder API key (for external service-to-service access)
+    API_KEY = os.environ.get('API_KEY', '')
+
     # Rate limiting
     RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT', '200 per minute')
     RATELIMIT_STORAGE_URI = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')

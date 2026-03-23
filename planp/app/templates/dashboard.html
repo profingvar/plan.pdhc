@@ -35,6 +35,13 @@
     <h2>PlanDefinitions</h2>
     <p>FHIR R5 care plan templates.</p>
   </a>
+
+  <a class="dash-card" href="{{ url_for('forms_web.list_forms') }}">
+    <i data-lucide="file-text"></i>
+    <div class="count">{{ counts.forms }}</div>
+    <h2>Forms</h2>
+    <p>FHIR Questionnaires produced from concepts. {{ counts.form_responses }} responses.</p>
+  </a>
 </div>
 
 <h2 class="mt-8">Terminology &amp; Lookup Tables</h2>

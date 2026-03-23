@@ -17,6 +17,7 @@
       <li><a href="{{ url_for('values_web.list_values') }}" {% if request.blueprint == 'values_web' %}class="active"{% endif %}>Values</a></li>
       <li><a href="{{ url_for('valuesets_web.list_valuesets') }}" {% if request.blueprint == 'valuesets_web' %}class="active"{% endif %}>ValueSets</a></li>
       <li><a href="{{ url_for('plandefinitions_web.list_plandefs') }}" {% if request.blueprint == 'plandefinitions_web' %}class="active"{% endif %}>PlanDefs</a></li>
+      <li><a href="{{ url_for('forms_web.list_forms') }}" {% if request.blueprint == 'forms_web' %}class="active"{% endif %}>Forms</a></li>
       <li class="nav-separator"></li>
       <li><a href="{{ url_for('lookup_web.list_canonical_libs') }}" {% if 'canonical_lib' in request.endpoint|default('') %}class="active"{% endif %}>Libraries</a></li>
       <li><a href="{{ url_for('lookup_web.list_units') }}" {% if 'unit' in request.endpoint|default('') %}class="active"{% endif %}>Units</a></li>

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Forms — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Form Catalogue</h1>
+    <p class="lead">FHIR Questionnaire definitions</p>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 0.75rem;">
+  <div style="display: flex; gap: 0.5rem;">
+    <a href="{{ url_for('forms_web.list_forms') }}" class="btn {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All</a>
+    <a href="{{ url_for('forms_web.list_forms', status='active') }}" class="btn {% if status_filter == 'active' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Active</a>
+    <a href="{{ url_for('forms_web.list_forms', status='draft') }}" class="btn {% if status_filter == 'draft' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Draft</a>
+    <a href="{{ url_for('forms_web.list_forms', status='retired') }}" class="btn {% if status_filter == 'retired' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Retired</a>
+  </div>
+</div>
+
+{% if forms %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Form GUID</th>
+          <th>Version</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for form in forms %}
+        <tr>
+          <td><a href="{{ url_for('forms_web.form_detail', form_guid=form.form_guid) }}">{{ form.title }}</a></td>
+          <td><code>{{ form.form_guid[:8] }}...</code></td>
+          <td>v{{ form.version }}</td>
+          <td>
+            {% if form.status == 'active' %}
+              <span class="badge badge-success">Active</span>
+            {% elif form.status == 'draft' %}
+              <span class="badge badge-warning">Draft</span>
+            {% else %}
+              <span class="badge badge-danger">Retired</span>
+            {% endif %}
+          </td>
+          <td>{{ form.created_at.strftime('%Y-%m-%d %H:%M') if form.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card empty-state">
+  <p>No forms found.</p>
+</div>
+{% endif %}
+{% endblock %}

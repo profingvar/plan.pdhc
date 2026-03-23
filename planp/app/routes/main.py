@@ -1,11 +1,13 @@
 import os
 from flask import Blueprint, render_template, send_file, abort, jsonify, current_app
+from sqlalchemy import func
 from app import db
 from app.models.concept_models import (
     Concept, ValueCatalog, ValueSet, CanonicalLib,
     ConceptType, ResponseType, Unit,
 )
 from app.models.fhir_models import PlanDefinition
+from app.models.forms_models import Questionnaire, QuestionnaireResponse
 
 main_bp = Blueprint('main', __name__)
 
@@ -79,6 +81,8 @@ def dashboard():
         'concept_types': db.session.query(ConceptType).count(),
         'response_types': db.session.query(ResponseType).count(),
         'units': db.session.query(Unit).count(),
+        'forms': db.session.query(func.count(func.distinct(Questionnaire.form_guid))).scalar() or 0,
+        'form_responses': db.session.query(QuestionnaireResponse).count(),
     }
     return render_template('dashboard.html', counts=counts)
 

@@ -58,7 +58,7 @@ def create_app(testing=False):
                     pass
 
     # Import models so they are registered with SQLAlchemy
-    from app.models import user_models, concept_models, fhir_models, activity_models  # noqa: F401
+    from app.models import user_models, concept_models, fhir_models, activity_models, forms_models  # noqa: F401
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -101,6 +101,12 @@ def create_app(testing=False):
 
     from app.routes.plandefinitions import plandef_web_bp
     app.register_blueprint(plandef_web_bp)
+
+    from app.api.forms import forms_bp
+    app.register_blueprint(forms_bp, url_prefix='/api/v1')
+
+    from app.routes.forms import forms_web_bp
+    app.register_blueprint(forms_web_bp)
 
     # Health endpoint (required by SSO service registry)
     @app.route('/api/health')
