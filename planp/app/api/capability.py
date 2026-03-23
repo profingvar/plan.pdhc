@@ -111,6 +111,14 @@ ENDPOINTS = [
     _endpoint('GET', '/PlanDefinition/<fhir_id>', False, 'FHIR R5 PlanDefinition resource'),
     _endpoint('GET', '/PlanDefinition/<fhir_id>/$expand', False, 'Force regenerate FHIR JSON'),
 
+    # Forms (FHIR Questionnaires)
+    _endpoint('GET', '/forms', 'API key or SSO', 'List form catalogue (paginated)'),
+    _endpoint('GET', '/forms/<form_guid>', 'API key or SSO', 'Get form definition (latest or specific version)'),
+    _endpoint('GET', '/forms/<form_guid>/versions', 'API key or SSO', 'Get version history for a form'),
+    _endpoint('POST', '/forms/produce', True, 'Produce a FHIR Questionnaire from concepts or PlanDefinition'),
+    _endpoint('POST', '/forms/<form_guid>/publish', True, 'Publish a form version (draft → active)'),
+    _endpoint('GET', '/forms/<form_guid>/immutability', True, 'Check latest version immutability status'),
+
     # Documentation
     _endpoint('GET', '/docs', False, 'List all available documentation files'),
     _endpoint('GET', '/docs/<filename>', False, 'Download a documentation file'),
@@ -272,6 +280,41 @@ def fhir_capability_statement():
                             'name': 'expand',
                             'definition': 'https://plan.pdhc.se/api/v1/PlanDefinition/{fhir_id}/$expand',
                             'documentation': 'Force regeneration of FHIR JSON from current relational data.',
+                        },
+                    ],
+                },
+                {
+                    'type': 'Questionnaire',
+                    'profile': 'http://hl7.org/fhir/StructureDefinition/Questionnaire',
+                    'documentation': (
+                        'FHIR R5 Questionnaire resources produced from clinical concepts. '
+                        'Forms are versioned per form_guid with content fingerprinting for idempotency. '
+                        'Managed via /api/v1/forms endpoints. Requires API key or SSO auth for reads, '
+                        'read_write role for produce/publish.'
+                    ),
+                    'interaction': [
+                        {
+                            'code': 'read',
+                            'documentation': 'GET /api/v1/forms/{form_guid}',
+                        },
+                        {
+                            'code': 'search-type',
+                            'documentation': 'GET /api/v1/forms',
+                        },
+                    ],
+                    'versioning': 'versioned',
+                    'readHistory': True,
+                    'updateCreate': False,
+                    'operation': [
+                        {
+                            'name': 'produce',
+                            'definition': 'https://plan.pdhc.se/api/v1/forms/produce',
+                            'documentation': 'Produce a FHIR Questionnaire from concept_guids or a PlanDefinition.',
+                        },
+                        {
+                            'name': 'publish',
+                            'definition': 'https://plan.pdhc.se/api/v1/forms/{form_guid}/publish',
+                            'documentation': 'Transition a form version from draft to active status.',
                         },
                     ],
                 },
