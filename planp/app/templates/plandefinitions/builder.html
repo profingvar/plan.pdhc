@@ -132,8 +132,18 @@
         </div>
 
         <div class="form-group">
-          <label for="validity_duration">Validity Duration (e.g. "30 d", "12 wk", "6 mo")</label>
-          <input type="text" id="validity_duration" name="validity_duration" class="form-control" value="{{ plandef.validity_duration if plandef else '' }}">
+          <label>Validity Duration</label>
+          <div style="display:flex; gap:0.5rem;">
+            <input type="number" id="validity_number" class="form-control" min="1" step="1" style="flex:1;"
+              value="{{ plandef.validity_duration.split()[0] if plandef and plandef.validity_duration else '' }}">
+            <select id="validity_unit" class="form-control" style="flex:1;">
+              <option value="">—</option>
+              <option value="d" {% if plandef and plandef.validity_duration and plandef.validity_duration.endswith('d') %}selected{% endif %}>Days</option>
+              <option value="wk" {% if plandef and plandef.validity_duration and plandef.validity_duration.endswith('wk') %}selected{% endif %}>Weeks</option>
+              <option value="mo" {% if plandef and plandef.validity_duration and plandef.validity_duration.endswith('mo') %}selected{% endif %}>Months</option>
+            </select>
+            <input type="hidden" id="validity_duration" name="validity_duration" value="{{ plandef.validity_duration if plandef else '' }}">
+          </div>
         </div>
       </div>
 
@@ -249,24 +259,30 @@ function addGoal(data) {
     <div class="form-row-3">
       <div class="form-group">
         <label>Target Type</label>
-        <select class="form-control goal-target-type" onchange="updatePreview()">
+        <select class="form-control goal-target-type" onchange="onTargetTypeChange(this); updatePreview()">
           <option value="">None</option>
           <option value="quantity" ${targetType === 'quantity' ? 'selected' : ''}>Quantity</option>
           <option value="range" ${targetType === 'range' ? 'selected' : ''}>Range</option>
           <option value="categorical" ${targetType === 'categorical' ? 'selected' : ''}>Categorical</option>
         </select>
       </div>
-      <div class="form-group">
+      <div class="form-group goal-qty-group" ${targetType === 'categorical' ? 'style="display:none"' : ''}>
         <label>Target Value / Low</label>
         <input type="number" step="any" class="form-control goal-target-qty" value="${data.target_quantity || data.target_range_low || ''}" oninput="updatePreview()">
       </div>
-      <div class="form-group">
+      <div class="form-group goal-cat-group" ${targetType !== 'categorical' ? 'style="display:none"' : ''}>
+        <label>Target Value (from valueset)</label>
+        <select class="form-control goal-cat-value" onchange="updatePreview()">
+          <option value="">Select value...</option>
+        </select>
+      </div>
+      <div class="form-group goal-high-group" ${targetType === 'categorical' ? 'style="display:none"' : ''}>
         <label>Target High / Operator</label>
         <input type="text" class="form-control goal-target-high" value="${data.target_range_high || data.target_operator || ''}" oninput="updatePreview()">
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group">
+      <div class="form-group goal-unit-group" ${targetType === 'categorical' ? 'style="display:none"' : ''}>
         <label>Unit</label>
         ${unitSelect('goal_unit_' + idx, data.target_unit || '')}
       </div>
@@ -277,6 +293,16 @@ function addGoal(data) {
     </div>
   `;
   container.appendChild(div);
+
+  // If categorical, populate valueset values and restore selection
+  if (targetType === 'categorical') {
+    populateCatValues(div);
+    if (data.target_categorical_text) {
+      const catSel = div.querySelector('.goal-cat-value');
+      if (catSel) catSel.value = data.target_categorical_text;
+    }
+  }
+
   lucide.createIcons();
   updatePreview();
 }
@@ -307,7 +333,8 @@ function collectGoals() {
       g.target_range_low = qtyVal ? parseFloat(qtyVal) : null;
       g.target_range_high = highVal ? parseFloat(highVal) : null;
     } else if (targetType === 'categorical') {
-      g.target_categorical_text = catText || null;
+      const catValue = row.querySelector('.goal-cat-value')?.value;
+      g.target_categorical_text = catValue || catText || null;
     }
 
     if (unitSel?.value) g.target_unit = unitSel.value;
@@ -362,15 +389,30 @@ function addAction(data) {
         </select>
       </div>
       <div class="form-group">
-        <label>Frequency</label>
-        <input type="number" class="form-control action-timing-freq" value="${data.timing_frequency || ''}" min="1" oninput="updatePreview()">
+        <label>Duration of activity</label>
+        <div style="display:flex; gap:0.5rem;">
+          <input type="number" min="1" class="form-control action-duration-value" value="${data.duration_value || ''}" oninput="updatePreview()" style="flex:1;">
+          <select class="form-control action-duration-unit" onchange="updatePreview()" style="flex:1;">
+            <option value="">—</option>
+            <option value="min" ${data.duration_unit === 'min' ? 'selected' : ''}>min</option>
+            <option value="h" ${data.duration_unit === 'h' ? 'selected' : ''}>hours</option>
+            <option value="d" ${data.duration_unit === 'd' ? 'selected' : ''}>days</option>
+          </select>
+        </div>
       </div>
       <div class="form-group">
-        <label>Period</label>
+        <label>Repeats per cycle</label>
+        <input type="number" class="form-control action-timing-freq" value="${data.timing_frequency || ''}" min="1" oninput="updatePreview()">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Repeat cycle</label>
         <div style="display:flex; gap:0.5rem;">
-          <input type="number" step="any" class="form-control action-timing-period" value="${data.timing_period || ''}" oninput="updatePreview()" style="flex:1;">
+          <input type="number" step="any" class="form-control action-timing-period" value="${data.timing_period || ''}" min="1" oninput="updatePreview()" style="flex:1;">
           <select class="form-control action-timing-unit" onchange="updatePreview()" style="flex:1;">
             <option value="">—</option>
+            <option value="h" ${data.timing_period_unit === 'h' ? 'selected' : ''}>hours</option>
             <option value="d" ${data.timing_period_unit === 'd' ? 'selected' : ''}>days</option>
             <option value="wk" ${data.timing_period_unit === 'wk' ? 'selected' : ''}>weeks</option>
             <option value="mo" ${data.timing_period_unit === 'mo' ? 'selected' : ''}>months</option>
@@ -435,6 +477,16 @@ function addTransaction(actionRow, actionIdx, data) {
         <input type="number" step="any" class="form-control txn-range-max" value="${data.range_max != null ? data.range_max : ''}" oninput="updatePreview()">
       </div>
     </div>
+    <div class="form-group">
+      <label>Allowed use</label>
+      <div style="display:flex; gap:1rem; flex-wrap:wrap; padding-top:0.3rem;">
+        ${['EMR','QR','LocalQ','StudyA','StudyB'].map(u =>
+          '<label style="display:flex;align-items:center;gap:0.3rem;font-weight:normal;cursor:pointer;">' +
+            '<input type="checkbox" class="txn-use" value="' + u + '" ' + ((data.allowed_use || []).includes(u) ? 'checked' : '') + ' onchange="updatePreview()"> ' + u +
+          '</label>'
+        ).join('')}
+      </div>
+    </div>
   `;
   container.appendChild(div);
   updatePreview();
@@ -449,6 +501,8 @@ function collectActions() {
       description: row.querySelector('.action-desc')?.value || null,
       performer_type: row.querySelector('.action-performer')?.value || null,
       timing_type: row.querySelector('.action-timing-type')?.value || null,
+      duration_value: row.querySelector('.action-duration-value')?.value ? parseInt(row.querySelector('.action-duration-value').value) : null,
+      duration_unit: row.querySelector('.action-duration-unit')?.value || null,
       timing_frequency: row.querySelector('.action-timing-freq')?.value ? parseInt(row.querySelector('.action-timing-freq').value) : null,
       timing_period: row.querySelector('.action-timing-period')?.value ? parseFloat(row.querySelector('.action-timing-period').value) : null,
       timing_period_unit: row.querySelector('.action-timing-unit')?.value || null,
@@ -465,6 +519,7 @@ function collectActions() {
         expected_value: txnRow.querySelector('.txn-expected')?.value || null,
         range_min: txnRow.querySelector('.txn-range-min')?.value ? parseFloat(txnRow.querySelector('.txn-range-min').value) : null,
         range_max: txnRow.querySelector('.txn-range-max')?.value ? parseFloat(txnRow.querySelector('.txn-range-max').value) : null,
+        allowed_use: Array.from(txnRow.querySelectorAll('.txn-use:checked')).map(cb => cb.value),
       };
       act.transactions.push(txn);
     });
@@ -562,12 +617,19 @@ function buildFhirPreview() {
         fhirAction.participant = [{ type: 'practitioner', role: { text: act.performer_type } }];
       }
       if (act.timing_type === 'repeat' && act.timing_frequency) {
+        const repeat = {
+          frequency: act.timing_frequency,
+          period: act.timing_period || 1,
+          periodUnit: act.timing_period_unit || 'd',
+        };
+        if (act.duration_value) {
+          repeat.duration = act.duration_value;
+          repeat.durationUnit = act.duration_unit || 'min';
+        }
+        fhirAction.timingTiming = { repeat };
+      } else if (act.timing_type === 'once' && act.duration_value) {
         fhirAction.timingTiming = {
-          repeat: {
-            frequency: act.timing_frequency,
-            period: act.timing_period || 1,
-            periodUnit: act.timing_period_unit || 'd',
-          }
+          repeat: { duration: act.duration_value, durationUnit: act.duration_unit || 'min' }
         };
       }
 
@@ -580,6 +642,7 @@ function buildFhirPreview() {
             _pdhc_concept_guid: txn.concept_guid || null,
           };
           if (txn.requirement_type) subAction.requiredBehavior = txn.requirement_type;
+          if (txn.allowed_use && txn.allowed_use.length > 0) subAction._pdhc_allowed_use = txn.allowed_use;
           if (concept) {
             subAction.definitionCanonical = `Concept/${txn.concept_guid}`;
           }
@@ -620,6 +683,61 @@ document.addEventListener('change', function(e) {
 
 // Listen for all input changes
 document.addEventListener('input', updatePreview);
+
+// --- Validity Duration: sync number + unit → hidden field ---
+function syncValidityDuration() {
+  const num = document.getElementById('validity_number').value;
+  const unit = document.getElementById('validity_unit').value;
+  const hidden = document.getElementById('validity_duration');
+  hidden.value = (num && unit) ? num + ' ' + unit : '';
+  updatePreview();
+}
+document.getElementById('validity_number').addEventListener('input', syncValidityDuration);
+document.getElementById('validity_unit').addEventListener('change', syncValidityDuration);
+
+// --- Categorical goal: show/hide fields and populate valueset values ---
+function onTargetTypeChange(sel) {
+  const row = sel.closest('.item-row');
+  const isCat = sel.value === 'categorical';
+  row.querySelector('.goal-qty-group').style.display = isCat ? 'none' : '';
+  row.querySelector('.goal-high-group').style.display = isCat ? 'none' : '';
+  row.querySelector('.goal-unit-group').style.display = isCat ? 'none' : '';
+  row.querySelector('.goal-cat-group').style.display = isCat ? '' : 'none';
+
+  if (isCat) {
+    populateCatValues(row);
+  }
+}
+
+function populateCatValues(row) {
+  const conceptSel = row.querySelector('.goal-concept');
+  const catSel = row.querySelector('.goal-cat-value');
+  catSel.innerHTML = '<option value="">Select value...</option>';
+
+  if (!conceptSel || !conceptSel.value) return;
+  const concept = CONCEPTS.find(c => c.guid === conceptSel.value);
+  if (!concept || !concept.valueset) return;
+  const vs = VALUESETS.find(v => v.guid === concept.valueset);
+  if (!vs || !vs.values) return;
+
+  vs.values.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.value_name;
+    opt.textContent = v.value_display_text || v.value_name;
+    catSel.appendChild(opt);
+  });
+}
+
+// Re-populate categorical values when concept changes in a goal
+document.addEventListener('change', function(e) {
+  if (e.target.matches('.goal-concept')) {
+    const row = e.target.closest('.item-row');
+    const targetType = row.querySelector('.goal-target-type');
+    if (targetType && targetType.value === 'categorical') {
+      populateCatValues(row);
+    }
+  }
+});
 
 // Init: load existing data or start fresh
 document.addEventListener('DOMContentLoaded', function() {

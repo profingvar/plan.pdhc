@@ -31,7 +31,7 @@ plan.pdhc/
 ├── _obs_gateway_repo/                    # previous prototype (untouched, Rule 14)
 ├── results/                              # test output (Rule 11)
 │   └── <ISO-8601>_results/
-└── gateway/                              # ← application root (Rule 21)
+└── planp/                              # ← application root (Rule 21)
     ├── Dockerfile
     ├── docker-compose.yml
     ├── requirements.txt                  # includes Flask-Limiter
@@ -120,17 +120,17 @@ All services use ports 9030–9033 exclusively:
 
 ### 2.2 PostgreSQL in Docker
 
-- **2.a** Create `gateway/docker-compose.yml` defining:
+- **2.a** Create `planp/docker-compose.yml` defining:
   - A `db` service running PostgreSQL 16, mapped to `localhost:9031`.
   - A named volume `pdhc_pgdata` for persistence.
-  - Environment variables sourced from `gateway/.env`.
-- **2.b** Create `gateway/.env` with at minimum:
+  - Environment variables sourced from `planp/.env`.
+- **2.b** Create `planp/.env` with at minimum:
 
 ```
 POSTGRES_USER=pdhc_admin
 POSTGRES_PASSWORD=<strong-generated-password>
-POSTGRES_DB=pdhc_gateway
-DATABASE_URL=postgresql://pdhc_admin:<password>@localhost:9031/pdhc_gateway
+POSTGRES_DB=pdhc_planp
+DATABASE_URL=postgresql://pdhc_admin:<password>@localhost:9031/pdhc_planp
 FLASK_SECRET_KEY=<generated>
 JWT_SECRET_KEY=<generated>
 BOOTSTRAP_SU_USERNAME=admin
@@ -139,12 +139,12 @@ FLASK_ENV=development
 FLASK_PORT=9030
 ```
 
-- **2.c** Create `gateway/.env.example` with placeholder values (committed to Git).
-- **2.d** Verify the database starts: `docker compose up db -d` and confirm connectivity via `psql -h localhost -p 9031 -U pdhc_admin -d pdhc_gateway`.
+- **2.c** Create `planp/.env.example` with placeholder values (committed to Git).
+- **2.d** Verify the database starts: `docker compose up db -d` and confirm connectivity via `psql -h localhost -p 9031 -U pdhc_admin -d pdhc_planp`.
 
 ### 2.3 Flask application container
 
-- **2.e** Create `gateway/Dockerfile`:
+- **2.e** Create `planp/Dockerfile`:
   - Base image `python:3.11-slim`.
   - Copy `requirements.txt`, install dependencies.
   - Copy application code.
@@ -153,7 +153,7 @@ FLASK_PORT=9030
 - **2.f** Add the `app` service to `docker-compose.yml`:
   - Depends on `db`.
   - Maps `localhost:9030` to container port 9030.
-  - Mounts `gateway/.env`.
+  - Mounts `planp/.env`.
 - **2.g** Verify the full stack starts: `docker compose up -d` — both `db` and `app` healthy.
 
 ### 2.4 The `start.sh` entry-point script (Rule 16)
@@ -162,7 +162,7 @@ FLASK_PORT=9030
   1. Kill any processes on ports 9000–9003 (legacy cleanup).
   2. Kill any processes on ports 9030–9033 (previous run cleanup).
   3. Ensure Docker is running (check and start Docker Desktop if needed).
-  4. Activate the Python virtual environment (`gateway/venv`).
+  4. Activate the Python virtual environment (`planp/venv`).
   5. Start the database and application via `docker compose up -d`.
   6. Tail logs.
   7. On `Ctrl+C`: `docker compose down`, deactivate venv, exit gracefully.
@@ -174,8 +174,8 @@ FLASK_PORT=9030
 
 ### 3.1 Virtual environment and dependencies
 
-- **3.a** Create `gateway/venv` via `python3 -m venv gateway/venv`.
-- **3.b** Create `gateway/requirements.txt`:
+- **3.a** Create `planp/venv` via `python3 -m venv planp/venv`.
+- **3.b** Create `planp/requirements.txt`:
 
 ```
 Flask>=3.0
@@ -193,17 +193,17 @@ pytest-cov>=4.1
 requests>=2.31
 ```
 
-- **3.c** Install dependencies: `pip install -r gateway/requirements.txt`.
+- **3.c** Install dependencies: `pip install -r planp/requirements.txt`.
 
 ### 3.2 Flask app factory
 
-- **3.d** Implement `gateway/app/__init__.py` — the application factory (`create_app()`):
+- **3.d** Implement `planp/app/__init__.py` — the application factory (`create_app()`):
   - Load configuration from `config.py` (reads `.env`).
   - Initialise SQLAlchemy, Flask-Migrate, Flask-Login, Flask-JWT-Extended.
   - Register API blueprints (prefix `/api/v1/`).
   - Register web UI route blueprints.
   - Register error handlers (JSON for API, HTML for web).
-- **3.e** Implement `gateway/app/config.py`:
+- **3.e** Implement `planp/app/config.py`:
   - `DATABASE_URL` from env.
   - `SECRET_KEY`, `JWT_SECRET_KEY` from env.
   - `FLASK_ENV`, debug flag.
@@ -211,7 +211,7 @@ requests>=2.31
 ### 3.3 Database migrations
 
 - **3.f** Initialise Flask-Migrate: `flask db init`.
-- **3.g** Confirm migration directory is created inside `gateway/`.
+- **3.g** Confirm migration directory is created inside `planp/`.
 
 ### 3.4 Tests for foundation
 
@@ -228,14 +228,14 @@ requests>=2.31
 
 ### 4.1 User and authentication models
 
-- **4.a** Implement `gateway/app/models/user_models.py`:
+- **4.a** Implement `planp/app/models/user_models.py`:
   - `User` model: `id`, `guid` (UUID), `username`, `email`, `password_hash`, `role` (`read_only`, `read_write`, `admin`), `is_active`, timestamps.
   - Password hashing via `werkzeug.security`.
   - Bootstrap superuser creation from `.env` variables (Rule 23).
 
 ### 4.2 Lookup table models
 
-- **4.b** Implement in `gateway/app/models/concept_models.py`:
+- **4.b** Implement in `planp/app/models/concept_models.py`:
   - `CanonicalLib` — `canonical_libs` table.
   - `ConceptType` — `concept_types` table.
   - `ResponseType` — `response_types` table.
@@ -263,9 +263,9 @@ requests>=2.31
 
 ### 4.5 PlanDefinition and activity models
 
-- **4.e** Implement `gateway/app/models/fhir_models.py`:
+- **4.e** Implement `planp/app/models/fhir_models.py`:
   - `PlanDefinition` — `plan_definitions` table: `id`, `guid`, `fhir_id` (UUID string), metadata (title, name, description, status, type, version, publisher, purpose, usage, copyright, subject_type), contributor fields, timing fields, `goal` (JSON text), `action` (JSON text), `fhir_data` (JSONB), timestamps.
-- **4.f** Implement `gateway/app/models/activity_models.py`:
+- **4.f** Implement `planp/app/models/activity_models.py`:
   - `Activity` — `activities` table: `id`, `guid`, title, description, performer_type, subject_type, timing fields, notes.
   - `Transaction` — `transactions` table: `id`, `guid`, `activity_guid` (FK), `concept_guid` (FK), expected_value, unit, min, max, requirement_type.
   - `PlanDefinitionGoal` — `plandefinition_goals` table: `id`, `guid`, `plandefinition_guid` (FK), `concept_guid`, `concept_name`, priority, target_type, target fields.
@@ -288,7 +288,7 @@ requests>=2.31
 
 ### 5.1 Auth API endpoints
 
-- **5.a** Implement `gateway/app/api/auth.py`:
+- **5.a** Implement `planp/app/api/auth.py`:
   - `POST /api/v1/auth/login` — accepts username + password, returns JWT.
   - `POST /api/v1/auth/logout` — invalidates token (blocklist or short expiry).
   - `GET /api/v1/auth/me` — returns current user info.
@@ -319,7 +319,7 @@ requests>=2.31
 
 ### 6.1 API endpoints
 
-- **6.a** Implement `gateway/app/api/lookup_tables.py` with full CRUD for each lookup table:
+- **6.a** Implement `planp/app/api/lookup_tables.py` with full CRUD for each lookup table:
   - **Canonical libraries**: `GET/POST /api/v1/canonical-libs`, `GET/PUT/DELETE /api/v1/canonical-libs/<guid>`.
   - **Concept types**: `GET/POST /api/v1/concept-types`, `GET/PUT/DELETE /api/v1/concept-types/<guid>`.
   - **Response types**: `GET/POST /api/v1/response-types`, `GET/PUT/DELETE /api/v1/response-types/<guid>`.
@@ -385,7 +385,7 @@ requests>=2.31
 
 ### 8.1 Concept API endpoints
 
-- **8.a** Implement `gateway/app/api/concepts.py`:
+- **8.a** Implement `planp/app/api/concepts.py`:
   - `GET /api/v1/concepts` — list with filtering (text search, concept_type, response_type, canonical_lib, has_values), pagination, deterministic sort by `concept_name` + `guid`.
   - `POST /api/v1/concepts` — create; requires `canonical_lib`, `concept_name`; validate UUID refs; sanitise strings; enforce name uniqueness.
   - `GET /api/v1/concepts/<guid>` — read with embedded ValueSet values if bound.
@@ -401,7 +401,7 @@ requests>=2.31
 
 ### 8.3 Name uniqueness service
 
-- **8.c** Implement `gateway/app/services/name_uniqueness.py`:
+- **8.c** Implement `planp/app/services/name_uniqueness.py`:
   - `make_unique_concept_name(name)` — for API/import (auto-suffix).
   - `validate_name_for_manual_entry(name)` — for web UI (reject duplicates).
   - Same pattern for values and valuesets.
@@ -423,7 +423,7 @@ requests>=2.31
 
 ### 9.1 FHIR serialization service
 
-- **9.a** Implement `gateway/app/services/fhir_service.py`:
+- **9.a** Implement `planp/app/services/fhir_service.py`:
   - `FHIRService.create_fhir_plandefinition(plandef)` — builds a FHIR R5 PlanDefinition JSON object per `plan_description.md` section 6.
   - Includes: `resourceType`, `id`, `meta`, `identifier`, `url`, `version`, `name`, `title`, `status`, `type`, `subjectCodeableConcept`, descriptive fields, date fields, contributors, `relatedArtifact`, `library`, `action`, `goal`.
   - Canonical codings (system + code) included when canonical library URL and ref number are available.
@@ -444,7 +444,7 @@ requests>=2.31
 
 ### 10.1 Web routes
 
-- **10.a** Implement `gateway/app/routes/plandefinitions.py`:
+- **10.a** Implement `planp/app/routes/plandefinitions.py`:
   - `GET /plandefinitions` — list page.
   - `GET /plandefinitions/builder` — builder UI; supports `?plandef_id=<fhir_id>` for edit mode.
   - `POST /plandefinitions/create` — save new PlanDefinition.
@@ -463,7 +463,7 @@ requests>=2.31
 
 ### 10.2 Client-side builder
 
-- **10.c** Implement `gateway/app/static/js/plandef-builder.js`:
+- **10.c** Implement `planp/app/static/js/plandef-builder.js`:
   - Concept selection with search.
   - Goal definition with numeric/range/categorical targets.
   - Activity definition with timing (once / repeat frequency).
@@ -488,7 +488,7 @@ requests>=2.31
 
 ### 11.1 Read and search
 
-- **11.a** Implement `gateway/app/api/fhir_plandefinitions.py`:
+- **11.a** Implement `planp/app/api/fhir_plandefinitions.py`:
   - `GET /api/v1/PlanDefinition` — FHIR searchset Bundle; supports `status`, `title`, `_count`, `_offset`.
   - `GET /api/v1/PlanDefinition/<id>` — returns stored `fhir_data`; enriches with `identifier`/`url` if missing.
   - `GET /api/v1/PlanDefinition/<id>/$expand` — forces regeneration for full nested structure.
@@ -516,7 +516,7 @@ requests>=2.31
 
 ## 12) Comprehensive API endpoint test script (Rules 9 and 20)
 
-- **12.a** Create `gateway/tests/test_all_endpoints.py` — a single script exercising every API endpoint per the capability statement:
+- **12.a** Create `planp/tests/test_all_endpoints.py` — a single script exercising every API endpoint per the capability statement:
   - Auth endpoints (login, logout, me).
   - All lookup table CRUD endpoints.
   - Values and ValueSets CRUD + membership.
@@ -532,14 +532,14 @@ requests>=2.31
 
 ### 13.1 Key storage rules
 
-- **13.a** All API keys and secrets stored exclusively in `gateway/.env`. Never committed to Git.
-- **13.b** `gateway/.env.example` committed with placeholder values as a template.
+- **13.a** All API keys and secrets stored exclusively in `planp/.env`. Never committed to Git.
+- **13.b** `planp/.env.example` committed with placeholder values as a template.
 
 ### 13.2 Key rotation procedure
 
 - **13.c** Rotation steps:
   1. Generate new key/secret values.
-  2. Update `gateway/.env` on the target environment.
+  2. Update `planp/.env` on the target environment.
   3. Restart the application (`./start.sh` or `docker compose restart app`).
   4. Verify via `GET /api/v1/auth/me` with a fresh token.
   5. Invalidate old tokens (JWT blocklist flush or short expiry handles this).
@@ -609,7 +609,7 @@ requests>=2.31
 
 ## 16) Final validation and sign-off
 
-- **16.a** Run the full test suite (`pytest gateway/tests/ -v`). All tests must pass.
+- **16.a** Run the full test suite (`pytest planp/tests/ -v`). All tests must pass.
 - **16.b** Run the comprehensive endpoint test script (step 12.a).
 - **16.c** Verify FHIR compliance: all PlanDefinition responses validate against FHIR R5 structure (Rule 15).
 - **16.d** Cross-reference each rule in `top_rules.md` against implementation — verify all satisfied.

@@ -366,11 +366,11 @@ DOCS_CATALOG = {
 
 
 def _resolve_doc_path(filename):
-    # Search order: gateway/docs/ → project root → /project-docs/ (Docker mount)
-    gateway_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    # Search order: planp/docs/ → project root → /project-docs/ (Docker mount)
+    planp_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     search_dirs = [
-        os.path.join(gateway_dir, 'docs'),
-        os.path.dirname(gateway_dir),
+        os.path.join(planp_dir, 'docs'),
+        os.path.dirname(planp_dir),
         '/project-docs',
     ]
     for d in search_dirs:

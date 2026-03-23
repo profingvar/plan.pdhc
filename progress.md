@@ -15,7 +15,7 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 
 ### 1.2 Project directory structure
 
-- **1.e** Directory structure created under `gateway/` with all required subdirectories.
+- **1.e** Directory structure created under `planp/` with all required subdirectories.
 - **1.f** `progress.md` created.
 - **1.g** `changed_files.md` created.
 
@@ -28,12 +28,12 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 
 ## 2) Docker and database setup
 
-- **2.a** `gateway/docker-compose.yml` created — PostgreSQL 16 on port 9031, app on port 9030.
-- **2.b** `gateway/.env` created with development credentials.
-- **2.c** `gateway/.env.example` created with placeholder values.
-- **2.d** `gateway/Dockerfile` created with `entrypoint.sh` that runs migrations before starting gunicorn.
+- **2.a** `planp/docker-compose.yml` created — PostgreSQL 16 on port 9031, app on port 9030.
+- **2.b** `planp/.env` created with development credentials.
+- **2.c** `planp/.env.example` created with placeholder values.
+- **2.d** `planp/Dockerfile` created with `entrypoint.sh` that runs migrations before starting gunicorn.
 - **2.e** App service added to `docker-compose.yml`, depends on db health check.
-- **2.f** Docker build succeeded — `gateway-app:latest` image built.
+- **2.f** Docker build succeeded — `planp-app:latest` image built.
 - **2.g** Full stack verified: `pdhc_db` (PostgreSQL 16, port 9031, healthy) + `pdhc_app` (Flask/gunicorn, port 9030, running). API responds to requests.
 - **2.h** `start.sh` created at project root — kills ports 9000–9003 and 9030–9033, starts Docker, activates venv, graceful shutdown on Ctrl+C.
 - **2.i** `start.sh` made executable.
@@ -42,13 +42,13 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 
 ## 3) Application foundation (Flask + SQLAlchemy)
 
-- **3.a** Virtual environment created at `gateway/venv`.
-- **3.b** `gateway/requirements.txt` created with all dependencies.
+- **3.a** Virtual environment created at `planp/venv`.
+- **3.b** `planp/requirements.txt` created with all dependencies.
 - **3.c** Dependencies installed successfully.
-- **3.d** `gateway/app/__init__.py` — Flask app factory implemented with blueprint registration and bootstrap superuser logic.
-- **3.e** `gateway/app/config.py` — configuration loader implemented.
-- **3.f** Flask-Migrate initialised — `gateway/migrations/` directory created.
-- **3.g** Migration directory confirmed inside `gateway/`.
+- **3.d** `planp/app/__init__.py` — Flask app factory implemented with blueprint registration and bootstrap superuser logic.
+- **3.e** `planp/app/config.py` — configuration loader implemented.
+- **3.f** Flask-Migrate initialised — `planp/migrations/` directory created.
+- **3.g** Migration directory confirmed inside `planp/`.
 
 ### 3.4 Tests
 
@@ -228,8 +228,8 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 
 ## 15) Documentation and API reference (2026-03-20)
 
-- **15.a** `gateway/docs/api_reference.md` — comprehensive API documentation with examples for all 68 endpoints.
-- **15.b** `gateway/db_schema_snapshot.md` — complete database schema documentation with all 17 tables.
+- **15.a** `planp/docs/api_reference.md` — comprehensive API documentation with examples for all 68 endpoints.
+- **15.b** `planp/db_schema_snapshot.md` — complete database schema documentation with all 17 tables.
 - **15.c** GUID resolution strategy documented (concept_guid as universal anchor).
 - **15.d** Documentation browser UI at `/docs` with download links.
 - **15.e** API endpoint for document listing and download: `GET /api/v1/docs`, `GET /api/v1/docs/<filename>`.

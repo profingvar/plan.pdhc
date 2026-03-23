@@ -5,7 +5,7 @@ from datetime import timedelta
 class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         'DATABASE_URL',
-        'postgresql://pdhc_admin:REDACTED@localhost:9031/pdhc_gateway'
+        'postgresql://pdhc_admin:REDACTED@localhost:9031/pdhc_planp'
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 

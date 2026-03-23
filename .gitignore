@@ -1,6 +1,6 @@
 # Virtual environment
 venv/
-gateway/venv/
+planp/venv/
 
 # Python
 __pycache__/
@@ -10,7 +10,7 @@ __pycache__/
 
 # Secrets
 .env
-gateway/.env
+planp/.env
 
 # macOS
 .DS_Store
@@ -28,4 +28,4 @@ _obs_gateway_repo/
 
 # SQLite test databases
 instance/
-gateway/instance/
+planp/instance/
