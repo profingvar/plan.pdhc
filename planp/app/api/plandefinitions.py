@@ -36,6 +36,8 @@ def _sanitize(val):
 def _plandef_full_dict(pd):
     """Return PlanDefinition dict with goals and activities."""
     result = pd.to_dict()
+    result['fhir_data'] = pd.fhir_data
+    result['action'] = pd.action
     if pd.form_definition_guid:
         fd = FormDefinition.query.filter_by(guid=pd.form_definition_guid).first()
         result['form_definition'] = fd.to_summary() if fd else None
