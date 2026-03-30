@@ -12,7 +12,7 @@ from app.models.concept_models import (
     Concept, CanonicalLib, ConceptType, ResponseType, Unit, PlanDefType,
     ValueSet, ValueSetValue, ValueCatalog,
 )
-from app.models.forms_models import FormDefinition
+from app.models.forms_models import FormDefinition, Questionnaire
 from app.services.fhir_service import FHIRService
 from app.services.name_uniqueness import NameUniquenessService
 
@@ -101,6 +101,23 @@ def builder():
         FormDefinition.archived == False
     ).order_by(FormDefinition.title).all()
 
+    # Build list of produced (active) questionnaires for the form picker
+    from sqlalchemy import func
+    latest_version = (
+        db.session.query(
+            Questionnaire.form_guid,
+            func.max(Questionnaire.version).label('max_version')
+        ).group_by(Questionnaire.form_guid).subquery()
+    )
+    produced_forms = (
+        Questionnaire.query
+        .join(latest_version,
+              (Questionnaire.form_guid == latest_version.c.form_guid) &
+              (Questionnaire.version == latest_version.c.max_version))
+        .filter(Questionnaire.archived == False)
+        .order_by(Questionnaire.title).all()
+    )
+
     return render_template(
         'plandefinitions/builder.html',
         plandef=plandef,
@@ -111,6 +128,7 @@ def builder():
         existing_goals_json=json.dumps(existing_goals),
         existing_actions_json=json.dumps(existing_actions),
         form_definitions=form_definitions,
+        produced_forms=produced_forms,
     )
 
 

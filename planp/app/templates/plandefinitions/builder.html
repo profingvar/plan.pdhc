@@ -199,9 +199,9 @@ const VALUESETS = {{ valuesets_json | safe }};
 const PLANDEF_TYPES = {{ plandef_types_json | safe }};
 const EXISTING_GOALS = {{ existing_goals_json | safe }};
 const EXISTING_ACTIONS = {{ existing_actions_json | safe }};
-const FORM_DEFINITIONS = [
-  {% for fd in form_definitions %}
-  { guid: "{{ fd.guid }}", title: "{{ fd.title }}", name: "{{ fd.name }}", status: "{{ fd.status }}", produced_form_guid: "{{ fd.produced_form_guid or '' }}" },
+const PRODUCED_FORMS = [
+  {% for q in produced_forms %}
+  { form_guid: "{{ q.form_guid }}", title: "{{ q.title }}", status: "{{ q.status }}", version: {{ q.version }} },
   {% endfor %}
 ];
 
@@ -459,14 +459,13 @@ function addFormAction(data) {
   div.dataset.actGuid = data.guid || '';
   div.dataset.isForm = '1';
 
-  const selectedFd = data.form_definition_guid || '';
+  const selectedFormGuid = data.form_guid || '';
   const timingType = data.timing_type || '';
 
-  let fdOptions = '<option value="">Select form definition...</option>';
-  for (const fd of FORM_DEFINITIONS) {
-    const sel = fd.guid === selectedFd ? ' selected' : '';
-    const badge = fd.produced_form_guid ? '' : ' (not produced)';
-    fdOptions += `<option value="${fd.guid}"${sel}>${fd.title} (${fd.status})${badge}</option>`;
+  let fdOptions = '<option value="">Select form...</option>';
+  for (const q of PRODUCED_FORMS) {
+    const sel = q.form_guid === selectedFormGuid ? ' selected' : '';
+    fdOptions += `<option value="${q.form_guid}"${sel}>${q.title} (${q.status}, v${q.version})</option>`;
   }
 
   div.innerHTML = `
@@ -478,8 +477,8 @@ function addFormAction(data) {
     ${data.guid ? `<span class="guid-tag">Activity: ${data.guid}</span>` : ''}
     <div class="form-row">
       <div class="form-group">
-        <label>Form Definition *</label>
-        <select class="form-control action-form-def" onchange="onFormDefChange(this); updatePreview()">
+        <label>Form *</label>
+        <select class="form-control action-form-guid" onchange="onFormSelect(this); updatePreview()">
           ${fdOptions}
         </select>
       </div>
@@ -524,12 +523,12 @@ function addFormAction(data) {
   updatePreview();
 }
 
-function onFormDefChange(sel) {
+function onFormSelect(sel) {
   const row = sel.closest('.item-row');
   const titleInput = row.querySelector('.action-title');
-  const fd = FORM_DEFINITIONS.find(f => f.guid === sel.value);
-  if (fd && !titleInput.value) {
-    titleInput.value = fd.title;
+  const q = PRODUCED_FORMS.find(f => f.form_guid === sel.value);
+  if (q && !titleInput.value) {
+    titleInput.value = q.title;
   }
 }
 
@@ -602,7 +601,7 @@ function collectActions() {
 
     if (isForm) {
       act.is_form = true;
-      act.form_definition_guid = row.querySelector('.action-form-def')?.value || null;
+      act.form_guid = row.querySelector('.action-form-guid')?.value || null;
     } else {
       act.performer_type = row.querySelector('.action-performer')?.value || null;
       act.duration_value = row.querySelector('.action-duration-value')?.value ? parseInt(row.querySelector('.action-duration-value').value) : null;
@@ -715,8 +714,7 @@ function buildFhirPreview() {
       if (act.description) fhirAction.description = act.description;
 
       // Form actions → collect-information type + definitionCanonical
-      if (act.is_form && act.form_definition_guid) {
-        const fd = FORM_DEFINITIONS.find(f => f.guid === act.form_definition_guid);
+      if (act.is_form && act.form_guid) {
         fhirAction.type = {
           coding: [{
             system: 'http://terminology.hl7.org/CodeSystem/action-type',
@@ -724,9 +722,7 @@ function buildFhirPreview() {
             display: 'Collect information',
           }]
         };
-        if (fd && fd.produced_form_guid) {
-          fhirAction.definitionCanonical = `Questionnaire/${fd.produced_form_guid}`;
-        }
+        fhirAction.definitionCanonical = `Questionnaire/${act.form_guid}`;
       }
 
       if (!act.is_form && act.performer_type) {

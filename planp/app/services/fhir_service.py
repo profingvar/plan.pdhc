@@ -109,13 +109,7 @@ class FHIRService:
                 if isinstance(actions, list):
                     fhir_actions = []
                     for act in actions:
-                        if act.get('is_form') and act.get('form_definition_guid'):
-                            # Resolve to FHIR collect-information action
-                            fd_guid = act['form_definition_guid']
-                            q = Questionnaire.query.filter(
-                                Questionnaire.production_key == f'builder:{fd_guid}',
-                                Questionnaire.status == 'active',
-                            ).order_by(Questionnaire.version.desc()).first()
+                        if act.get('is_form') and act.get('form_guid'):
                             fhir_act = {
                                 'title': act.get('title', ''),
                                 'type': {
@@ -125,11 +119,10 @@ class FHIRService:
                                         'display': 'Collect information',
                                     }]
                                 },
+                                'definitionCanonical': f'Questionnaire/{act["form_guid"]}',
                             }
                             if act.get('description'):
                                 fhir_act['description'] = act['description']
-                            if q:
-                                fhir_act['definitionCanonical'] = f'Questionnaire/{q.form_guid}'
                             # Timing
                             if act.get('timing_type') == 'repeat' and act.get('timing_frequency'):
                                 fhir_act['timingTiming'] = {
