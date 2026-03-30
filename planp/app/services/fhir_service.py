@@ -2,6 +2,8 @@ import json
 from collections import OrderedDict
 from datetime import datetime, timezone
 
+from app.models.forms_models import Questionnaire
+
 
 class FHIRService:
     """Builds FHIR R5 PlanDefinition JSON from a PlanDefinition model instance."""
@@ -108,5 +110,31 @@ class FHIRService:
                     resource['action'] = actions
             except (json.JSONDecodeError, TypeError):
                 pass
+
+        # Questionnaire references — add collect-information actions for
+        # any Questionnaires produced from this PlanDefinition.
+        produced = Questionnaire.query.filter(
+            Questionnaire.production_key == f'plandef:{plandef.guid}',
+            Questionnaire.status == 'active',
+        ).order_by(Questionnaire.form_guid, Questionnaire.version.desc()).all()
+
+        # Deduplicate to latest version per form_guid
+        seen_forms = set()
+        for q in produced:
+            if q.form_guid in seen_forms:
+                continue
+            seen_forms.add(q.form_guid)
+            action_entry = {
+                'title': q.title,
+                'type': {
+                    'coding': [{
+                        'system': 'http://terminology.hl7.org/CodeSystem/action-type',
+                        'code': 'collect-information',
+                        'display': 'Collect information',
+                    }]
+                },
+                'definitionCanonical': f'Questionnaire/{q.form_guid}',
+            }
+            resource.setdefault('action', []).append(action_entry)
 
         return resource

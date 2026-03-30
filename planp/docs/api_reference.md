@@ -657,6 +657,32 @@ Cascade deletes goals, activity links, transactions, and orphaned activities.
 
 FHIR R5-compliant read endpoints. These return stored `fhir_data` enriched with identifiers.
 
+### Questionnaire References (definitionCanonical)
+
+When a Questionnaire has been produced from a PlanDefinition (via `/api/v1/forms/produce` with `plandefinition_guid`) and published to `active` status, the FHIR output automatically includes `collect-information` actions with `definitionCanonical` references:
+
+```json
+{
+  "resourceType": "PlanDefinition",
+  "id": "f2dd13b0-...",
+  "action": [
+    {
+      "title": "Daily Vitals Check",
+      "type": {
+        "coding": [{
+          "system": "http://terminology.hl7.org/CodeSystem/action-type",
+          "code": "collect-information",
+          "display": "Collect information"
+        }]
+      },
+      "definitionCanonical": "Questionnaire/a1b2c3d4-..."
+    }
+  ]
+}
+```
+
+This allows downstream consumers (request.pdhc, 1177.pdhc) to discover which Questionnaires to issue to a patient as part of a care plan. Only the latest active version of each linked Questionnaire is included. These actions are appended after any manually authored actions.
+
 ### Search (FHIR Bundle)
 
 ```
@@ -743,6 +769,161 @@ Returns the document as a downloadable file.
 
 ---
 
+## Form Definitions
+
+Authored form blueprints — the intermediate layer between clinical concepts and FHIR Questionnaires. Build a definition by selecting concepts, configuring per-question overrides, then produce a validated FHIR Questionnaire.
+
+### List Definitions
+
+```
+GET /api/v1/form-definitions?status=draft&search=vitals&limit=100&offset=0
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `status` | string | Filter by status (draft, active, retired) |
+| `search` | string | Search by title |
+| `limit` | int | Max results (default 100) |
+| `offset` | int | Pagination offset (default 0) |
+
+### Create Definition
+
+```
+POST /api/v1/form-definitions
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "Daily Vitals Check",
+  "name": "daily_vitals_check",
+  "description": "Standard vitals capture form"
+}
+```
+
+**Required:** `title`, `name`
+
+### Read Definition (With Resolved Items)
+
+```
+GET /api/v1/form-definitions/<guid>
+```
+
+Returns the definition with all items resolved against their concepts (names, response types, canonical references).
+
+### Update Definition
+
+```
+PUT /api/v1/form-definitions/<guid>
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "Updated Title",
+  "description": "Updated description"
+}
+```
+
+### Delete Definition
+
+```
+DELETE /api/v1/form-definitions/<guid>
+Authorization: Bearer <token>
+```
+
+Only draft definitions can be deleted.
+
+### List Items
+
+```
+GET /api/v1/form-definitions/<guid>/items
+```
+
+### Add Item (Concept)
+
+```
+POST /api/v1/form-definitions/<guid>/items
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "concept_guid": "59013287-07a0-458d-adf4-57f09b93e899",
+  "required": true,
+  "display_text_override": "Blood Pressure (systolic)",
+  "group_label": "Vitals"
+}
+```
+
+**Required:** `concept_guid`
+
+### Update Item
+
+```
+PUT /api/v1/form-definitions/<guid>/items/<item_guid>
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "required": true,
+  "enabled": true,
+  "display_text_override": "Custom label",
+  "group_label": "Assessment"
+}
+```
+
+### Remove Item
+
+```
+DELETE /api/v1/form-definitions/<guid>/items/<item_guid>
+Authorization: Bearer <token>
+```
+
+### Reorder Items
+
+```
+POST /api/v1/form-definitions/<guid>/reorder
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "ordered_guids": ["guid-1", "guid-2", "guid-3"]
+}
+```
+
+### Produce FHIR Questionnaire
+
+```
+POST /api/v1/form-definitions/<guid>/produce
+Authorization: Bearer <token>
+```
+
+Resolves all enabled items against concepts, builds a validated FHIR R5 Questionnaire, and persists it. Returns the produced form GUID and version.
+
+### Preview (Without Persisting)
+
+```
+GET /api/v1/form-definitions/<guid>/preview
+```
+
+Returns resolved items without producing a Questionnaire.
+
+### Get Produced Questionnaire
+
+```
+GET /api/v1/form-definitions/<guid>/questionnaire?version=1
+```
+
+Returns the FHIR Questionnaire JSON. Supports API key or SSO authentication.
+
+### Get Render-Ready Output
+
+```
+GET /api/v1/form-definitions/<guid>/render-ready?version=1
+```
+
+Returns a simplified representation suitable for UI rendering. Supports API key or SSO authentication.
+
+---
+
 ## Error Responses
 
 All errors follow a consistent format:
@@ -782,6 +963,7 @@ All errors follow a consistent format:
 | 12 | Concept Values | 3 | read_write |
 | 13 | PlanDefinitions (CRUD) | 5 | read_write |
 | 14 | FHIR PlanDefinition | 3 | Public |
-| 15 | Capability | 2 | Public |
-| 16 | Documentation | 2 | Public |
-| | **Total** | **68** | |
+| 15 | Form Definitions | 14 | Mixed |
+| 16 | Capability | 2 | Public |
+| 17 | Documentation | 2 | Public |
+| | **Total** | **82** | |
