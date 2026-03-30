@@ -112,9 +112,13 @@ class FHIRService:
                 pass
 
         # Questionnaire references — add collect-information actions for
-        # any Questionnaires produced from this PlanDefinition.
+        # any Questionnaires produced from this PlanDefinition or its linked FormDefinition.
+        from sqlalchemy import or_
+        pk_filters = [Questionnaire.production_key == f'plandef:{plandef.guid}']
+        if plandef.form_definition_guid:
+            pk_filters.append(Questionnaire.production_key == f'builder:{plandef.form_definition_guid}')
         produced = Questionnaire.query.filter(
-            Questionnaire.production_key == f'plandef:{plandef.guid}',
+            or_(*pk_filters),
             Questionnaire.status == 'active',
         ).order_by(Questionnaire.form_guid, Questionnaire.version.desc()).all()
 
