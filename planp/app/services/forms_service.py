@@ -384,6 +384,19 @@ def _build_fhir_item(item):
                 'url': 'http://hl7.org/fhir/StructureDefinition/questionnaire-unit',
                 'valueCoding': {'display': item['unit']},
             })
+        # Add questionnaire-itemControl extension for sliders
+        if ext_type == 'slider':
+            extensions.append({
+                'url': 'http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl',
+                'valueCodeableConcept': {
+                    'coding': [{
+                        'system': 'http://hl7.org/fhir/questionnaire-item-control',
+                        'code': 'slider',
+                        'display': 'Slider',
+                    }]
+                },
+            })
+
         if extensions:
             fhir_item['extension'] = extensions
 
