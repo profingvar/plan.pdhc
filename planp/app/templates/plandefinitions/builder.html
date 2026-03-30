@@ -145,6 +145,16 @@
             <input type="hidden" id="validity_duration" name="validity_duration" value="{{ plandef.validity_duration if plandef else '' }}">
           </div>
         </div>
+
+        <div class="form-group">
+          <label for="form_definition_guid">Linked Form Definition</label>
+          <select id="form_definition_guid" name="form_definition_guid" class="form-control">
+            <option value="">— None —</option>
+            {% for fd in form_definitions %}
+            <option value="{{ fd.guid }}" {% if plandef and plandef.form_definition_guid == fd.guid %}selected{% endif %}>{{ fd.title }} ({{ fd.status }})</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
 
       <!-- Goals -->

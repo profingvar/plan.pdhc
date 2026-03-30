@@ -46,6 +46,9 @@ class PlanDefinition(db.Model):
     goal = db.Column(db.Text, nullable=True)
     action = db.Column(db.Text, nullable=True)
 
+    # Linked form definition (optional — authored via Forms)
+    form_definition_guid = db.Column(db.String(36), nullable=True)
+
     # Canonical FHIR representation
     fhir_data = db.Column(db.JSON, nullable=True)
 
@@ -76,5 +79,6 @@ class PlanDefinition(db.Model):
             'subject_type': self.subject_type,
             'publisher': self.publisher,
             'author': self.author,
+            'form_definition_guid': self.form_definition_guid,
             'date_created': self.date_created.isoformat() if self.date_created else None,
         }

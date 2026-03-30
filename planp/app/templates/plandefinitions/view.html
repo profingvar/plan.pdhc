@@ -43,6 +43,16 @@
     <span class="detail-label">Author</span>
     <span class="detail-value">{{ plandef.author or '—' }}</span>
 
+    <span class="detail-label">Form Definition</span>
+    <span class="detail-value">
+      {% if linked_form %}
+        <a href="{{ url_for('forms_defs_web.view_definition', guid=linked_form.guid) }}">{{ linked_form.title }}</a>
+        <span class="badge badge-{{ 'success' if linked_form.status == 'active' else 'warning' }}">{{ linked_form.status }}</span>
+      {% else %}
+        —
+      {% endif %}
+    </span>
+
     <span class="detail-label">Created</span>
     <span class="detail-value">{{ plandef.date_created.strftime('%Y-%m-%d %H:%M') if plandef.date_created else '—' }}</span>
   </div>

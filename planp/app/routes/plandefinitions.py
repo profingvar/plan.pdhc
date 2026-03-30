@@ -12,6 +12,7 @@ from app.models.concept_models import (
     Concept, CanonicalLib, ConceptType, ResponseType, Unit, PlanDefType,
     ValueSet, ValueSetValue, ValueCatalog,
 )
+from app.models.forms_models import FormDefinition
 from app.services.fhir_service import FHIRService
 from app.services.name_uniqueness import NameUniquenessService
 
@@ -24,7 +25,13 @@ def list_plandefs():
     pagination = PlanDefinition.query.order_by(
         PlanDefinition.date_created.desc()
     ).paginate(page=page, per_page=20, error_out=False)
-    return render_template('plandefinitions/list.html', pagination=pagination)
+    # Build a lookup of form definition titles by guid
+    form_guids = [pd.form_definition_guid for pd in pagination.items if pd.form_definition_guid]
+    form_lookup = {}
+    if form_guids:
+        forms = FormDefinition.query.filter(FormDefinition.guid.in_(form_guids)).all()
+        form_lookup = {f.guid: f.title for f in forms}
+    return render_template('plandefinitions/list.html', pagination=pagination, form_lookup=form_lookup)
 
 
 def _build_existing_data(plandef):
@@ -68,6 +75,7 @@ def builder():
     units = Unit.query.order_by(Unit.unit_name).all()
     valuesets = ValueSet.query.order_by(ValueSet.valueset_name).all()
     plandef_types = PlanDefType.query.order_by(PlanDefType.plandef_type_name).all()
+    form_definitions = FormDefinition.query.order_by(FormDefinition.title).all()
 
     return render_template(
         'plandefinitions/builder.html',
@@ -78,6 +86,7 @@ def builder():
         plandef_types_json=json.dumps([t.to_dict() for t in plandef_types]),
         existing_goals_json=json.dumps(existing_goals),
         existing_actions_json=json.dumps(existing_actions),
+        form_definitions=form_definitions,
     )
 
 
@@ -146,6 +155,7 @@ def create_plandef():
         editor=request.form.get('editor'),
         reviewer=request.form.get('reviewer'),
         endorser=request.form.get('endorser'),
+        form_definition_guid=request.form.get('form_definition_guid') or None,
         validity_duration=validity or None,
         effective_period_start=ep_start,
         effective_period_end=ep_end,
@@ -223,7 +233,10 @@ def create_plandef():
 @plandef_web_bp.route('/<fhir_id>')
 def view_plandef(fhir_id):
     plandef = PlanDefinition.query.filter_by(fhir_id=fhir_id).first_or_404()
-    return render_template('plandefinitions/view.html', plandef=plandef)
+    linked_form = None
+    if plandef.form_definition_guid:
+        linked_form = FormDefinition.query.filter_by(guid=plandef.form_definition_guid).first()
+    return render_template('plandefinitions/view.html', plandef=plandef, linked_form=linked_form)
 
 
 @plandef_web_bp.route('/<fhir_id>/edit', methods=['POST'])
@@ -237,6 +250,7 @@ def edit_plandef(fhir_id):
     plandef.type = request.form.get('type', plandef.type)
     plandef.version = request.form.get('version', plandef.version)
     plandef.publisher = request.form.get('publisher', plandef.publisher)
+    plandef.form_definition_guid = request.form.get('form_definition_guid') or None
 
     goal_json = request.form.get('goal', '[]')
     action_json = request.form.get('action', '[]')

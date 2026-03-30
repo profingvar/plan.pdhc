@@ -10,6 +10,8 @@ from app.models.fhir_models import PlanDefinition
 from app.models.activity_models import (
     Activity, Transaction, PlanDefinitionGoal, PlanDefinitionActivity,
 )
+from app.models.concept_models import Concept
+from app.models.forms_models import FormDefinition
 from app.services.fhir_service import FHIRService
 from app.services.name_uniqueness import NameUniquenessService
 
@@ -34,6 +36,9 @@ def _sanitize(val):
 def _plandef_full_dict(pd):
     """Return PlanDefinition dict with goals and activities."""
     result = pd.to_dict()
+    if pd.form_definition_guid:
+        fd = FormDefinition.query.filter_by(guid=pd.form_definition_guid).first()
+        result['form_definition'] = fd.to_summary() if fd else None
     result['goals'] = [g.to_dict() for g in
                        PlanDefinitionGoal.query.filter_by(plandefinition_guid=pd.guid)
                        .order_by(PlanDefinitionGoal.sort_order).all()]
@@ -45,9 +50,16 @@ def _plandef_full_dict(pd):
         if act:
             d = act.to_dict()
             d['sort_order'] = link.sort_order
-            d['transactions'] = [t.to_dict() for t in
-                                 Transaction.query.filter_by(activity_guid=act.guid)
-                                 .order_by(Transaction.sort_order).all()]
+            txns = []
+            for t in Transaction.query.filter_by(activity_guid=act.guid).order_by(Transaction.sort_order).all():
+                td = t.to_dict()
+                if t.concept_guid:
+                    concept = Concept.query.filter_by(guid=t.concept_guid).first()
+                    td['concept_name'] = concept.concept_name if concept else ''
+                else:
+                    td['concept_name'] = ''
+                txns.append(td)
+            d['transactions'] = txns
             activities.append(d)
     result['activities'] = activities
     return result
@@ -134,6 +146,7 @@ def create_plandefinition():
         validity_duration=validity,
         effective_period_start=ep_start,
         effective_period_end=ep_end,
+        form_definition_guid=data.get('form_definition_guid') or None,
         goal=json.dumps(goals_data),
         action=json.dumps(actions_data),
     )
@@ -233,6 +246,9 @@ def update_plandefinition(guid):
 
     if 'status' in data:
         pd.status = data['status']
+
+    if 'form_definition_guid' in data:
+        pd.form_definition_guid = data['form_definition_guid'] or None
 
     if 'validity_duration' in data:
         validity = data['validity_duration']
