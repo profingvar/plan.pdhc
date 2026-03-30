@@ -7,15 +7,26 @@
     <h1>Form Catalogue</h1>
     <p class="lead">FHIR Questionnaire definitions</p>
   </div>
-  <a href="{{ url_for('forms_web.produce_form') }}" class="btn btn-primary btn-sm"><i data-lucide="file-plus"></i> Produce Form</a>
+  <div class="button-group-sm">
+    <a href="{{ url_for('forms_defs_web.create_definition') }}" class="btn btn-primary btn-sm"><i data-lucide="plus"></i> New Form Definition</a>
+    <a href="{{ url_for('forms_web.produce_form') }}" class="btn btn-secondary btn-sm"><i data-lucide="file-plus"></i> Quick Produce</a>
+    <a href="{{ url_for('forms_defs_web.list_definitions') }}" class="btn btn-secondary btn-sm"><i data-lucide="list"></i> Definitions</a>
+  </div>
 </div>
 
 <div class="card" style="margin-bottom: 0.75rem;">
-  <div style="display: flex; gap: 0.5rem;">
-    <a href="{{ url_for('forms_web.list_forms') }}" class="btn {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All</a>
-    <a href="{{ url_for('forms_web.list_forms', status='active') }}" class="btn {% if status_filter == 'active' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Active</a>
-    <a href="{{ url_for('forms_web.list_forms', status='draft') }}" class="btn {% if status_filter == 'draft' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Draft</a>
-    <a href="{{ url_for('forms_web.list_forms', status='retired') }}" class="btn {% if status_filter == 'retired' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Retired</a>
+  <div style="display: flex; gap: 0.5rem; align-items: center;">
+    <a href="{{ url_for('forms_web.list_forms', show_all=show_all or '') }}" class="btn {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All</a>
+    <a href="{{ url_for('forms_web.list_forms', status='active', show_all=show_all or '') }}" class="btn {% if status_filter == 'active' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Active</a>
+    <a href="{{ url_for('forms_web.list_forms', status='draft', show_all=show_all or '') }}" class="btn {% if status_filter == 'draft' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Draft</a>
+    <a href="{{ url_for('forms_web.list_forms', status='retired', show_all=show_all or '') }}" class="btn {% if status_filter == 'retired' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Retired</a>
+    <span style="margin-left: auto;">
+      {% if show_all %}
+      <a href="{{ url_for('forms_web.list_forms', status=status_filter) }}" class="btn btn-secondary btn-sm">Hide Archived</a>
+      {% else %}
+      <a href="{{ url_for('forms_web.list_forms', status=status_filter, show_all='1') }}" class="btn btn-secondary btn-sm"><i data-lucide="archive"></i> Show All</a>
+      {% endif %}
+    </span>
   </div>
 </div>
 
@@ -30,11 +41,12 @@
           <th>Version</th>
           <th>Status</th>
           <th>Created</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
         {% for form in forms %}
-        <tr>
+        <tr{% if form.archived %} style="opacity: 0.5;"{% endif %}>
           <td><a href="{{ url_for('forms_web.form_detail', form_guid=form.form_guid) }}">{{ form.title }}</a></td>
           <td><code>{{ form.form_guid[:8] }}...</code></td>
           <td>v{{ form.version }}</td>
@@ -48,6 +60,13 @@
             {% endif %}
           </td>
           <td>{{ form.created_at.strftime('%Y-%m-%d %H:%M') if form.created_at else '—' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('forms_web.archive_form', form_guid=form.form_guid) }}" style="display:inline;">
+              <button type="submit" class="btn btn-secondary btn-sm" title="{{ 'Unarchive' if form.archived else 'Archive' }}">
+                <i data-lucide="{{ 'archive-restore' if form.archived else 'archive' }}"></i>
+              </button>
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

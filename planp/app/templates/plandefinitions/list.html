@@ -10,6 +10,16 @@
   </div>
 </div>
 
+<div class="card" style="margin-bottom: 0.75rem;">
+  <div style="display: flex; gap: 0.5rem; align-items: center;">
+    {% if show_all %}
+    <a href="{{ url_for('plandefinitions_web.list_plandefs') }}" class="btn btn-secondary btn-sm">Hide Archived</a>
+    {% else %}
+    <a href="{{ url_for('plandefinitions_web.list_plandefs', show_all='1') }}" class="btn btn-secondary btn-sm"><i data-lucide="archive"></i> Show All</a>
+    {% endif %}
+  </div>
+</div>
+
 <div class="card">
   {% if pagination.items %}
   <div class="table-wrap">
@@ -22,17 +32,25 @@
           <th>Type</th>
           <th>Form</th>
           <th>Created</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
         {% for pd in pagination.items %}
-        <tr>
+        <tr{% if pd.archived %} style="opacity: 0.5;"{% endif %}>
           <td><a href="{{ url_for('plandefinitions_web.view_plandef', fhir_id=pd.fhir_id) }}">{{ pd.title }}</a></td>
           <td><span class="badge badge-{{ 'success' if pd.status == 'active' else 'warning' }}">{{ pd.status }}</span></td>
           <td>{{ pd.version or '—' }}</td>
           <td>{{ pd.type or '—' }}</td>
           <td>{{ form_lookup.get(pd.form_definition_guid, '—') }}</td>
           <td>{{ pd.date_created.strftime('%Y-%m-%d') if pd.date_created else '—' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('plandefinitions_web.archive_plandef', fhir_id=pd.fhir_id) }}" style="display:inline;">
+              <button type="submit" class="btn btn-secondary btn-sm" title="{{ 'Unarchive' if pd.archived else 'Archive' }}">
+                <i data-lucide="{{ 'archive-restore' if pd.archived else 'archive' }}"></i>
+              </button>
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

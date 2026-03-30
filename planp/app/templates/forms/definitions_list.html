@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Form Definitions — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Form Definitions</h1>
+    <p class="lead">Author reusable form definitions from concepts</p>
+  </div>
+  <div class="button-group-sm">
+    <a href="{{ url_for('forms_defs_web.create_definition') }}" class="btn btn-primary btn-sm"><i data-lucide="plus"></i> New Definition</a>
+    <a href="{{ url_for('forms_web.list_forms') }}" class="btn btn-secondary btn-sm"><i data-lucide="arrow-left"></i> Forms</a>
+  </div>
+</div>
+
+<div class="card">
+  <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; align-items: center;">
+    <a href="{{ url_for('forms_defs_web.list_definitions', show_all=show_all or '') }}" class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %}">All</a>
+    <a href="{{ url_for('forms_defs_web.list_definitions', status='draft', show_all=show_all or '') }}" class="btn btn-sm {% if status_filter == 'draft' %}btn-primary{% else %}btn-secondary{% endif %}">Draft</a>
+    <a href="{{ url_for('forms_defs_web.list_definitions', status='active', show_all=show_all or '') }}" class="btn btn-sm {% if status_filter == 'active' %}btn-primary{% else %}btn-secondary{% endif %}">Active</a>
+    <a href="{{ url_for('forms_defs_web.list_definitions', status='retired', show_all=show_all or '') }}" class="btn btn-sm {% if status_filter == 'retired' %}btn-primary{% else %}btn-secondary{% endif %}">Retired</a>
+    <span style="margin-left: auto;">
+      {% if show_all %}
+      <a href="{{ url_for('forms_defs_web.list_definitions', status=status_filter) }}" class="btn btn-secondary btn-sm">Hide Archived</a>
+      {% else %}
+      <a href="{{ url_for('forms_defs_web.list_definitions', status=status_filter, show_all='1') }}" class="btn btn-secondary btn-sm"><i data-lucide="archive"></i> Show All</a>
+      {% endif %}
+    </span>
+  </div>
+
+  {% if definitions %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Name</th>
+          <th>Status</th>
+          <th>Items</th>
+          <th>Produced</th>
+          <th>Updated</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fd in definitions %}
+        <tr{% if fd.archived %} style="opacity: 0.5;"{% endif %}>
+          <td><a href="{{ url_for('forms_defs_web.view_definition', guid=fd.guid) }}">{{ fd.title }}</a></td>
+          <td><code>{{ fd.name }}</code></td>
+          <td>
+            {% if fd.status == 'active' %}<span class="badge badge-success">Active</span>
+            {% elif fd.status == 'draft' %}<span class="badge badge-warning">Draft</span>
+            {% else %}<span class="badge badge-danger">Retired</span>{% endif %}
+          </td>
+          <td>{{ fd.items | length }}</td>
+          <td>
+            {% if fd.produced_form_guid %}
+              <a href="{{ url_for('forms_web.form_detail', form_guid=fd.produced_form_guid) }}"><i data-lucide="check-circle" style="color: var(--success); width: 0.85rem; height: 0.85rem;"></i></a>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>{{ fd.date_updated.strftime('%Y-%m-%d') if fd.date_updated else '—' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('forms_defs_web.archive_definition', guid=fd.guid) }}" style="display:inline;">
+              <button type="submit" class="btn btn-secondary btn-sm" title="{{ 'Unarchive' if fd.archived else 'Archive' }}">
+                <i data-lucide="{{ 'archive-restore' if fd.archived else 'archive' }}"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>No form definitions yet.</p>
+    <a href="{{ url_for('forms_defs_web.create_definition') }}" class="btn btn-primary btn-sm"><i data-lucide="plus"></i> Create one</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

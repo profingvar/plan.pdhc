@@ -22,7 +22,11 @@ plandef_web_bp = Blueprint('plandefinitions_web', __name__, url_prefix='/plandef
 @plandef_web_bp.route('/')
 def list_plandefs():
     page = max(1, request.args.get('page', 1, type=int))
-    pagination = PlanDefinition.query.order_by(
+    show_all = request.args.get('show_all', '') == '1'
+    query = PlanDefinition.query
+    if not show_all:
+        query = query.filter(PlanDefinition.archived == False)
+    pagination = query.order_by(
         PlanDefinition.date_created.desc()
     ).paginate(page=page, per_page=20, error_out=False)
     # Build a lookup of form definition titles by guid
@@ -31,7 +35,8 @@ def list_plandefs():
     if form_guids:
         forms = FormDefinition.query.filter(FormDefinition.guid.in_(form_guids)).all()
         form_lookup = {f.guid: f.title for f in forms}
-    return render_template('plandefinitions/list.html', pagination=pagination, form_lookup=form_lookup)
+    return render_template('plandefinitions/list.html', pagination=pagination,
+                           form_lookup=form_lookup, show_all=show_all)
 
 
 def _build_existing_data(plandef):
@@ -377,6 +382,17 @@ def delete_plandef(fhir_id):
     db.session.commit()
     flash('PlanDefinition deleted.', 'success')
     return redirect(url_for('plandefinitions_web.list_plandefs'))
+
+
+@plandef_web_bp.route('/<fhir_id>/archive', methods=['POST'])
+@sso_login_required
+def archive_plandef(fhir_id):
+    plandef = PlanDefinition.query.filter_by(fhir_id=fhir_id).first_or_404()
+    plandef.archived = not plandef.archived
+    db.session.commit()
+    label = 'archived' if plandef.archived else 'unarchived'
+    flash(f'PlanDefinition {label}.', 'success')
+    return redirect(request.referrer or url_for('plandefinitions_web.list_plandefs'))
 
 
 @plandef_web_bp.route('/<fhir_id>/export')

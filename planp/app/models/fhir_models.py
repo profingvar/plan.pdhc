@@ -52,6 +52,9 @@ class PlanDefinition(db.Model):
     # Canonical FHIR representation
     fhir_data = db.Column(db.JSON, nullable=True)
 
+    # Archive flag
+    archived = db.Column(db.Boolean, default=False, nullable=False, server_default='0')
+
     # Timestamps
     date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     date_updated = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
