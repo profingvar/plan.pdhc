@@ -146,15 +146,6 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="form_definition_guid">Linked Form Definition</label>
-          <select id="form_definition_guid" name="form_definition_guid" class="form-control">
-            <option value="">— None —</option>
-            {% for fd in form_definitions %}
-            <option value="{{ fd.guid }}" {% if plandef and plandef.form_definition_guid == fd.guid %}selected{% endif %}>{{ fd.title }} ({{ fd.status }})</option>
-            {% endfor %}
-          </select>
-        </div>
       </div>
 
       <!-- Goals -->
@@ -170,7 +161,10 @@
       <div class="card mt-6">
         <div class="page-header mb-1">
           <h2 class="section-heading mb-0">Actions (Activities)</h2>
-          <button type="button" class="btn btn-primary btn-sm" onclick="addAction()"><i data-lucide="plus"></i> Add Action</button>
+          <div class="button-group-sm">
+            <button type="button" class="btn btn-primary btn-sm" onclick="addAction()"><i data-lucide="plus"></i> Add Action</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addFormAction()"><i data-lucide="file-plus"></i> Add Form</button>
+          </div>
         </div>
         <div id="actionsContainer"></div>
       </div>
@@ -205,6 +199,11 @@ const VALUESETS = {{ valuesets_json | safe }};
 const PLANDEF_TYPES = {{ plandef_types_json | safe }};
 const EXISTING_GOALS = {{ existing_goals_json | safe }};
 const EXISTING_ACTIONS = {{ existing_actions_json | safe }};
+const FORM_DEFINITIONS = [
+  {% for fd in form_definitions %}
+  { guid: "{{ fd.guid }}", title: "{{ fd.title }}", name: "{{ fd.name }}", status: "{{ fd.status }}", produced_form_guid: "{{ fd.produced_form_guid or '' }}" },
+  {% endfor %}
+];
 
 let goalCounter = 0;
 let actionCounter = 0;
@@ -450,6 +449,90 @@ function addAction(data) {
   updatePreview();
 }
 
+function addFormAction(data) {
+  data = data || {};
+  const idx = actionCounter++;
+  const container = document.getElementById('actionsContainer');
+  const div = document.createElement('div');
+  div.className = 'item-row';
+  div.dataset.actionIdx = idx;
+  div.dataset.actGuid = data.guid || '';
+  div.dataset.isForm = '1';
+
+  const selectedFd = data.form_definition_guid || '';
+  const timingType = data.timing_type || '';
+
+  let fdOptions = '<option value="">Select form definition...</option>';
+  for (const fd of FORM_DEFINITIONS) {
+    const sel = fd.guid === selectedFd ? ' selected' : '';
+    const badge = fd.produced_form_guid ? '' : ' (not produced)';
+    fdOptions += `<option value="${fd.guid}"${sel}>${fd.title} (${fd.status})${badge}</option>`;
+  }
+
+  div.innerHTML = `
+    <button type="button" class="remove-btn" onclick="this.parentElement.remove(); updatePreview();">&times;</button>
+    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+      <span class="badge badge-info" style="font-size:0.7rem;">Form</span>
+      <span style="font-size:0.75rem; color:var(--text-muted);">collect-information action</span>
+    </div>
+    ${data.guid ? `<span class="guid-tag">Activity: ${data.guid}</span>` : ''}
+    <div class="form-row">
+      <div class="form-group">
+        <label>Form Definition *</label>
+        <select class="form-control action-form-def" onchange="onFormDefChange(this); updatePreview()">
+          ${fdOptions}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Title (auto-filled from form)</label>
+        <input type="text" class="form-control action-title" value="${data.title || ''}" oninput="updatePreview()">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea class="form-control action-desc" rows="2" oninput="updatePreview()">${data.description || ''}</textarea>
+    </div>
+    <div class="form-row-3">
+      <div class="form-group">
+        <label>Timing</label>
+        <select class="form-control action-timing-type" onchange="updatePreview()">
+          <option value="">None</option>
+          <option value="once" ${timingType === 'once' ? 'selected' : ''}>Once</option>
+          <option value="repeat" ${timingType === 'repeat' ? 'selected' : ''}>Repeat</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Repeats per cycle</label>
+        <input type="number" class="form-control action-timing-freq" value="${data.timing_frequency || ''}" min="1" oninput="updatePreview()">
+      </div>
+      <div class="form-group">
+        <label>Repeat cycle</label>
+        <div style="display:flex; gap:0.5rem;">
+          <input type="number" step="any" class="form-control action-timing-period" value="${data.timing_period || ''}" min="1" oninput="updatePreview()" style="flex:1;">
+          <select class="form-control action-timing-unit" onchange="updatePreview()" style="flex:1;">
+            <option value="">—</option>
+            <option value="d" ${data.timing_period_unit === 'd' ? 'selected' : ''}>days</option>
+            <option value="wk" ${data.timing_period_unit === 'wk' ? 'selected' : ''}>weeks</option>
+            <option value="mo" ${data.timing_period_unit === 'mo' ? 'selected' : ''}>months</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  `;
+  container.appendChild(div);
+  lucide.createIcons();
+  updatePreview();
+}
+
+function onFormDefChange(sel) {
+  const row = sel.closest('.item-row');
+  const titleInput = row.querySelector('.action-title');
+  const fd = FORM_DEFINITIONS.find(f => f.guid === sel.value);
+  if (fd && !titleInput.value) {
+    titleInput.value = fd.title;
+  }
+}
+
 function addTransaction(actionRow, actionIdx, data) {
   data = data || {};
   const container = actionRow.querySelector('.txn-container');
@@ -505,34 +588,41 @@ function addTransaction(actionRow, actionIdx, data) {
 function collectActions() {
   const actions = [];
   document.querySelectorAll('#actionsContainer .item-row').forEach(row => {
+    const isForm = row.dataset.isForm === '1';
     const act = {
       id: row.dataset.actGuid || undefined,
       title: row.querySelector('.action-title')?.value || '',
       description: row.querySelector('.action-desc')?.value || null,
-      performer_type: row.querySelector('.action-performer')?.value || null,
       timing_type: row.querySelector('.action-timing-type')?.value || null,
-      duration_value: row.querySelector('.action-duration-value')?.value ? parseInt(row.querySelector('.action-duration-value').value) : null,
-      duration_unit: row.querySelector('.action-duration-unit')?.value || null,
       timing_frequency: row.querySelector('.action-timing-freq')?.value ? parseInt(row.querySelector('.action-timing-freq').value) : null,
       timing_period: row.querySelector('.action-timing-period')?.value ? parseFloat(row.querySelector('.action-timing-period').value) : null,
       timing_period_unit: row.querySelector('.action-timing-unit')?.value || null,
       transactions: [],
     };
 
-    row.querySelectorAll('.txn-row').forEach(txnRow => {
-      const conceptSel = txnRow.querySelector('.txn-concept');
-      const concept = CONCEPTS.find(c => c.guid === conceptSel?.value);
-      const txn = {
-        concept_guid: conceptSel?.value || null,
-        concept_name: concept ? concept.concept_name : null,
-        requirement_type: txnRow.querySelector('.txn-requirement')?.value || null,
-        expected_value: txnRow.querySelector('.txn-expected')?.value || null,
-        range_min: txnRow.querySelector('.txn-range-min')?.value ? parseFloat(txnRow.querySelector('.txn-range-min').value) : null,
-        range_max: txnRow.querySelector('.txn-range-max')?.value ? parseFloat(txnRow.querySelector('.txn-range-max').value) : null,
-        allowed_use: Array.from(txnRow.querySelectorAll('.txn-use:checked')).map(cb => cb.value),
-      };
-      act.transactions.push(txn);
-    });
+    if (isForm) {
+      act.is_form = true;
+      act.form_definition_guid = row.querySelector('.action-form-def')?.value || null;
+    } else {
+      act.performer_type = row.querySelector('.action-performer')?.value || null;
+      act.duration_value = row.querySelector('.action-duration-value')?.value ? parseInt(row.querySelector('.action-duration-value').value) : null;
+      act.duration_unit = row.querySelector('.action-duration-unit')?.value || null;
+
+      row.querySelectorAll('.txn-row').forEach(txnRow => {
+        const conceptSel = txnRow.querySelector('.txn-concept');
+        const concept = CONCEPTS.find(c => c.guid === conceptSel?.value);
+        const txn = {
+          concept_guid: conceptSel?.value || null,
+          concept_name: concept ? concept.concept_name : null,
+          requirement_type: txnRow.querySelector('.txn-requirement')?.value || null,
+          expected_value: txnRow.querySelector('.txn-expected')?.value || null,
+          range_min: txnRow.querySelector('.txn-range-min')?.value ? parseFloat(txnRow.querySelector('.txn-range-min').value) : null,
+          range_max: txnRow.querySelector('.txn-range-max')?.value ? parseFloat(txnRow.querySelector('.txn-range-max').value) : null,
+          allowed_use: Array.from(txnRow.querySelectorAll('.txn-use:checked')).map(cb => cb.value),
+        };
+        act.transactions.push(txn);
+      });
+    }
 
     actions.push(act);
   });
@@ -623,9 +713,27 @@ function buildFhirPreview() {
       const fhirAction = { title: act.title };
       if (act.id) fhirAction._pdhc_activity_guid = act.id;
       if (act.description) fhirAction.description = act.description;
-      if (act.performer_type) {
+
+      // Form actions → collect-information type + definitionCanonical
+      if (act.is_form && act.form_definition_guid) {
+        const fd = FORM_DEFINITIONS.find(f => f.guid === act.form_definition_guid);
+        fhirAction.type = {
+          coding: [{
+            system: 'http://terminology.hl7.org/CodeSystem/action-type',
+            code: 'collect-information',
+            display: 'Collect information',
+          }]
+        };
+        if (fd && fd.produced_form_guid) {
+          fhirAction.definitionCanonical = `Questionnaire/${fd.produced_form_guid}`;
+        }
+      }
+
+      if (!act.is_form && act.performer_type) {
         fhirAction.participant = [{ type: 'practitioner', role: { text: act.performer_type } }];
       }
+
+      // Timing
       if (act.timing_type === 'repeat' && act.timing_frequency) {
         const repeat = {
           frequency: act.timing_frequency,
@@ -643,8 +751,8 @@ function buildFhirPreview() {
         };
       }
 
-      // Transactions as sub-actions
-      if (act.transactions.length > 0) {
+      // Transactions as sub-actions (regular actions only)
+      if (!act.is_form && act.transactions.length > 0) {
         fhirAction.action = act.transactions.map(txn => {
           const concept = CONCEPTS.find(c => c.guid === txn.concept_guid);
           const subAction = {
@@ -755,7 +863,13 @@ document.addEventListener('DOMContentLoaded', function() {
     EXISTING_GOALS.forEach(g => addGoal(g));
   }
   if (EXISTING_ACTIONS.length > 0) {
-    EXISTING_ACTIONS.forEach(a => addAction(a));
+    EXISTING_ACTIONS.forEach(a => {
+      if (a.is_form) {
+        addFormAction(a);
+      } else {
+        addAction(a);
+      }
+    });
   }
   updatePreview();
 });

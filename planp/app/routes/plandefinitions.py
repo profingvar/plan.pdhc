@@ -47,21 +47,38 @@ def _build_existing_data(plandef):
     ).order_by(PlanDefinitionGoal.sort_order).all():
         goals.append(g.to_dict())
 
+    # Load actions from the stored JSON (preserves both regular and form actions)
     actions = []
-    for link in PlanDefinitionActivity.query.filter_by(
-        plandefinition_guid=plandef.guid
-    ).order_by(PlanDefinitionActivity.sort_order).all():
-        act = Activity.query.filter_by(guid=link.activity_guid).first()
-        if act:
-            d = act.to_dict()
-            d['sort_order'] = link.sort_order
-            txns = Transaction.query.filter_by(
-                activity_guid=act.guid
-            ).order_by(Transaction.sort_order).all()
-            d['transactions'] = [t.to_dict() for t in txns]
-            actions.append(d)
+    if plandef.action:
+        try:
+            actions = json.loads(plandef.action)
+            if not isinstance(actions, list):
+                actions = []
+        except (json.JSONDecodeError, TypeError):
+            actions = []
 
-    return goals, actions
+    # For regular (non-form) actions, enrich with relational Activity data
+    enriched = []
+    for act_data in actions:
+        if act_data.get('is_form'):
+            enriched.append(act_data)
+        else:
+            # Try to match with relational Activity by id/guid
+            act_guid = act_data.get('id')
+            if act_guid:
+                act = Activity.query.filter_by(guid=act_guid).first()
+                if act:
+                    d = act.to_dict()
+                    d['sort_order'] = act_data.get('sort_order', 0)
+                    txns = Transaction.query.filter_by(
+                        activity_guid=act.guid
+                    ).order_by(Transaction.sort_order).all()
+                    d['transactions'] = [t.to_dict() for t in txns]
+                    enriched.append(d)
+                    continue
+            enriched.append(act_data)
+
+    return goals, enriched
 
 
 @plandef_web_bp.route('/builder')
@@ -80,7 +97,9 @@ def builder():
     units = Unit.query.order_by(Unit.unit_name).all()
     valuesets = ValueSet.query.order_by(ValueSet.valueset_name).all()
     plandef_types = PlanDefType.query.order_by(PlanDefType.plandef_type_name).all()
-    form_definitions = FormDefinition.query.order_by(FormDefinition.title).all()
+    form_definitions = FormDefinition.query.filter(
+        FormDefinition.archived == False
+    ).order_by(FormDefinition.title).all()
 
     return render_template(
         'plandefinitions/builder.html',

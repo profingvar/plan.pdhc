@@ -102,43 +102,49 @@ class FHIRService:
             except (json.JSONDecodeError, TypeError):
                 pass
 
-        # Action (from stored JSON)
+        # Action (from stored JSON) — resolve form actions to definitionCanonical
         if plandef.action:
             try:
                 actions = json.loads(plandef.action)
                 if isinstance(actions, list):
-                    resource['action'] = actions
+                    fhir_actions = []
+                    for act in actions:
+                        if act.get('is_form') and act.get('form_definition_guid'):
+                            # Resolve to FHIR collect-information action
+                            fd_guid = act['form_definition_guid']
+                            q = Questionnaire.query.filter(
+                                Questionnaire.production_key == f'builder:{fd_guid}',
+                                Questionnaire.status == 'active',
+                            ).order_by(Questionnaire.version.desc()).first()
+                            fhir_act = {
+                                'title': act.get('title', ''),
+                                'type': {
+                                    'coding': [{
+                                        'system': 'http://terminology.hl7.org/CodeSystem/action-type',
+                                        'code': 'collect-information',
+                                        'display': 'Collect information',
+                                    }]
+                                },
+                            }
+                            if act.get('description'):
+                                fhir_act['description'] = act['description']
+                            if q:
+                                fhir_act['definitionCanonical'] = f'Questionnaire/{q.form_guid}'
+                            # Timing
+                            if act.get('timing_type') == 'repeat' and act.get('timing_frequency'):
+                                fhir_act['timingTiming'] = {
+                                    'repeat': {
+                                        'frequency': act['timing_frequency'],
+                                        'period': act.get('timing_period', 1),
+                                        'periodUnit': act.get('timing_period_unit', 'd'),
+                                    }
+                                }
+                            fhir_actions.append(fhir_act)
+                        else:
+                            fhir_actions.append(act)
+                    if fhir_actions:
+                        resource['action'] = fhir_actions
             except (json.JSONDecodeError, TypeError):
                 pass
-
-        # Questionnaire references — add collect-information actions for
-        # any Questionnaires produced from this PlanDefinition or its linked FormDefinition.
-        from sqlalchemy import or_
-        pk_filters = [Questionnaire.production_key == f'plandef:{plandef.guid}']
-        if plandef.form_definition_guid:
-            pk_filters.append(Questionnaire.production_key == f'builder:{plandef.form_definition_guid}')
-        produced = Questionnaire.query.filter(
-            or_(*pk_filters),
-            Questionnaire.status == 'active',
-        ).order_by(Questionnaire.form_guid, Questionnaire.version.desc()).all()
-
-        # Deduplicate to latest version per form_guid
-        seen_forms = set()
-        for q in produced:
-            if q.form_guid in seen_forms:
-                continue
-            seen_forms.add(q.form_guid)
-            action_entry = {
-                'title': q.title,
-                'type': {
-                    'coding': [{
-                        'system': 'http://terminology.hl7.org/CodeSystem/action-type',
-                        'code': 'collect-information',
-                        'display': 'Collect information',
-                    }]
-                },
-                'definitionCanonical': f'Questionnaire/{q.form_guid}',
-            }
-            resource.setdefault('action', []).append(action_entry)
 
         return resource
