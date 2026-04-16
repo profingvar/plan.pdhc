@@ -136,7 +136,7 @@ The access blob returned by `/api/auth/me/service` contains user identity and au
     {
       "group_guid": "770e8400-e29b-41d4-a716-446655440002",
       "group_name": "Oncology Planning",
-      "group_type": "planning",
+      "category": "planning",
       "status": "approved",
       "is_admin": false
     }

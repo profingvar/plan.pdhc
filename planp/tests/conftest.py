@@ -49,6 +49,27 @@ def client(app):
     return app.test_client()
 
 
+@pytest.fixture(autouse=True)
+def mock_sso_validate_per_request(monkeypatch, request):
+    """Ticket #49 shim: the auth decorators now re-validate with SSO on
+    every protected request. In tests we short-circuit that to return
+    the blob stashed by set_sso_session(), preserving the original
+    test ergonomics while still exercising the new re-validation code
+    path end-to-end. The TestSSOCallback class is skipped because those
+    tests explicitly exercise validate_token via a requests.get patch.
+    """
+    cls = getattr(request.node, 'cls', None)
+    if cls is not None and cls.__name__ == 'TestSSOCallback':
+        return
+    from flask import session as flask_session
+
+    def fake_validate_token(token):
+        return flask_session.get('sso_user')
+
+    monkeypatch.setattr(
+        'app.services.sso_service.validate_token', fake_validate_token)
+
+
 @pytest.fixture(scope='function')
 def db_session(app):
     """Provide a clean database session for each test."""
@@ -71,7 +92,7 @@ SAMPLE_ACCESS_BLOB = {
     'groups': [{
         'group_guid': 'grp-guid-0001',
         'group_name': 'Planning Team',
-        'group_type': 'planning',
+        'category': 'planning',
         'status': 'approved',
         'is_admin': False,
     }],
@@ -103,7 +124,7 @@ SAMPLE_READONLY_BLOB = {
     'groups': [{
         'group_guid': 'grp-guid-0002',
         'group_name': 'Analysis Team',
-        'group_type': 'analysis',
+        'category': 'analysis',
         'status': 'approved',
         'is_admin': False,
     }],
