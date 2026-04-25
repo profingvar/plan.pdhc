@@ -44,4 +44,26 @@
   </div>
   {% endif %}
 </div>
+
+{% if value.canonical_lib_rel and value.canonical_refnumber %}
+<div class="card termbank-panel"
+     data-system="{{ value.canonical_lib_rel.canonical_lib_name }}"
+     data-code="{{ value.canonical_refnumber }}"
+     style="margin-top:1rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+    <h3 style="margin:0;">Termbank source
+      <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;">
+        {{ value.canonical_lib_rel.canonical_lib_display_text or value.canonical_lib_rel.canonical_lib_name }}: {{ value.canonical_refnumber }}
+      </span>
+    </h3>
+    <button class="btn btn-secondary btn-sm" type="button" data-termbank-refresh>↻</button>
+  </div>
+  <div data-termbank-content>Loading…</div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='js/termbank_panel.js') }}"></script>
 {% endblock %}

@@ -71,4 +71,28 @@
   </div>
   {% endif %}
 </div>
+
+{% if concept.canonical_lib_rel and concept.canonical_refnumber %}
+{# View-in-termbank panel — fetches termbank's $lookup via plan.pdhc proxy.
+   Hidden until the fetch resolves so partial states don't flash. #}
+<div class="card termbank-panel"
+     data-system="{{ concept.canonical_lib_rel.canonical_lib_name }}"
+     data-code="{{ concept.canonical_refnumber }}"
+     style="margin-top:1rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+    <h3 style="margin:0;">Termbank source
+      <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;">
+        {{ concept.canonical_lib_rel.canonical_lib_display_text or concept.canonical_lib_rel.canonical_lib_name }}: {{ concept.canonical_refnumber }}
+      </span>
+    </h3>
+    <button class="btn btn-secondary btn-sm" type="button" data-termbank-refresh>↻</button>
+  </div>
+  <div data-termbank-content>Loading…</div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='js/termbank_panel.js') }}"></script>
 {% endblock %}
