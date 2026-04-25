@@ -87,6 +87,26 @@
       </div>
     </div>
 
+    <!-- Slider preview -->
+    <div id="slider-preview" style="display:none;margin-bottom:1rem;">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <span id="anchor-low-label" style="font-size:0.85rem;color:var(--text-muted);min-width:80px;text-align:right;"></span>
+        <input type="range" id="slider-demo" style="flex:1;" disabled>
+        <span id="anchor-high-label" style="font-size:0.85rem;color:var(--text-muted);min-width:80px;"></span>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="anchor_low_text">Anchor Word (Low)</label>
+        <input type="text" id="anchor_low_text" name="anchor_low_text" class="form-control" placeholder="e.g. Not at all">
+      </div>
+      <div class="form-group">
+        <label for="anchor_high_text">Anchor Word (High)</label>
+        <input type="text" id="anchor_high_text" name="anchor_high_text" class="form-control" placeholder="e.g. Extremely">
+      </div>
+    </div>
+
     <div class="form-group">
       <label for="concept_explain">Explanation</label>
       <textarea id="concept_explain" name="concept_explain" class="form-control" rows="3"></textarea>
@@ -98,4 +118,40 @@
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  var rangeLow = document.getElementById('range_low');
+  var rangeHigh = document.getElementById('range_high');
+  var anchorLow = document.getElementById('anchor_low_text');
+  var anchorHigh = document.getElementById('anchor_high_text');
+  var sliderPreview = document.getElementById('slider-preview');
+  var sliderDemo = document.getElementById('slider-demo');
+  var anchorLowLabel = document.getElementById('anchor-low-label');
+  var anchorHighLabel = document.getElementById('anchor-high-label');
+
+  function updateSlider() {
+    var lo = parseFloat(rangeLow.value);
+    var hi = parseFloat(rangeHigh.value);
+    if (!isNaN(lo) && !isNaN(hi) && lo < hi) {
+      sliderDemo.min = lo;
+      sliderDemo.max = hi;
+      sliderDemo.value = (lo + hi) / 2;
+      sliderPreview.style.display = 'block';
+    } else {
+      sliderPreview.style.display = 'none';
+    }
+    anchorLowLabel.textContent = anchorLow.value || '';
+    anchorHighLabel.textContent = anchorHigh.value || '';
+  }
+
+  rangeLow.addEventListener('input', updateSlider);
+  rangeHigh.addEventListener('input', updateSlider);
+  anchorLow.addEventListener('input', updateSlider);
+  anchorHigh.addEventListener('input', updateSlider);
+  updateSlider();
+})();
+</script>
 {% endblock %}

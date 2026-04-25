@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ concept.concept_name }} — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Edit Concept</h1>
+</div>
+
+<div class="card">
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="concept_name">Name *</label>
+        <input type="text" id="concept_name" name="concept_name" class="form-control" required
+               value="{{ concept.concept_name }}">
+      </div>
+      <div class="form-group">
+        <label for="concept_display_text">Display Text</label>
+        <input type="text" id="concept_display_text" name="concept_display_text" class="form-control"
+               value="{{ concept.concept_display_text or '' }}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="canonical_lib">Canonical Library *</label>
+      <select id="canonical_lib" name="canonical_lib" class="form-control" required>
+        <option value="">Select...</option>
+        {% for lib in canonical_libs %}
+        <option value="{{ lib.guid }}" {% if concept.canonical_lib == lib.guid %}selected{% endif %}>{{ lib.canonical_lib_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="canonical_refnumber">Canonical Reference Number</label>
+      <input type="text" id="canonical_refnumber" name="canonical_refnumber" class="form-control"
+             value="{{ concept.canonical_refnumber or '' }}">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="concept_type">Concept Type</label>
+        <select id="concept_type" name="concept_type" class="form-control">
+          <option value="">None</option>
+          {% for ct in concept_types %}
+          <option value="{{ ct.guid }}" {% if concept.concept_type == ct.guid %}selected{% endif %}>{{ ct.concept_type_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="response_type">Response Type</label>
+        <select id="response_type" name="response_type" class="form-control">
+          <option value="">None</option>
+          {% for rt in response_types %}
+          <option value="{{ rt.guid }}" {% if concept.response_type == rt.guid %}selected{% endif %}>{{ rt.response_type_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="unit">Unit</label>
+        <select id="unit" name="unit" class="form-control">
+          <option value="">None</option>
+          {% for u in units %}
+          <option value="{{ u.guid }}" {% if concept.unit == u.guid %}selected{% endif %}>{{ u.unit_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="valueset">ValueSet</label>
+        <select id="valueset" name="valueset" class="form-control">
+          <option value="">None</option>
+          {% for vs in valuesets %}
+          <option value="{{ vs.guid }}" {% if concept.valueset == vs.guid %}selected{% endif %}>{{ vs.valueset_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Range with slider -->
+    <div id="range-section">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="range_low">Range Low</label>
+          <input type="number" step="any" id="range_low" name="range_low" class="form-control"
+                 value="{{ concept.range_low if concept.range_low is not none else '' }}">
+        </div>
+        <div class="form-group">
+          <label for="range_high">Range High</label>
+          <input type="number" step="any" id="range_high" name="range_high" class="form-control"
+                 value="{{ concept.range_high if concept.range_high is not none else '' }}">
+        </div>
+      </div>
+
+      <!-- Slider preview (visible when both range values set) -->
+      <div id="slider-preview" style="display:none;margin-bottom:1rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <span id="anchor-low-label" style="font-size:0.85rem;color:var(--text-muted);min-width:80px;text-align:right;"></span>
+          <input type="range" id="slider-demo" style="flex:1;" disabled>
+          <span id="anchor-high-label" style="font-size:0.85rem;color:var(--text-muted);min-width:80px;"></span>
+        </div>
+      </div>
+
+      <!-- Anchor words (visible when slider/range response type) -->
+      <div id="anchor-section">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="anchor_low_text">Anchor Word (Low)</label>
+            <input type="text" id="anchor_low_text" name="anchor_low_text" class="form-control"
+                   placeholder="e.g. Not at all"
+                   value="{{ concept.anchor_low_text or '' }}">
+          </div>
+          <div class="form-group">
+            <label for="anchor_high_text">Anchor Word (High)</label>
+            <input type="text" id="anchor_high_text" name="anchor_high_text" class="form-control"
+                   placeholder="e.g. Extremely"
+                   value="{{ concept.anchor_high_text or '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="concept_explain">Explanation</label>
+      <textarea id="concept_explain" name="concept_explain" class="form-control" rows="3">{{ concept.concept_explain or '' }}</textarea>
+    </div>
+
+    <div class="button-group">
+      <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Save Changes</button>
+      <a href="{{ url_for('concepts_web.view_concept', guid=concept.guid) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  var rangeLow = document.getElementById('range_low');
+  var rangeHigh = document.getElementById('range_high');
+  var anchorLow = document.getElementById('anchor_low_text');
+  var anchorHigh = document.getElementById('anchor_high_text');
+  var sliderPreview = document.getElementById('slider-preview');
+  var sliderDemo = document.getElementById('slider-demo');
+  var anchorLowLabel = document.getElementById('anchor-low-label');
+  var anchorHighLabel = document.getElementById('anchor-high-label');
+
+  function updateSlider() {
+    var lo = parseFloat(rangeLow.value);
+    var hi = parseFloat(rangeHigh.value);
+    if (!isNaN(lo) && !isNaN(hi) && lo < hi) {
+      sliderDemo.min = lo;
+      sliderDemo.max = hi;
+      sliderDemo.value = (lo + hi) / 2;
+      sliderPreview.style.display = 'block';
+    } else {
+      sliderPreview.style.display = 'none';
+    }
+    anchorLowLabel.textContent = anchorLow.value || '';
+    anchorHighLabel.textContent = anchorHigh.value || '';
+  }
+
+  rangeLow.addEventListener('input', updateSlider);
+  rangeHigh.addEventListener('input', updateSlider);
+  anchorLow.addEventListener('input', updateSlider);
+  anchorHigh.addEventListener('input', updateSlider);
+  updateSlider();
+})();
+</script>
+{% endblock %}

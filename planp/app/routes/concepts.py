@@ -56,6 +56,8 @@ def create_concept():
             valueset=valueset_guid or None,
             range_low=request.form.get('range_low', type=float),
             range_high=request.form.get('range_high', type=float),
+            anchor_low_text=request.form.get('anchor_low_text') or None,
+            anchor_high_text=request.form.get('anchor_high_text') or None,
         )
         db.session.add(concept)
         db.session.commit()
@@ -74,3 +76,69 @@ def create_concept():
 def view_concept(guid):
     concept = Concept.query.filter_by(guid=guid).first_or_404()
     return render_template('concepts/view.html', concept=concept)
+
+
+@concepts_web_bp.route('/<guid>/edit', methods=['GET', 'POST'])
+@sso_login_required
+def edit_concept(guid):
+    concept = Concept.query.filter_by(guid=guid).first_or_404()
+
+    if request.method == 'POST':
+        name = request.form.get('concept_name', '').strip()
+
+        # Check uniqueness only if name changed
+        if name != concept.concept_name:
+            error = NameUniquenessService.validate_name_for_manual_entry(
+                name, Concept, 'concept_name'
+            )
+            if error:
+                flash(error, 'error')
+                return redirect(url_for('concepts_web.edit_concept', guid=guid))
+
+        # Business rule: single-choice response types require a valueset
+        response_type_guid = request.form.get('response_type')
+        valueset_guid = request.form.get('valueset')
+        if response_type_guid:
+            rt = ResponseType.query.filter_by(guid=response_type_guid).first()
+            if rt and rt.response_type_name.lower() in (
+                'single choice', 'single_choice', 'singlechoice', 'categorical'
+            ):
+                if not valueset_guid:
+                    flash('Single-choice response type requires a ValueSet.', 'error')
+                    return redirect(url_for('concepts_web.edit_concept', guid=guid))
+
+        concept.concept_name = name
+        concept.canonical_lib = request.form.get('canonical_lib')
+        concept.canonical_refnumber = request.form.get('canonical_refnumber')
+        concept.concept_display_text = request.form.get('concept_display_text')
+        concept.concept_explain = request.form.get('concept_explain')
+        concept.concept_type = request.form.get('concept_type') or None
+        concept.response_type = response_type_guid or None
+        concept.unit = request.form.get('unit') or None
+        concept.valueset = valueset_guid or None
+        concept.range_low = request.form.get('range_low', type=float)
+        concept.range_high = request.form.get('range_high', type=float)
+        concept.anchor_low_text = request.form.get('anchor_low_text') or None
+        concept.anchor_high_text = request.form.get('anchor_high_text') or None
+
+        db.session.commit()
+        flash('Concept updated.', 'success')
+        return redirect(url_for('concepts_web.view_concept', guid=guid))
+
+    return render_template('concepts/edit.html',
+                           concept=concept,
+                           canonical_libs=CanonicalLib.query.all(),
+                           concept_types=ConceptType.query.all(),
+                           response_types=ResponseType.query.all(),
+                           units=Unit.query.all(),
+                           valuesets=ValueSet.query.all())
+
+
+@concepts_web_bp.route('/<guid>/delete', methods=['POST'])
+@sso_login_required
+def delete_concept(guid):
+    concept = Concept.query.filter_by(guid=guid).first_or_404()
+    db.session.delete(concept)
+    db.session.commit()
+    flash(f'Concept "{concept.concept_name}" deleted.', 'success')
+    return redirect(url_for('concepts_web.list_concepts'))

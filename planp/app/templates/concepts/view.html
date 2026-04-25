@@ -4,7 +4,14 @@
 {% block content %}
 <div class="page-header">
   <h1>{{ concept.concept_name }}</h1>
-  <a href="{{ url_for('concepts_web.list_concepts') }}" class="btn btn-secondary btn-sm"><i data-lucide="arrow-left"></i> Back to list</a>
+  <div style="display:flex;gap:0.5rem;">
+    <a href="{{ url_for('concepts_web.edit_concept', guid=concept.guid) }}" class="btn btn-primary btn-sm"><i data-lucide="pencil"></i> Edit</a>
+    <form method="post" action="{{ url_for('concepts_web.delete_concept', guid=concept.guid) }}" style="display:inline;"
+          onsubmit="return confirm('Delete concept &quot;{{ concept.concept_name }}&quot;?');">
+      <button type="submit" class="btn btn-danger btn-sm"><i data-lucide="trash-2"></i> Delete</button>
+    </form>
+    <a href="{{ url_for('concepts_web.list_concepts') }}" class="btn btn-secondary btn-sm"><i data-lucide="arrow-left"></i> Back to list</a>
+  </div>
 </div>
 
 <div class="card">
@@ -37,6 +44,9 @@
     <span class="detail-value">
       {% if concept.range_low is not none or concept.range_high is not none %}
         {{ concept.range_low if concept.range_low is not none else '...' }} – {{ concept.range_high if concept.range_high is not none else '...' }}
+        {% if concept.anchor_low_text or concept.anchor_high_text %}
+          <br><span style="font-size:0.85rem;color:var(--text-muted);">{{ concept.anchor_low_text or '' }} → {{ concept.anchor_high_text or '' }}</span>
+        {% endif %}
       {% else %}—{% endif %}
     </span>
 

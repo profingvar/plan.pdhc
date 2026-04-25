@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime, timezone
 from app import db
 
+PLAN_BASE = "https://plan.pdhc.se"
+
 
 # ---------------------------------------------------------------------------
 # Lookup tables
@@ -166,8 +168,9 @@ class ValueCatalog(db.Model):
                                          primaryjoin='ValueCatalog.canonical_lib == CanonicalLib.guid')
 
     def to_dict(self):
-        return {
+        d = {
             'guid': self.guid,
+            'url': f"{PLAN_BASE}/api/v1/lookup/values/{self.guid}",
             'canonical_lib': self.canonical_lib,
             'canonical_refnumber': self.canonical_refnumber,
             'value_name': self.value_name,
@@ -177,6 +180,9 @@ class ValueCatalog(db.Model):
             'vers_number': self.vers_number,
             'date_created': self.date_created.isoformat() if self.date_created else None,
         }
+        if self.canonical_lib:
+            d['canonical_lib_url'] = f"{PLAN_BASE}/api/v1/lookup/canonical-libs/{self.canonical_lib}"
+        return d
 
 
 class ValueSet(db.Model):
@@ -201,6 +207,7 @@ class ValueSet(db.Model):
     def to_dict(self, include_values=True):
         d = {
             'guid': self.guid,
+            'url': f"{PLAN_BASE}/api/v1/valuesets/{self.guid}",
             'canonical_lib': self.canonical_lib,
             'canonical_refnumber': self.canonical_refnumber,
             'valueset_name': self.valueset_name,
@@ -210,6 +217,8 @@ class ValueSet(db.Model):
             'vers_number': self.vers_number,
             'date_created': self.date_created.isoformat() if self.date_created else None,
         }
+        if self.canonical_lib:
+            d['canonical_lib_url'] = f"{PLAN_BASE}/api/v1/lookup/canonical-libs/{self.canonical_lib}"
         if include_values:
             links = ValueSetValue.query.filter_by(
                 valueset_guid=self.guid
@@ -300,8 +309,9 @@ class Concept(db.Model):
                                     primaryjoin='Concept.valueset == ValueSet.guid')
 
     def to_dict(self):
-        return {
+        d = {
             'guid': self.guid,
+            'url': f"{PLAN_BASE}/api/v1/concepts/{self.guid}",
             'canonical_lib': self.canonical_lib,
             'canonical_refnumber': self.canonical_refnumber,
             'concept_name': self.concept_name,
@@ -321,3 +331,14 @@ class Concept(db.Model):
             'vers_number': self.vers_number,
             'date_created': self.date_created.isoformat() if self.date_created else None,
         }
+        if self.concept_type:
+            d['concept_type_url'] = f"{PLAN_BASE}/api/v1/lookup/concept-types/{self.concept_type}"
+        if self.response_type:
+            d['response_type_url'] = f"{PLAN_BASE}/api/v1/lookup/response-types/{self.response_type}"
+        if self.unit:
+            d['unit_url'] = f"{PLAN_BASE}/api/v1/lookup/units/{self.unit}"
+        if self.valueset:
+            d['valueset_url'] = f"{PLAN_BASE}/api/v1/valuesets/{self.valueset}"
+        if self.canonical_lib:
+            d['canonical_lib_url'] = f"{PLAN_BASE}/api/v1/lookup/canonical-libs/{self.canonical_lib}"
+        return d
