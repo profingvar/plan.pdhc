@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_jwt_extended import JWTManager
+from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
@@ -32,6 +33,7 @@ def create_app(testing=False):
     migrate.init_app(app, db)
     login_manager.init_app(app)
     limiter.init_app(app)
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     # Flask-JWT-Extended only needed when AUTH_DISABLED (local dev uses local JWT).
     # In production, SSO issues tokens — we validate via /api/auth/me/service.
@@ -108,11 +110,47 @@ def create_app(testing=False):
     from app.routes.forms import forms_web_bp
     app.register_blueprint(forms_web_bp)
 
-    # Health endpoint (required by SSO service registry)
+    from app.api.form_definitions import form_defs_bp
+    app.register_blueprint(form_defs_bp, url_prefix='/api/v1')
+
+    from app.api.dispatch import dispatch_bp
+    app.register_blueprint(dispatch_bp, url_prefix='/api/v1')
+
+    from app.routes.form_definitions import forms_defs_web_bp
+    app.register_blueprint(forms_defs_web_bp)
+
+    # Health endpoint (required by SSO service registry).
+    # Shape per CLAUDE.md §10 — matches cgm.pdhc pattern.
     @app.route('/api/health')
     def health():
         from flask import jsonify
-        return jsonify({'status': 'ok'}), 200
+        from sqlalchemy import text
+        db_ok = False
+        try:
+            db.session.execute(text('SELECT 1'))
+            db_ok = True
+        except Exception:
+            pass
+        status = 'ok' if db_ok else 'degraded'
+        code = 200 if db_ok else 503
+        resp = jsonify({
+            'status': status,
+            'database': 'connected' if db_ok else 'unavailable',
+            'service': 'plan.pdhc',
+        })
+        # Ticket #70 / CLAUDE.md §10: let www.pdhc.se/services.html read the
+        # JSON body cross-origin so it can drive real status/DB dots. Specific
+        # origin + Vary: Origin (not "*") keeps future Allow-Credentials
+        # spec-compliant. Use .add() for Vary to preserve the existing
+        # "Vary: Cookie" emitted by the session middleware.
+        # NOTE: Flask-CORS is also active on /api/* with origins="*", so it
+        # may override this header via its after_request hook. Acceptance test
+        # below will flag that; if it does, we narrow Flask-CORS for this path.
+        resp.headers['Access-Control-Allow-Origin'] = 'https://www.pdhc.se'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET'
+        resp.headers.add('Vary', 'Origin')
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, code
 
     # Bootstrap superuser on first run
     with app.app_context():

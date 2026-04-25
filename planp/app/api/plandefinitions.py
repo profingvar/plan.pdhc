@@ -15,6 +15,8 @@ from app.models.forms_models import FormDefinition
 from app.services.fhir_service import FHIRService
 from app.services.name_uniqueness import NameUniquenessService
 
+PLAN_BASE = "https://plan.pdhc.se"
+
 plandefinitions_bp = Blueprint('plandefinitions_api', __name__)
 limiter.limit("200/minute")(plandefinitions_bp)
 
@@ -41,9 +43,26 @@ def _plandef_full_dict(pd):
     if pd.form_definition_guid:
         fd = FormDefinition.query.filter_by(guid=pd.form_definition_guid).first()
         result['form_definition'] = fd.to_summary() if fd else None
-    result['goals'] = [g.to_dict() for g in
-                       PlanDefinitionGoal.query.filter_by(plandefinition_guid=pd.guid)
-                       .order_by(PlanDefinitionGoal.sort_order).all()]
+    goals = []
+    for g in PlanDefinitionGoal.query.filter_by(plandefinition_guid=pd.guid) \
+            .order_by(PlanDefinitionGoal.sort_order).all():
+        gd = g.to_dict()
+        if g.concept_guid:
+            gd['concept_url'] = f"{PLAN_BASE}/api/v1/concepts/{g.concept_guid}"
+        goals.append(gd)
+    result['goals'] = goals
+
+    # Single-goal inference: if the plan has exactly one Goal, every
+    # activity implicitly measures against it. This lets downstream
+    # consumers (request.pdhc sr_context, gateway report enrichment)
+    # resolve "which measurement concept is this observation for?" from
+    # the snapshot alone, without any Goal↔Activity FK in the model.
+    # When multi-goal plans need explicit assignment, add a real
+    # goal_guid column on Activity and populate it here instead.
+    default_goal_guid = goals[0].get('guid') if len(goals) == 1 else None
+    default_goal_concept_guid = goals[0].get('concept_guid') if len(goals) == 1 else None
+    default_goal_concept_name = goals[0].get('concept_name') if len(goals) == 1 else None
+
     links = PlanDefinitionActivity.query.filter_by(plandefinition_guid=pd.guid) \
         .order_by(PlanDefinitionActivity.sort_order).all()
     activities = []
@@ -52,14 +71,24 @@ def _plandef_full_dict(pd):
         if act:
             d = act.to_dict()
             d['sort_order'] = link.sort_order
+            d['goal_guid'] = default_goal_guid
+            d['goal_concept_guid'] = default_goal_concept_guid
+            d['goal_concept_name'] = default_goal_concept_name
             txns = []
             for t in Transaction.query.filter_by(activity_guid=act.guid).order_by(Transaction.sort_order).all():
                 td = t.to_dict()
                 if t.concept_guid:
                     concept = Concept.query.filter_by(guid=t.concept_guid).first()
                     td['concept_name'] = concept.concept_name if concept else ''
+                    td['concept_url'] = f"{PLAN_BASE}/api/v1/concepts/{t.concept_guid}"
                 else:
                     td['concept_name'] = ''
+                # Carry the goal linkage onto the transaction too so
+                # consumers don't have to walk activities → transactions
+                # just to enrich a single observation.
+                td['goal_guid'] = default_goal_guid
+                td['goal_concept_guid'] = default_goal_concept_guid
+                td['goal_concept_name'] = default_goal_concept_name
                 txns.append(td)
             d['transactions'] = txns
             activities.append(d)

@@ -119,6 +119,22 @@ ENDPOINTS = [
     _endpoint('POST', '/forms/<form_guid>/publish', True, 'Publish a form version (draft → active)'),
     _endpoint('GET', '/forms/<form_guid>/immutability', True, 'Check latest version immutability status'),
 
+    # Form Definitions
+    _endpoint('GET', '/form-definitions', True, 'List form definitions (paginated, filterable)'),
+    _endpoint('POST', '/form-definitions', True, 'Create a form definition'),
+    _endpoint('GET', '/form-definitions/<guid>', True, 'Get form definition with resolved items'),
+    _endpoint('PUT', '/form-definitions/<guid>', True, 'Update form definition metadata'),
+    _endpoint('DELETE', '/form-definitions/<guid>', True, 'Delete a draft form definition'),
+    _endpoint('GET', '/form-definitions/<guid>/items', True, 'List items in a form definition'),
+    _endpoint('POST', '/form-definitions/<guid>/items', True, 'Add a concept to a form definition'),
+    _endpoint('PUT', '/form-definitions/<guid>/items/<item_guid>', True, 'Update item settings'),
+    _endpoint('DELETE', '/form-definitions/<guid>/items/<item_guid>', True, 'Remove item from definition'),
+    _endpoint('POST', '/form-definitions/<guid>/reorder', True, 'Bulk reorder items'),
+    _endpoint('POST', '/form-definitions/<guid>/produce', True, 'Produce FHIR Questionnaire from definition'),
+    _endpoint('GET', '/form-definitions/<guid>/preview', True, 'Preview resolved form without persisting'),
+    _endpoint('GET', '/form-definitions/<guid>/questionnaire', 'API key or SSO', 'Get produced FHIR Questionnaire JSON'),
+    _endpoint('GET', '/form-definitions/<guid>/render-ready', 'API key or SSO', 'Get render-ready JSON for frontend integration'),
+
     # Documentation
     _endpoint('GET', '/docs', False, 'List all available documentation files'),
     _endpoint('GET', '/docs/<filename>', False, 'Download a documentation file'),
@@ -345,6 +361,54 @@ def fhir_capability_statement():
                         {
                             'code': 'delete',
                             'documentation': 'DELETE /api/v1/valuesets/{guid} (requires auth)',
+                        },
+                    ],
+                },
+                {
+                    'type': 'FormDefinition',
+                    'profile': 'custom:form-definition',
+                    'documentation': (
+                        'Authored form definitions that serve as blueprints for FHIR Questionnaires. '
+                        'Created via the Forms UI or API. Each definition references concepts '
+                        'and can be produced into a versioned FHIR Questionnaire.'
+                    ),
+                    'interaction': [
+                        {
+                            'code': 'read',
+                            'documentation': 'GET /api/v1/form-definitions/{guid}',
+                        },
+                        {
+                            'code': 'search-type',
+                            'documentation': 'GET /api/v1/form-definitions',
+                        },
+                        {
+                            'code': 'create',
+                            'documentation': 'POST /api/v1/form-definitions',
+                        },
+                        {
+                            'code': 'update',
+                            'documentation': 'PUT /api/v1/form-definitions/{guid}',
+                        },
+                        {
+                            'code': 'delete',
+                            'documentation': 'DELETE /api/v1/form-definitions/{guid}',
+                        },
+                    ],
+                    'operation': [
+                        {
+                            'name': 'produce',
+                            'definition': 'https://plan.pdhc.se/api/v1/form-definitions/{guid}/produce',
+                            'documentation': 'Produce FHIR Questionnaire from form definition.',
+                        },
+                        {
+                            'name': 'preview',
+                            'definition': 'https://plan.pdhc.se/api/v1/form-definitions/{guid}/preview',
+                            'documentation': 'Preview resolved form without persisting.',
+                        },
+                        {
+                            'name': 'render-ready',
+                            'definition': 'https://plan.pdhc.se/api/v1/form-definitions/{guid}/render-ready',
+                            'documentation': 'Render-ready JSON optimized for frontend integration.',
                         },
                     ],
                 },

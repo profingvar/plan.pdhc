@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime, timezone
 from app import db
 
+PLAN_BASE = "https://plan.pdhc.se"
+
 
 class PlanDefinition(db.Model):
     __tablename__ = 'plan_definitions'
@@ -72,6 +74,7 @@ class PlanDefinition(db.Model):
     def to_dict(self):
         return {
             'guid': self.guid,
+            'url': f"{PLAN_BASE}/api/v1/plandefinitions/{self.guid}",
             'fhir_id': self.fhir_id,
             'name': self.name,
             'title': self.title,

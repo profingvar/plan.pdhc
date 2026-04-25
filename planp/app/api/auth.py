@@ -8,6 +8,41 @@ limiter.limit("200/minute")(auth_bp)
 
 
 # ---------------------------------------------------------------------------
+# Ticket #49: NO blob caching. Every protected request re-validates the
+# stored bearer with sso.pdhc /api/auth/me/service. This makes the per-user
+# session flush (SSO ticket #44) take effect immediately — a revoked token
+# gets a 401 on the very next call here. `session['sso_user']` is retained
+# only as a display-only cache (rendered in base.html); it is NEVER trusted
+# for authorization decisions and is refreshed from each fresh validation.
+# ---------------------------------------------------------------------------
+
+def _sso_change_password_url():
+    base = current_app.config['SSO_BASE_URL'].rstrip('/')
+    return f'{base}/change-password'
+
+
+def _refresh_blob_or_clear():
+    """Re-validate the stored bearer; refresh session cache; return blob or None.
+
+    On 401/invalid, drops the session entirely. Callers get None and MUST
+    route the user to re-login.
+    """
+    from app.services.sso_service import validate_token
+    token = session.get('sso_token')
+    if not token:
+        return None
+    blob = validate_token(token)
+    if blob is None:
+        # Stale token (expired, revoked, or flushed by SU) — wipe session.
+        session.pop('sso_token', None)
+        session.pop('sso_user', None)
+        return None
+    # Refresh the display-only cache with the fresh blob.
+    session['sso_user'] = blob
+    return blob
+
+
+# ---------------------------------------------------------------------------
 # SSO-aware role decorator
 # ---------------------------------------------------------------------------
 
@@ -15,7 +50,8 @@ def requires_role(min_role):
     """Decorator enforcing minimum role level.
 
     When AUTH_DISABLED is True (local dev), all requests pass through.
-    When AUTH_DISABLED is False (production), checks SSO access blob in session.
+    When AUTH_DISABLED is False (production), re-validates the stored bearer
+    with SSO on every request (no blob caching — Rule 11).
 
     Role mapping (plan.pdhc → SSO access blob):
       read_only  → any authenticated session
@@ -30,9 +66,16 @@ def requires_role(min_role):
             if current_app.config.get('AUTH_DISABLED'):
                 return fn(*args, **kwargs)
 
-            blob = session.get('sso_user')
+            blob = _refresh_blob_or_clear()
             if not blob:
                 return jsonify({'error': 'Authentication required'}), 401
+
+            # Ticket #43: block actions while SSO requires a password change.
+            if blob.get('must_change_password'):
+                return jsonify({
+                    'error': 'Password change required',
+                    'change_password_url': _sso_change_password_url(),
+                }), 403
 
             required = role_levels.get(min_role, 0)
 
@@ -54,7 +97,9 @@ def requires_role(min_role):
 
 
 def sso_login_required(fn):
-    """Decorator for web routes: redirects to SSO login if no session.
+    """Decorator for web routes: re-validates SSO per request; redirects
+    to SSO login if stored bearer is missing or stale, or to SSO
+    /change-password if SSO flagged a forced password change.
 
     When AUTH_DISABLED is True, does nothing (Flask-Login auto-login handles it).
     """
@@ -62,11 +107,20 @@ def sso_login_required(fn):
     def wrapper(*args, **kwargs):
         if current_app.config.get('AUTH_DISABLED'):
             return fn(*args, **kwargs)
-        if not session.get('sso_user'):
+
+        blob = _refresh_blob_or_clear()
+        if not blob:
             from app.services.sso_service import get_sso_login_url
             state = secrets.token_urlsafe(32)
             session['sso_state'] = state
             return redirect(get_sso_login_url(state))
+
+        # Ticket #43: forced password reset — send user to SSO's change-password
+        # page. Once they change it, SSO clears the flag and future blobs will
+        # pass this check.
+        if blob.get('must_change_password'):
+            return redirect(_sso_change_password_url())
+
         return fn(*args, **kwargs)
     return wrapper
 
@@ -118,10 +172,17 @@ def callback():
     if blob is None:
         return jsonify({'error': 'Token validation failed'}), 401
 
-    # Store access blob and token in session
-    session['sso_user'] = blob
+    # Ticket #49: keep only the bearer in session for later re-validation.
+    # session['sso_user'] is a display-only cache refreshed on every
+    # validated request — the decorators do not trust it for auth.
     session['sso_token'] = token
+    session['sso_user'] = blob
     session.permanent = True
+
+    # Ticket #43: if SSO flagged this user for forced password change, go
+    # straight to the SSO change-password page rather than the dashboard.
+    if blob.get('must_change_password'):
+        return redirect(_sso_change_password_url())
 
     # Redirect to dashboard
     return redirect(url_for('main.dashboard'))
@@ -142,7 +203,12 @@ def logout():
 
 @auth_bp.route('/me', methods=['GET'])
 def me():
-    """Return current user's access blob from session."""
+    """Return current user's access blob, freshly re-validated with SSO.
+
+    Ticket #49: re-validates per request so the client learns about session
+    flushes (SSO #44) and forced password resets (SSO #43) as soon as they
+    happen — no stale session copy.
+    """
     if current_app.config.get('AUTH_DISABLED'):
         from app.models.user_models import User
         user = User.query.filter_by(role='admin').first()
@@ -150,7 +216,7 @@ def me():
             return jsonify(user.to_dict()), 200
         return jsonify({'error': 'No user'}), 404
 
-    blob = session.get('sso_user')
+    blob = _refresh_blob_or_clear()
     if not blob:
         return jsonify({'error': 'Not authenticated'}), 401
     return jsonify(blob), 200

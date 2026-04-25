@@ -32,6 +32,9 @@ class Config:
     # Forms builder API key (for external service-to-service access)
     API_KEY = os.environ.get('API_KEY', '')
 
+    # Upstream services
+    CONTRACT_BASE_URL = os.environ.get('CONTRACT_BASE_URL', 'http://localhost:9021')
+
     # Rate limiting
     RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT', '200 per minute')
     RATELIMIT_STORAGE_URI = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')

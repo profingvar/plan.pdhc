@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime, timezone
 from app import db
 
+PLAN_BASE = "https://plan.pdhc.se"
+
 
 class Activity(db.Model):
     __tablename__ = 'activities'
@@ -63,8 +65,9 @@ class Transaction(db.Model):
     date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
-        return {
+        d = {
             'guid': self.guid,
+            'url': f"{PLAN_BASE}/api/v1/transactions/{self.guid}",
             'activity_guid': self.activity_guid,
             'concept_guid': self.concept_guid,
             'expected_value': self.expected_value,
@@ -74,6 +77,9 @@ class Transaction(db.Model):
             'requirement_type': self.requirement_type,
             'sort_order': self.sort_order,
         }
+        if self.concept_guid:
+            d['concept_url'] = f"{PLAN_BASE}/api/v1/concepts/{self.concept_guid}"
+        return d
 
 
 class PlanDefinitionGoal(db.Model):
@@ -100,7 +106,7 @@ class PlanDefinitionGoal(db.Model):
     date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
-        return {
+        d = {
             'guid': self.guid,
             'plandefinition_guid': self.plandefinition_guid,
             'concept_guid': self.concept_guid,
@@ -116,6 +122,11 @@ class PlanDefinitionGoal(db.Model):
             'target_unit': self.target_unit,
             'sort_order': self.sort_order,
         }
+        if self.concept_guid:
+            d['concept_url'] = f"{PLAN_BASE}/api/v1/concepts/{self.concept_guid}"
+        if self.target_value_guid:
+            d['target_value_url'] = f"{PLAN_BASE}/api/v1/lookup/values/{self.target_value_guid}"
+        return d
 
 
 class PlanDefinitionActivity(db.Model):
@@ -137,5 +148,6 @@ class PlanDefinitionActivity(db.Model):
         return {
             'plandefinition_guid': self.plandefinition_guid,
             'activity_guid': self.activity_guid,
+            'url': f"{PLAN_BASE}/api/v1/activities/{self.activity_guid}",
             'sort_order': self.sort_order,
         }
