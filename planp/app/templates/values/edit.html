@@ -6,6 +6,27 @@
   <h1>Edit Value</h1>
 </div>
 
+<div class="card termbank-search-picker"
+     data-name-input="value_name"
+     data-code-input="canonical_refnumber"
+     style="background:#f9f9f9; margin-bottom:1rem;">
+  <h4 style="margin:0 0 0.5rem 0;">Search termbank to fill</h4>
+  <div style="display:flex; gap:0.5rem; align-items:flex-end;">
+    <div style="flex:1;">
+      <label style="font-size:0.85em;">Query</label>
+      <input type="text" data-termbank-q class="form-control" placeholder="e.g. diabetes mellitus typ 2…">
+    </div>
+    <div style="width:200px;">
+      <label style="font-size:0.85em;">System</label>
+      <select data-termbank-system class="form-control"></select>
+    </div>
+  </div>
+  <div data-termbank-results style="margin-top:0.5rem;"></div>
+  <p style="font-size:0.75em;color:var(--text-muted);margin-top:0.5rem;">
+    Note: this edit form doesn't expose Canonical Library — clicking a result only fills the reference number. Make sure the chosen system matches the value's existing library.
+  </p>
+</div>
+
 <div class="card">
   <form method="post">
     <div class="form-row">
@@ -41,4 +62,9 @@
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='js/termbank_search_picker.js') }}"></script>
 {% endblock %}
