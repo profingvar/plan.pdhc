@@ -263,3 +263,31 @@ Steps 1 through 15 are complete. Docker stack runs on ports 9030 (app) and 9031 
 - 16: Server deployment preparation (nginx reverse proxy, Mac Mini)
 - 17: SSO integration (to replace AUTH_DISABLED mode)
 - 18: Final validation and sign-off
+
+---
+
+## 2026-04-11 — Snapshot goal enrichment (local edit, not deployed)
+
+Edited `planp/app/api/plandefinitions.py :: _plandef_full_dict()` so
+the `plan_definition_snapshot` JSON column stamped into every
+ServiceRequest carries `goal_guid` / `goal_concept_guid` /
+`goal_concept_name` on each activity dict and each transaction dict.
+Today, with single-goal plans, values are filled in via inference:
+if `len(snapshot.goals) == 1`, that goal is applied to every
+activity/transaction unless they already have one.
+
+**Why this matters.** Gateway's contract-scope validator compares
+each observation's `concept_guid` against the contract's
+`return_scope` (obligatory/optional). For CGM that scope authorizes
+the *measurement* concept B-glucos (`1c34a590-...`), not the procedure
+concept CGM (`22d0f6c6-...`). Gateway needs a way to look up the
+"measurement concept this observation is reporting against", which is
+the Goal's concept — hence the enrichment.
+
+**Why not deployed yet.** `request.pdhc/gateway/app/services/context_service.py`
+already has the same single-goal fallback (deployed earlier today), so
+every active SR on miserver currently picks up the right goal concept
+even without this plan.pdhc redeploy. Ship this on the next plan.pdhc
+release or whenever we need to support multi-goal plans (which will
+need an explicit activity→goal FK in the plan model, not just
+inference).

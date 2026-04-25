@@ -637,3 +637,316 @@ Per Rules 2, 4, 11, and 17:
 | 9033 | Reserved             |
 
 Kill targets before startup: ports 9000–9003 (legacy) and 9030–9033 (previous run).
+
+---
+
+## 17) FHIR Form Builder — interactive Questionnaire authoring
+
+### 17.0 Overview and design rationale
+
+The existing "Produce Form" flow (step 16.f / current `/forms/produce`) is a one-shot pipeline: pick concepts or a PlanDefinition → auto-generate a FHIR Questionnaire. That is useful for batch production but does **not** allow an author to:
+
+1. Iteratively build a form question by question.
+2. Configure per-question settings (required, display text override, item ordering).
+3. Mix concepts from different sources in a single form.
+4. Save a draft form definition that can be revised before production.
+5. Re-use a form definition across multiple PlanDefinitions or from `request.pdhc.se`.
+
+This section introduces a **Form Builder** — an interactive authoring tool that sits between raw concepts and the final FHIR Questionnaire. The builder produces a **FormDefinition** (the authored blueprint), which is then rendered into a versioned FHIR Questionnaire via the existing production pipeline.
+
+```
+┌──────────────┐     ┌──────────────────┐     ┌─────────────────────┐
+│  Concepts    │────▶│  Form Builder     │────▶│  FHIR Questionnaire │
+│  Values      │     │  (FormDefinition) │     │  (versioned, stored)│
+│  ValueSets   │     └──────────────────┘     └─────────────────────┘
+└──────────────┘            │                          │
+                            │  referenced by           │  callable from
+                    ┌───────▼────────┐         ┌───────▼────────┐
+                    │  PlanDefinition │         │ request.pdhc.se│
+                    └────────────────┘         └────────────────┘
+```
+
+### 17.1 Data model — `form_definitions` and `form_definition_items`
+
+- **17.a** Add `FormDefinition` model to `planp/app/models/forms_models.py`:
+
+```
+form_definitions
+────────────────────────────────────────────────────────────
+Column                  Type           Notes
+────────────────────────────────────────────────────────────
+id                      Integer        PK, auto
+guid                    String(36)     UUID, unique, indexed
+name                    String(255)    Machine name, unique
+title                   String(500)    Human-readable title
+description             Text           Optional long description
+status                  String(20)     draft | active | retired (default: draft)
+author                  String(255)    Creator identifier
+vers_number             Integer        Incremented on update (default: 1)
+produced_form_guid      String(36)     FK → questionnaires.form_guid (nullable)
+                                       Points to the latest produced FHIR Questionnaire
+production_key          String(255)    Tracks origin (e.g. "builder:<guid>")
+date_created            DateTime       UTC timestamp
+date_updated            DateTime       UTC timestamp, auto-update
+```
+
+- **17.b** Add `FormDefinitionItem` model to `planp/app/models/forms_models.py`:
+
+```
+form_definition_items
+────────────────────────────────────────────────────────────
+Column                  Type           Notes
+────────────────────────────────────────────────────────────
+id                      Integer        PK, auto
+guid                    String(36)     UUID, unique
+form_definition_guid    String(36)     FK → form_definitions.guid, indexed
+concept_guid            String(36)     FK → concepts.guid
+sort_order              Integer        Display ordering (default: 0)
+display_text_override   String(500)    Optional override of concept_display_text
+required                Boolean        Whether this question is mandatory (default: false)
+enabled                 Boolean        Include in production (default: true)
+item_type_override      String(50)     Override the auto-detected FHIR type (nullable)
+group_label             String(255)    Optional group heading for sectioned forms
+notes                   Text           Author notes (not rendered in FHIR)
+date_created            DateTime       UTC timestamp
+```
+
+- **17.c** Junction constraint: `UNIQUE(form_definition_guid, concept_guid)` — a concept appears at most once per form definition.
+- **17.d** Cascade delete: deleting a `FormDefinition` deletes its items.
+
+### 17.2 Form Builder service — `planp/app/services/form_builder_service.py`
+
+- **17.e** Implement `FormBuilderService` with the following operations:
+
+| Function                          | Purpose                                                            |
+|-----------------------------------|--------------------------------------------------------------------|
+| `create_form_definition(data)`    | Create a new FormDefinition with metadata; return dict             |
+| `update_form_definition(guid, data)` | Update metadata (title, description, status); increment vers_number |
+| `delete_form_definition(guid)`    | Delete draft-only definition (reject if active/retired or has produced forms with responses) |
+| `get_form_definition(guid)`       | Return definition with all items (concepts resolved)               |
+| `list_form_definitions(filters)`  | Paginated list with status/search filters                          |
+| `add_item(form_guid, data)`       | Add a concept to the definition; validate concept exists; enforce uniqueness |
+| `update_item(item_guid, data)`    | Update sort_order, required, display_text_override, enabled, group_label |
+| `remove_item(item_guid)`          | Remove a concept from the definition                               |
+| `reorder_items(form_guid, ordered_guids)` | Bulk reorder items by accepting an ordered list of item GUIDs |
+| `produce(form_guid)`              | Run the production pipeline: resolve items → build FHIR → validate → persist as Questionnaire |
+| `get_resolved_preview(form_guid)` | Resolve items to question set without persisting (for live preview) |
+
+- **17.f** The `produce()` function must:
+  1. Load the FormDefinition and all enabled items (ordered by `sort_order`).
+  2. Resolve each item's concept via the existing `_concept_to_question_item()` from `forms_service.py`.
+  3. Apply per-item overrides (`display_text_override`, `required`, `item_type_override`).
+  4. Group items under `group_label` headings using FHIR `group` items where applicable.
+  5. Pass through `build_fhir_questionnaire()` → `validate_fhir_questionnaire()` → `create_or_append_form_version()`.
+  6. Store the resulting `form_guid` back on `FormDefinition.produced_form_guid`.
+  7. Set `production_key = "builder:<form_definition_guid>"`.
+
+### 17.3 API endpoints — `planp/app/api/form_builder.py`
+
+- **17.g** Register blueprint with prefix `/api/v1/form-definitions`. All write endpoints require `read_write` role. All read endpoints require `read_only`.
+
+| Method | Path                                    | Description                                      |
+|--------|-----------------------------------------|--------------------------------------------------|
+| GET    | `/form-definitions`                     | List definitions (filters: status, search, limit, offset) |
+| POST   | `/form-definitions`                     | Create definition (body: name, title, description) |
+| GET    | `/form-definitions/<guid>`              | Get definition with resolved items                |
+| PUT    | `/form-definitions/<guid>`              | Update metadata                                   |
+| DELETE | `/form-definitions/<guid>`              | Delete draft definition                           |
+| GET    | `/form-definitions/<guid>/items`        | List items for a definition                       |
+| POST   | `/form-definitions/<guid>/items`        | Add concept to definition                         |
+| PUT    | `/form-definitions/<guid>/items/<item_guid>` | Update item settings                         |
+| DELETE | `/form-definitions/<guid>/items/<item_guid>` | Remove item from definition                  |
+| POST   | `/form-definitions/<guid>/reorder`      | Bulk reorder items (body: `[item_guid, ...]`)     |
+| POST   | `/form-definitions/<guid>/produce`      | Run production pipeline → returns FHIR Questionnaire |
+| GET    | `/form-definitions/<guid>/preview`      | Resolve items without persisting (live preview)   |
+
+- **17.h** The `produce` endpoint returns the produced Questionnaire dict (same shape as `POST /api/v1/forms/produce`) and links the FormDefinition to the produced form.
+
+### 17.4 Web UI — Form Builder page
+
+- **17.i** Add web routes to `planp/app/routes/form_builder.py`:
+
+| Route                                      | Method    | Template / Action                          |
+|--------------------------------------------|-----------|--------------------------------------------|
+| `/form-builder`                            | GET       | List all form definitions                  |
+| `/form-builder/create`                     | GET, POST | Create new form definition                 |
+| `/form-builder/<guid>`                     | GET       | View definition detail + items             |
+| `/form-builder/<guid>/edit`                | GET, POST | Edit metadata + manage items               |
+| `/form-builder/<guid>/delete`              | POST      | Delete draft definition                    |
+| `/form-builder/<guid>/produce`             | POST      | Produce FHIR Questionnaire → redirect to form detail |
+
+- **17.j** The **builder/edit page** (`form-builder/<guid>/edit`) is the core interactive experience. It must provide:
+
+1. **Metadata section** — editable title, description, name (auto-derived from title if empty).
+2. **Item list** — a sortable table of added concepts showing:
+   - Sort handle (drag or up/down arrows)
+   - Concept name + canonical code
+   - Response type (auto-detected)
+   - Display text override (inline editable)
+   - Required toggle (checkbox)
+   - Enabled toggle (checkbox)
+   - Group label (inline editable)
+   - Remove button
+3. **Concept picker** — reuse the concept filter/search pattern from `produce.html`:
+   - Searchable list of all active concepts
+   - "Add" button per concept (greyed out if already added)
+   - Show response type and canonical code for each concept
+4. **Live preview panel** — calls `/api/v1/form-definitions/<guid>/preview` and renders a read-only preview of the form as it would appear (question text, type indicator, options for choice questions).
+5. **Produce button** — triggers production pipeline; redirects to the produced Questionnaire detail page on success.
+
+- **17.k** Templates to create:
+
+```
+templates/form_builder/
+├── list.html              # Definition catalogue with status filters
+├── create.html            # New definition form (name, title, description)
+├── view.html              # Read-only definition detail with items and production history
+└── edit.html              # Interactive builder (metadata + item management + preview)
+```
+
+- **17.l** Add "Form Builder" link to the navbar in `base.html` (between "Forms" and "Docs").
+
+### 17.5 Integration with PlanDefinitions
+
+- **17.m** Add optional `form_definition_guid` column to `plan_definitions` table (nullable FK → `form_definitions.guid`). This allows a PlanDefinition to reference a specific authored form.
+
+- **17.n** In the PlanDefinition builder (`/plandefinitions/builder`), add a "Linked Form" dropdown that lists active FormDefinitions. When selected, the form's concepts are displayed read-only in the builder for reference.
+
+- **17.o** When a PlanDefinition with a linked FormDefinition is used in `request.pdhc.se`, the integration endpoint returns:
+  - The PlanDefinition FHIR JSON (existing behavior)
+  - The produced Questionnaire FHIR JSON (from the linked FormDefinition's `produced_form_guid`)
+
+### 17.6 External access — callable from `request.pdhc.se`
+
+- **17.p** Add endpoint `GET /api/v1/form-definitions/<guid>/questionnaire` that returns the latest produced FHIR Questionnaire JSON for a FormDefinition. This is the primary integration point for `request.pdhc.se`:
+  - If the FormDefinition has a `produced_form_guid`, return that Questionnaire's `fhir_json`.
+  - If not yet produced, return 404 with instruction to produce first.
+  - Accepts `?version=N` to retrieve a specific Questionnaire version.
+  - Authentication: API key (`X-API-Key`) or SSO session.
+
+- **17.q** Add endpoint `GET /api/v1/form-definitions/<guid>/render-ready` that returns a simplified, render-ready JSON format optimized for frontend rendering in `request.pdhc.se`:
+
+```json
+{
+  "form_guid": "<uuid>",
+  "title": "Blood Pressure Monitoring",
+  "description": "...",
+  "version": 3,
+  "status": "active",
+  "items": [
+    {
+      "link_id": "<concept-guid>",
+      "text": "Systolic blood pressure",
+      "type": "numeric",
+      "required": true,
+      "unit": "mmHg",
+      "min_value": 60,
+      "max_value": 300,
+      "group": "Vitals"
+    },
+    {
+      "link_id": "<concept-guid>",
+      "text": "Pain severity",
+      "type": "single_choice",
+      "required": true,
+      "options": [
+        {"value": "<guid>", "label": "Mild", "code": "1"},
+        {"value": "<guid>", "label": "Moderate", "code": "2"},
+        {"value": "<guid>", "label": "Severe", "code": "3"}
+      ],
+      "group": "Assessment"
+    }
+  ]
+}
+```
+
+### 17.7 Database migration
+
+- **17.r** Generate migration: `flask db migrate -m "add form_definitions and form_definition_items tables"`.
+- **17.s** Apply migration: `flask db upgrade`.
+- **17.t** Add `form_definition_guid` column to `plan_definitions` via a separate migration: `flask db migrate -m "add form_definition_guid to plan_definitions"`.
+
+### 17.8 Tests
+
+- **17.u** Write `tests/test_form_builder.py`:
+  - CRUD cycle for FormDefinition (create, read, update, delete).
+  - Item management (add, update, remove, reorder).
+  - Duplicate concept rejection (unique constraint).
+  - Production pipeline (produce from definition → verify Questionnaire created).
+  - Preview endpoint returns resolved items without persisting.
+  - Status lifecycle: draft → active → retired.
+  - Delete rejection for active/retired definitions.
+  - Auth enforcement on all endpoints.
+
+- **17.v** Write `tests/test_form_builder_integration.py`:
+  - PlanDefinition with linked FormDefinition produces correct Questionnaire.
+  - `/questionnaire` endpoint returns produced FHIR JSON.
+  - `/render-ready` endpoint returns simplified format.
+  - Version pinning works correctly.
+
+- **17.w** Run tests. Store results in `./results/<timestamp>_results/`. Update `progress.md`.
+
+### 17.9 Capability statement update
+
+- **17.x** Add FormDefinition endpoints to the capability statement in `planp/app/api/capability.py`:
+
+```json
+{
+  "type": "FormDefinition",
+  "profile": "custom:form-definition",
+  "interaction": [
+    {"code": "read"},
+    {"code": "search-type"},
+    {"code": "create"},
+    {"code": "update"},
+    {"code": "delete"}
+  ],
+  "operation": [
+    {"name": "produce", "definition": "Produce FHIR Questionnaire from definition"},
+    {"name": "preview", "definition": "Preview resolved form without persisting"},
+    {"name": "render-ready", "definition": "Render-ready JSON for frontend integration"}
+  ]
+}
+```
+
+### 17.10 File summary
+
+New files:
+
+| File                                            | Purpose                                |
+|-------------------------------------------------|----------------------------------------|
+| `planp/app/services/form_builder_service.py`    | Form builder business logic            |
+| `planp/app/api/form_builder.py`                 | API endpoints blueprint                |
+| `planp/app/routes/form_builder.py`              | Web UI routes                          |
+| `planp/app/templates/form_builder/list.html`    | Definition catalogue                   |
+| `planp/app/templates/form_builder/create.html`  | New definition form                    |
+| `planp/app/templates/form_builder/view.html`    | Definition detail                      |
+| `planp/app/templates/form_builder/edit.html`    | Interactive builder                    |
+| `planp/tests/test_form_builder.py`              | Unit + integration tests               |
+| `planp/tests/test_form_builder_integration.py`  | Cross-system integration tests         |
+
+Modified files:
+
+| File                                            | Change                                 |
+|-------------------------------------------------|----------------------------------------|
+| `planp/app/models/forms_models.py`              | Add FormDefinition, FormDefinitionItem |
+| `planp/app/__init__.py`                         | Register new blueprints                |
+| `planp/app/templates/base.html`                 | Add Form Builder nav link              |
+| `planp/app/models/fhir_models.py`               | Add form_definition_guid column        |
+| `planp/app/api/capability.py`                   | Add FormDefinition to capability       |
+| `planp/migrations/versions/`                    | Two new migration files                |
+
+### 17.11 Implementation order
+
+| Step | Task                                              | Depends on |
+|------|---------------------------------------------------|------------|
+| 1    | Add models (17.a–17.d) + migration (17.r–17.s)   | —          |
+| 2    | Implement service layer (17.e–17.f)               | Step 1     |
+| 3    | Implement API blueprint (17.g–17.h)               | Step 2     |
+| 4    | Register blueprint in `__init__.py`               | Step 3     |
+| 5    | Implement web routes (17.i)                       | Step 2     |
+| 6    | Create templates (17.j–17.l)                      | Step 5     |
+| 7    | Add PlanDefinition integration (17.m–17.o, 17.t)  | Step 4     |
+| 8    | Add external access endpoints (17.p–17.q)         | Step 4     |
+| 9    | Update capability statement (17.x)                | Step 4     |
+| 10   | Write and run tests (17.u–17.w)                   | Steps 1–8  |

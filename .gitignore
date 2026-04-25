@@ -29,3 +29,10 @@ _obs_gateway_repo/
 # SQLite test databases
 instance/
 planp/instance/
+
+# npm cache (frontend bits land in static/js/ once built)
+planp/node_modules/
+node_modules/
+
+# Local DB snapshots (operator-managed)
+db_backups/
