@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ form.title }} — PDHC PlanDef Builder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Edit Form (v{{ form.version }})</h1>
+</div>
+
+<div class="card">
+  <form method="post">
+    <div class="form-group">
+      <label for="title">Title *</label>
+      <input type="text" id="title" name="title" class="form-control" required
+             value="{{ form.title }}">
+    </div>
+
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" class="form-control" rows="3">{{ form.description or '' }}</textarea>
+    </div>
+
+    <div class="detail-grid" style="margin-bottom:1rem;">
+      <span class="detail-label">Form GUID</span>
+      <span class="detail-value"><code>{{ form.form_guid }}</code></span>
+      <span class="detail-label">Version</span>
+      <span class="detail-value">{{ form.version }}</span>
+      <span class="detail-label">Status</span>
+      <span class="detail-value"><span class="badge badge-warning">{{ form.status }}</span></span>
+    </div>
+
+    <div class="button-group">
+      <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Save Changes</button>
+      <a href="{{ url_for('forms_web.form_detail', form_guid=form.form_guid, version=form.version) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

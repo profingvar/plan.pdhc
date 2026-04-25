@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ definition.title }} — Form Definition{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ definition.title }}</h1>
+    <p class="lead">
+      {% if definition.status == 'active' %}<span class="badge badge-success">Active</span>
+      {% elif definition.status == 'draft' %}<span class="badge badge-warning">Draft</span>
+      {% else %}<span class="badge badge-danger">Retired</span>{% endif %}
+      &middot; v{{ definition.vers_number }} &middot; {{ definition.item_count }} items
+    </p>
+  </div>
+  <div class="button-group-sm">
+    <a href="{{ url_for('forms_defs_web.edit_definition', guid=definition.guid) }}" class="btn btn-primary btn-sm"><i data-lucide="pencil"></i> Edit</a>
+    {% if definition.questions %}
+    <form method="post" action="{{ url_for('forms_defs_web.produce_definition', guid=definition.guid) }}" style="display: inline;">
+      <button type="submit" class="btn btn-success btn-sm"><i data-lucide="zap"></i> Produce</button>
+    </form>
+    {% endif %}
+    {% if definition.status == 'draft' %}
+    <form method="post" action="{{ url_for('forms_defs_web.delete_definition_route', guid=definition.guid) }}"
+          onsubmit="return confirm('Delete this form definition?');" style="display: inline;">
+      <button type="submit" class="btn btn-danger btn-sm"><i data-lucide="trash-2"></i> Delete</button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('forms_defs_web.list_definitions') }}" class="btn btn-secondary btn-sm"><i data-lucide="arrow-left"></i> Back</a>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Details</h2>
+    <div class="detail-grid">
+      <span class="detail-label">GUID</span>
+      <span class="detail-value"><code>{{ definition.guid }}</code></span>
+      <span class="detail-label">Name</span>
+      <span class="detail-value"><code>{{ definition.name }}</code></span>
+      <span class="detail-label">Description</span>
+      <span class="detail-value">{{ definition.description or '—' }}</span>
+      <span class="detail-label">Author</span>
+      <span class="detail-value">{{ definition.author or '—' }}</span>
+      <span class="detail-label">Created</span>
+      <span class="detail-value">{{ definition.date_created[:10] if definition.date_created else '—' }}</span>
+      <span class="detail-label">Updated</span>
+      <span class="detail-value">{{ definition.date_updated[:10] if definition.date_updated else '—' }}</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Production</h2>
+    <div class="detail-grid">
+      <span class="detail-label">Produced Form</span>
+      <span class="detail-value">
+        {% if definition.produced_form_guid %}
+          <a href="{{ url_for('forms_web.form_detail', form_guid=definition.produced_form_guid) }}">{{ definition.produced_form_guid[:12] }}...</a>
+        {% else %}
+          <span class="text-muted">Not yet produced</span>
+        {% endif %}
+      </span>
+      <span class="detail-label">Production Key</span>
+      <span class="detail-value"><code>{{ definition.production_key or '—' }}</code></span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Items ({{ definition.questions | length }})</h2>
+  {% if definition.questions %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Concept</th>
+          <th>Display Text</th>
+          <th>Response Type</th>
+          <th>Required</th>
+          <th>Enabled</th>
+          <th>Group</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in definition.questions %}
+        <tr>
+          <td>{{ item.sort_order + 1 }}</td>
+          <td><code>{{ item.concept_name or item.concept_guid[:12] }}</code></td>
+          <td>{{ item.display_text_override or '—' }}</td>
+          <td>{{ item.response_type or '—' }}</td>
+          <td>{% if item.required %}<span class="badge badge-info">Yes</span>{% else %}No{% endif %}</td>
+          <td>{% if item.enabled %}<span class="badge badge-success">Yes</span>{% else %}<span class="badge badge-danger">No</span>{% endif %}</td>
+          <td>{{ item.group_label or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>No items added yet.</p>
+    <a href="{{ url_for('forms_defs_web.edit_definition', guid=definition.guid) }}" class="btn btn-primary btn-sm"><i data-lucide="plus"></i> Add concepts</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

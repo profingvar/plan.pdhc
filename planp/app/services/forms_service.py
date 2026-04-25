@@ -588,7 +588,7 @@ def publish_form_version(form_guid, version=None):
 # 7. GetFormCatalogue
 # ===========================================================================
 
-def get_form_catalogue(status='active', limit=100, offset=0):
+def get_form_catalogue(status='active', limit=100, offset=0, include_archived=False):
     """Return paginated list of forms (latest version per form_guid)."""
     latest_version = (
         Questionnaire.query
@@ -609,6 +609,8 @@ def get_form_catalogue(status='active', limit=100, offset=0):
 
     if status:
         query = query.filter(Questionnaire.status == status)
+    if not include_archived:
+        query = query.filter(Questionnaire.archived == False)
 
     total = query.count()
     forms = query.order_by(Questionnaire.title).offset(offset).limit(limit).all()

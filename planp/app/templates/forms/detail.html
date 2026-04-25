@@ -29,6 +29,14 @@
       <button type="submit" class="btn btn-danger btn-sm"><i data-lucide="archive"></i> Retire</button>
     </form>
     {% endif %}
+    {% if form.status == 'draft' %}
+    <a href="{{ url_for('forms_web.edit_form', form_guid=form.form_guid, version=form.version) }}" class="btn btn-primary btn-sm"><i data-lucide="pencil"></i> Edit</a>
+    <form method="post" action="{{ url_for('forms_web.delete_form', form_guid=form.form_guid) }}" style="display:inline;"
+          onsubmit="return confirm('Delete form v{{ form.version }}?');">
+      <input type="hidden" name="version" value="{{ form.version }}">
+      <button type="submit" class="btn btn-danger btn-sm"><i data-lucide="trash-2"></i> Delete</button>
+    </form>
+    {% endif %}
     <a href="{{ url_for('forms_web.produce_form') }}" class="btn btn-primary btn-sm"><i data-lucide="file-plus"></i> New Form</a>
     <a href="{{ url_for('forms_web.list_forms') }}" class="btn btn-secondary btn-sm"><i data-lucide="arrow-left"></i> Back</a>
   </div>

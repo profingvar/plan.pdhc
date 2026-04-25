@@ -32,23 +32,22 @@ def require_api_key_or_role(fn):
 
 
 # ---------------------------------------------------------------------------
-# Builder read endpoints (API key or SSO)
+# Builder read endpoints (public, rate-limited)
 # ---------------------------------------------------------------------------
 
 @forms_bp.route('/forms')
-@require_api_key_or_role
 def list_forms():
-    """GET /api/v1/forms — GetFormCatalogue"""
+    """GET /api/v1/forms — GetFormCatalogue (public read)"""
     status = request.args.get('status', 'active')
     limit = request.args.get('limit', 100, type=int)
     offset = request.args.get('offset', 0, type=int)
-    return jsonify(get_form_catalogue(status=status, limit=limit, offset=offset))
+    include_archived = request.args.get('include_archived', '0').lower() in ('1','true','yes')
+    return jsonify(get_form_catalogue(status=status, limit=limit, offset=offset, include_archived=include_archived))
 
 
 @forms_bp.route('/forms/<form_guid>')
-@require_api_key_or_role
 def get_form(form_guid):
-    """GET /api/v1/forms/<form_guid> — GetFormDefinition"""
+    """GET /api/v1/forms/<form_guid> — GetFormDefinition (public read)"""
     version = request.args.get('version', type=int)
     try:
         return jsonify(get_form_definition(form_guid, version=version))
@@ -57,9 +56,8 @@ def get_form(form_guid):
 
 
 @forms_bp.route('/forms/<form_guid>/versions')
-@require_api_key_or_role
 def get_versions(form_guid):
-    """GET /api/v1/forms/<form_guid>/versions — GetFormVersionHistory"""
+    """GET /api/v1/forms/<form_guid>/versions — GetFormVersionHistory (public read)"""
     try:
         return jsonify(get_form_version_history(form_guid))
     except HistoryError as e:
@@ -148,6 +146,46 @@ def produce_form():
         return jsonify(error="Build Error", message=e.message, code=e.status_code), e.status_code
     except ValidationError as e:
         return jsonify(error="Validation Error", message=e.message, code=e.status_code), e.status_code
+
+
+@forms_bp.route('/forms/<form_guid>/questionnaire')
+@require_api_key_or_role
+def get_questionnaire(form_guid):
+    """GET /api/v1/forms/<form_guid>/questionnaire — return FHIR Questionnaire JSON."""
+    version = request.args.get('version', type=int)
+    if version is not None:
+        q = Questionnaire.query.filter_by(form_guid=form_guid, version=version).first()
+    else:
+        q = Questionnaire.query.filter_by(
+            form_guid=form_guid, status='active'
+        ).order_by(Questionnaire.version.desc()).first()
+        if not q:
+            q = Questionnaire.query.filter_by(form_guid=form_guid).order_by(
+                Questionnaire.version.desc()
+            ).first()
+    if not q:
+        return jsonify(error="Not Found", message=f"No questionnaire for form {form_guid}", code=404), 404
+    return jsonify(q.fhir_json)
+
+
+@forms_bp.route('/forms/<form_guid>/render-ready')
+@require_api_key_or_role
+def get_form_render_ready(form_guid):
+    """GET /api/v1/forms/<form_guid>/render-ready — return render-ready JSON."""
+    version = request.args.get('version', type=int)
+    if version is not None:
+        q = Questionnaire.query.filter_by(form_guid=form_guid, version=version).first()
+    else:
+        q = Questionnaire.query.filter_by(
+            form_guid=form_guid, status='active'
+        ).order_by(Questionnaire.version.desc()).first()
+        if not q:
+            q = Questionnaire.query.filter_by(form_guid=form_guid).order_by(
+                Questionnaire.version.desc()
+            ).first()
+    if not q:
+        return jsonify(error="Not Found", message=f"No questionnaire for form {form_guid}", code=404), 404
+    return jsonify(q.fhir_json)
 
 
 @forms_bp.route('/forms/<form_guid>/publish', methods=['POST'])
