@@ -10,14 +10,18 @@
 </head>
 <body>
   <nav>
-    <a class="brand" href="{{ url_for('main.dashboard') }}">PDHC PlanDef Builder</a>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <a class="brand" href="https://www.pdhc.se/services.html" style="opacity:0.75;font-size:0.85em;">PDHC</a>
+      <span style="color:rgba(255,255,255,0.3);">/</span>
+      <a class="brand" href="{{ url_for('main.dashboard') }}">PlanDef Builder</a>
+    </div>
     <ul class="nav-links">
       <li><a href="{{ url_for('main.dashboard') }}" {% if request.endpoint == 'main.dashboard' %}class="active"{% endif %}>Dashboard</a></li>
       <li><a href="{{ url_for('concepts_web.list_concepts') }}" {% if request.blueprint == 'concepts_web' %}class="active"{% endif %}>Concepts</a></li>
       <li><a href="{{ url_for('values_web.list_values') }}" {% if request.blueprint == 'values_web' %}class="active"{% endif %}>Values</a></li>
       <li><a href="{{ url_for('valuesets_web.list_valuesets') }}" {% if request.blueprint == 'valuesets_web' %}class="active"{% endif %}>ValueSets</a></li>
       <li><a href="{{ url_for('plandefinitions_web.list_plandefs') }}" {% if request.blueprint == 'plandefinitions_web' %}class="active"{% endif %}>PlanDefs</a></li>
-      <li><a href="{{ url_for('forms_web.list_forms') }}" {% if request.blueprint == 'forms_web' %}class="active"{% endif %}>Forms</a></li>
+      <li><a href="{{ url_for('forms_web.list_forms') }}" {% if request.blueprint == 'forms_web' or request.blueprint == 'forms_defs_web' %}class="active"{% endif %}>Forms</a></li>
       <li class="nav-separator"></li>
       <li><a href="{{ url_for('lookup_web.list_canonical_libs') }}" {% if 'canonical_lib' in request.endpoint|default('') %}class="active"{% endif %}>Libraries</a></li>
       <li><a href="{{ url_for('lookup_web.list_units') }}" {% if 'unit' in request.endpoint|default('') %}class="active"{% endif %}>Units</a></li>
@@ -49,6 +53,7 @@
   </div>
 
   <script>lucide.createIcons();</script>
+  <script src="{{ url_for('static', filename='js/agentation.bundle.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>
