@@ -85,6 +85,14 @@ def create_app(testing=False):
     from app.api.capability import capability_bp
     app.register_blueprint(capability_bp, url_prefix='/api/v1')
 
+    # Terminology surface — $validate-code + termbank proxies (platform-plan §0.2)
+    from app.api.terminology import bp as terminology_bp
+    app.register_blueprint(terminology_bp, url_prefix='/api/v1')
+
+    # Termbank HTTP client — one instance per app, with TTL cache
+    from app.services.termbank_client import TermbankClient
+    app.termbank_client = TermbankClient()
+
     # Register web UI blueprints
     from app.routes.main import main_bp
     app.register_blueprint(main_bp)
