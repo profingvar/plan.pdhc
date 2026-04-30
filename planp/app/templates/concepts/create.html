@@ -43,7 +43,7 @@
       <select id="canonical_lib" name="canonical_lib" class="form-control" required>
         <option value="">Select...</option>
         {% for lib in canonical_libs %}
-        <option value="{{ lib.guid }}">{{ lib.canonical_lib_name }}</option>
+        <option value="{{ lib.guid }}" data-name="{{ lib.canonical_lib_name }}">{{ lib.canonical_lib_display_text or lib.canonical_lib_name }}</option>
         {% endfor %}
       </select>
     </div>

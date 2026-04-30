@@ -36,20 +36,26 @@
   function buildSystemSelect(panel, libSelect) {
     var sysSelect = panel.querySelector("[data-termbank-system]");
     sysSelect.innerHTML = '<option value="">All systems</option>';
-    var names = [];
+    // Each entry is { name, label } — name is the short canonical
+    // identifier sent to termbank's `/search?system=`, label is the
+    // human-friendly display.
+    var entries = [];
     if (libSelect) {
       Array.prototype.forEach.call(libSelect.options, function (opt) {
         if (!opt.value) return;
-        var name = (opt.textContent || "").trim();
-        if (name) names.push(name);
+        // Prefer data-name (the canonical short name) over the option's
+        // displayed text. Falls back to text for older templates.
+        var name = (opt.getAttribute("data-name") || opt.textContent || "").trim();
+        var label = (opt.textContent || "").trim() || name;
+        if (name) entries.push({ name: name, label: label });
       });
     } else {
-      names = FALLBACK_SYSTEMS.slice();
+      entries = FALLBACK_SYSTEMS.map(function (n) { return { name: n, label: n }; });
     }
-    names.forEach(function (name) {
+    entries.forEach(function (e) {
       var o = document.createElement("option");
-      o.value = name;
-      o.textContent = name;
+      o.value = e.name;
+      o.textContent = e.label;
       sysSelect.appendChild(o);
     });
   }
