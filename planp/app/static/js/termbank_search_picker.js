@@ -10,7 +10,11 @@
  * The widget reads system options from the named canonical_lib select,
  * so it stays in sync with whatever CanonicalLib rows the page renders.
  *
- * Calls /api/v1/termbank/search and on click populates the form fields.
+ * Calls /api/v1/termbank/search with a "prechosen libs" multi-select
+ * (one checkbox per canonical lib) so users can scope the search
+ * across several systems at once. Repeated `system=…` query params
+ * are sent — termbank's /search honours them. On click of a result
+ * the form fields are populated.
  */
 (function () {
   function escapeHtml(s) {
@@ -31,33 +35,71 @@
   // Fallback list of termbank systems when no canonical_lib <select> is
   // exposed on the page (e.g. on edit forms that don't let you change
   // the library). Keep in sync with the seed migration's CANONICAL_LIBS.
-  var FALLBACK_SYSTEMS = ["loinc", "socialstyrelsen", "icd10", "atc", "snomed"];
+  var FALLBACK_SYSTEMS = ["loinc", "socialstyrelsen", "icd10", "atc", "snomed", "icf"];
 
-  function buildSystemSelect(panel, libSelect) {
-    var sysSelect = panel.querySelector("[data-termbank-system]");
-    sysSelect.innerHTML = '<option value="">All systems</option>';
+  function readEntries(libSelect) {
     // Each entry is { name, label } — name is the short canonical
     // identifier sent to termbank's `/search?system=`, label is the
     // human-friendly display.
-    var entries = [];
-    if (libSelect) {
-      Array.prototype.forEach.call(libSelect.options, function (opt) {
-        if (!opt.value) return;
-        // Prefer data-name (the canonical short name) over the option's
-        // displayed text. Falls back to text for older templates.
-        var name = (opt.getAttribute("data-name") || opt.textContent || "").trim();
-        var label = (opt.textContent || "").trim() || name;
-        if (name) entries.push({ name: name, label: label });
-      });
-    } else {
-      entries = FALLBACK_SYSTEMS.map(function (n) { return { name: n, label: n }; });
+    if (!libSelect) {
+      return FALLBACK_SYSTEMS.map(function (n) { return { name: n, label: n }; });
     }
-    entries.forEach(function (e) {
-      var o = document.createElement("option");
-      o.value = e.name;
-      o.textContent = e.label;
-      sysSelect.appendChild(o);
+    var entries = [];
+    Array.prototype.forEach.call(libSelect.options, function (opt) {
+      if (!opt.value) return;
+      var name = (opt.getAttribute("data-name") || opt.textContent || "").trim();
+      var label = (opt.textContent || "").trim() || name;
+      if (name) entries.push({ name: name, label: label });
     });
+    return entries;
+  }
+
+  function buildSystemCheckboxes(panel, entries) {
+    // Modern container; falls back to the legacy <select data-termbank-system>
+    // for templates that haven't been migrated yet.
+    var box = panel.querySelector("[data-termbank-systems]");
+    if (!box) {
+      var legacy = panel.querySelector("[data-termbank-system]");
+      if (legacy) {
+        legacy.innerHTML = '<option value="">All libraries</option>';
+        entries.forEach(function (e) {
+          var o = document.createElement("option");
+          o.value = e.name;
+          o.textContent = e.label;
+          legacy.appendChild(o);
+        });
+      }
+      return;
+    }
+    box.innerHTML = "";
+    box.style.display = "flex";
+    box.style.flexWrap = "wrap";
+    box.style.gap = "0.5rem 0.9rem";
+    entries.forEach(function (e) {
+      var label = document.createElement("label");
+      label.style.display = "inline-flex";
+      label.style.alignItems = "center";
+      label.style.gap = "0.25rem";
+      label.style.fontSize = "0.85em";
+      label.style.cursor = "pointer";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = e.name;
+      cb.setAttribute("data-termbank-system-cb", "");
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(" " + e.label));
+      box.appendChild(label);
+    });
+  }
+
+  function selectedSystems(panel) {
+    var modern = panel.querySelectorAll("[data-termbank-system-cb]:checked");
+    if (modern && modern.length) {
+      return Array.prototype.map.call(modern, function (cb) { return cb.value; });
+    }
+    var legacy = panel.querySelector("[data-termbank-system]");
+    if (legacy && legacy.value) return [legacy.value];
+    return [];
   }
 
   function applyResult(panel, result) {
@@ -141,21 +183,21 @@
 
   function bind(panel) {
     var qInput = panel.querySelector("[data-termbank-q]");
-    var sysSelect = panel.querySelector("[data-termbank-system]");
     var libSelectId = panel.getAttribute("data-system-select");
     var libSelect = libSelectId ? document.getElementById(libSelectId) : null;
 
-    buildSystemSelect(panel, libSelect);
+    buildSystemCheckboxes(panel, readEntries(libSelect));
 
     function search() {
       var q = (qInput.value || "").trim();
-      var sys = sysSelect.value;
       if (q.length < 2) {
         panel.querySelector("[data-termbank-results]").innerHTML = "";
         return;
       }
       var url = "/api/v1/termbank/search?q=" + encodeURIComponent(q) + "&limit=10";
-      if (sys) url += "&system=" + encodeURIComponent(sys);
+      selectedSystems(panel).forEach(function (s) {
+        url += "&system=" + encodeURIComponent(s);
+      });
       fetch(url)
         .then(function (r) { return r.ok ? r.json() : { error: "http_" + r.status, results: [] }; })
         .then(function (body) { renderResults(panel, body); })
@@ -164,7 +206,11 @@
 
     var debounced = debounce(search, 300);
     qInput.addEventListener("input", debounced);
-    sysSelect.addEventListener("change", search);
+    panel.addEventListener("change", function (ev) {
+      if (ev.target && ev.target.matches("[data-termbank-system-cb], [data-termbank-system]")) {
+        search();
+      }
+    });
   }
 
   function init() {

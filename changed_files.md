@@ -167,3 +167,11 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 | `planp/app/static/js/termbank_search_picker.js` | `buildSystemSelect` now reads `opt.getAttribute("data-name")` first, falling back to `textContent` for compatibility. Each option carries `value` = canonical short name; visible text = display label. Lets the same widget render either friendly or short labels depending on whether the underlying form sets `data-name`. |
 | (DB) miserver pdhc_db / `canonical_libs` | Six canonical_libs aligned with termbank's `concepts.system` exact-match: ATC→atc, ICD10→icd10, LOINC→loinc, "Snomed CT"→snomed; added new rows `icf` and `socialstyrelsen`. Pre-existing rows from migration `b3a1f7c9d401` had drifted from the seed convention; the later seed migration `c2d6ef39a1f0` was idempotent and skipped them. Same rename + ICF insert applied to local Mac DB on :9031. |
 | `pdhc_app` env | Added `TERMBANK_BASE_URL=http://host.docker.internal:9012` to `/usr/local/www/plan.pdhc/planp/.env`. Container recreated via `docker compose -p planp up -d app` so the env actually loads (docker restart keeps create-time env). Plan.pdhc's New Concept widget now reaches termbank.pdhc and returns real results across all 6 systems. |
+
+## 2026-04-30 — Multi-select "prechosen libs" in termbank picker
+
+| File | Change |
+|------|--------|
+| `planp/app/static/js/termbank_search_picker.js` | Replaced the single `<select data-termbank-system>` dropdown with a checkbox group (`<div data-termbank-systems>`) — one checkbox per canonical_lib. JS collects all checked boxes and sends repeated `?system=loinc&system=snomed` query params (which termbank's new ranked `/search` honours via `request.args.getlist`). Legacy `data-termbank-system` `<select>` still honoured if any template hasn't been migrated. `FALLBACK_SYSTEMS` extended with `icf`. |
+| `planp/app/templates/concepts/create.html`, `planp/app/templates/concepts/edit.html`, `planp/app/templates/values/create.html`, `planp/app/templates/values/edit.html` | Picker block restructured: query input on its own row, "Limit to libraries (none = all)" checkbox row underneath. |
+| `pdhc_app` (live container) | New JS + 4 templates copied via `colima ssh -- docker cp` from `/Users/miserver/tmp_plan_deploy/...` (image-baked code, not bind-mounted). pdhc_app restarted; /api/health 200. |

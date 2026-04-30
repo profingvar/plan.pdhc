@@ -11,15 +11,13 @@
      data-code-input="canonical_refnumber"
      style="background:#f9f9f9; margin-bottom:1rem;">
   <h4 style="margin:0 0 0.5rem 0;">Search termbank to fill</h4>
-  <div style="display:flex; gap:0.5rem; align-items:flex-end;">
-    <div style="flex:1;">
-      <label style="font-size:0.85em;">Query</label>
-      <input type="text" data-termbank-q class="form-control" placeholder="e.g. diabetes mellitus typ 2…">
-    </div>
-    <div style="width:200px;">
-      <label style="font-size:0.85em;">System</label>
-      <select data-termbank-system class="form-control"></select>
-    </div>
+  <div style="flex:1;">
+    <label style="font-size:0.85em;">Query</label>
+    <input type="text" data-termbank-q class="form-control" placeholder="e.g. diabetes mellitus typ 2…">
+  </div>
+  <div style="margin-top:0.5rem;">
+    <label style="font-size:0.85em;">Limit to libraries (none = all)</label>
+    <div data-termbank-systems></div>
   </div>
   <div data-termbank-results style="margin-top:0.5rem;"></div>
   <p style="font-size:0.75em;color:var(--text-muted);margin-top:0.5rem;">
