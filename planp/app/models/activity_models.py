@@ -23,6 +23,14 @@ class Activity(db.Model):
     timing_duration = db.Column(db.Float, nullable=True)
     timing_duration_unit = db.Column(db.String(10), nullable=True)
 
+    # Bounded recurrence — NULL means unbounded (backward compatible).
+    # mode='count' → bounds_count holds total occurrences (Timing.repeat.count)
+    # mode='duration' → bounds_duration_* hold the window (Timing.repeat.boundsDuration)
+    timing_bounds_mode = db.Column(db.String(20), nullable=True)
+    timing_bounds_count = db.Column(db.Integer, nullable=True)
+    timing_bounds_duration_value = db.Column(db.Float, nullable=True)
+    timing_bounds_duration_unit = db.Column(db.String(10), nullable=True)
+
     notes = db.Column(db.Text, nullable=True)
     date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     date_updated = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
@@ -43,6 +51,10 @@ class Activity(db.Model):
             'timing_frequency': self.timing_frequency,
             'timing_period': self.timing_period,
             'timing_period_unit': self.timing_period_unit,
+            'timing_bounds_mode': self.timing_bounds_mode,
+            'timing_bounds_count': self.timing_bounds_count,
+            'timing_bounds_duration_value': self.timing_bounds_duration_value,
+            'timing_bounds_duration_unit': self.timing_bounds_duration_unit,
             'notes': self.notes,
         }
 

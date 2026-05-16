@@ -175,3 +175,14 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 | `planp/app/static/js/termbank_search_picker.js` | Replaced the single `<select data-termbank-system>` dropdown with a checkbox group (`<div data-termbank-systems>`) — one checkbox per canonical_lib. JS collects all checked boxes and sends repeated `?system=loinc&system=snomed` query params (which termbank's new ranked `/search` honours via `request.args.getlist`). Legacy `data-termbank-system` `<select>` still honoured if any template hasn't been migrated. `FALLBACK_SYSTEMS` extended with `icf`. |
 | `planp/app/templates/concepts/create.html`, `planp/app/templates/concepts/edit.html`, `planp/app/templates/values/create.html`, `planp/app/templates/values/edit.html` | Picker block restructured: query input on its own row, "Limit to libraries (none = all)" checkbox row underneath. |
 | `pdhc_app` (live container) | New JS + 4 templates copied via `colima ssh -- docker cp` from `/Users/miserver/tmp_plan_deploy/...` (image-baked code, not bind-mounted). pdhc_app restarted; /api/health 200. |
+
+## 2026-05-16 — Bounded recurrence on PlanDefinition actions (Option A)
+
+| File | Change |
+|------|--------|
+| `planp/app/models/activity_models.py` | Added four nullable columns to `Activity`: `timing_bounds_mode` ('count' / 'duration' / NULL), `timing_bounds_count`, `timing_bounds_duration_value`, `timing_bounds_duration_unit`. NULL = unbounded (backward compatible). `to_dict` extended. |
+| `planp/migrations/versions/d4f5a6b71208_add_activity_timing_bounds.py` | New migration. `down_revision = c2d6ef39a1f0` (current head). Adds the four columns, all nullable. |
+| `planp/app/templates/plandefinitions/builder.html` | New "Ends" row rendered by `boundsRowHtml()` — segmented select (Never / After N occurrences / After a period) with conditional inputs. Visible only when Timing = Repeat (toggled by `onTimingTypeChange`). `collectActions()` serializes the new fields; `buildFhirPreview()` emits `repeat.count` or `repeat.boundsDuration` (UCUM). |
+| `planp/app/routes/plandefinitions.py` | `create_plandef` and `edit_plandef` persist the four new fields on both new and existing Activity rows. |
+| `planp/app/api/plandefinitions.py` | `create_plandefinition` and `update_plandefinition` persist the four new fields on both new and existing Activity rows. |
+| `planp/app/services/fhir_service.py` | Form-action FHIR emission now includes `count` or `boundsDuration` on `Timing.repeat` when bounds_mode is set. Regular actions inherit the new fields automatically via the raw JSON pass-through. |

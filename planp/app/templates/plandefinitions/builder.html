@@ -391,7 +391,7 @@ function addAction(data) {
     <div class="form-row-3">
       <div class="form-group">
         <label>Timing</label>
-        <select class="form-control action-timing-type" onchange="updatePreview()">
+        <select class="form-control action-timing-type" onchange="onTimingTypeChange(this); updatePreview();">
           <option value="">None</option>
           <option value="once" ${timingType === 'once' ? 'selected' : ''}>Once</option>
           <option value="repeat" ${timingType === 'repeat' ? 'selected' : ''}>Repeat</option>
@@ -429,6 +429,7 @@ function addAction(data) {
         </div>
       </div>
     </div>
+    ${boundsRowHtml(data, timingType)}
 
     <div class="sub-section">
       <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -494,7 +495,7 @@ function addFormAction(data) {
     <div class="form-row-3">
       <div class="form-group">
         <label>Timing</label>
-        <select class="form-control action-timing-type" onchange="updatePreview()">
+        <select class="form-control action-timing-type" onchange="onTimingTypeChange(this); updatePreview();">
           <option value="">None</option>
           <option value="once" ${timingType === 'once' ? 'selected' : ''}>Once</option>
           <option value="repeat" ${timingType === 'repeat' ? 'selected' : ''}>Repeat</option>
@@ -517,6 +518,7 @@ function addFormAction(data) {
         </div>
       </div>
     </div>
+    ${boundsRowHtml(data, timingType)}
   `;
   container.appendChild(div);
   lucide.createIcons();
@@ -584,10 +586,62 @@ function addTransaction(actionRow, actionIdx, data) {
   updatePreview();
 }
 
+// Render the "Ends" row (count or duration bound). Shown only when Timing = Repeat.
+function boundsRowHtml(data, timingType) {
+  const mode = data.timing_bounds_mode || '';
+  const visible = timingType === 'repeat';
+  const showCount = mode === 'count';
+  const showDuration = mode === 'duration';
+  const unit = data.timing_bounds_duration_unit || 'mo';
+  return `
+    <div class="form-row action-bounds-row" style="display:${visible ? '' : 'none'};">
+      <div class="form-group">
+        <label>Ends</label>
+        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+          <select class="form-control action-bounds-mode" onchange="onBoundsModeChange(this); updatePreview();" style="flex:0 0 14rem;">
+            <option value="" ${!mode ? 'selected' : ''}>Never (repeats indefinitely)</option>
+            <option value="count" ${mode === 'count' ? 'selected' : ''}>After N occurrences</option>
+            <option value="duration" ${mode === 'duration' ? 'selected' : ''}>After a period</option>
+          </select>
+          <div class="bounds-count-group" style="display:${showCount ? 'flex' : 'none'}; gap:0.5rem; align-items:center; flex:1; min-width:14rem;">
+            <input type="number" min="1" class="form-control action-bounds-count" value="${data.timing_bounds_count || ''}" placeholder="e.g. 6" oninput="updatePreview()" style="flex:0 0 6rem;">
+            <span style="color:var(--text-muted);">occurrences total</span>
+          </div>
+          <div class="bounds-duration-group" style="display:${showDuration ? 'flex' : 'none'}; gap:0.5rem; align-items:center; flex:1; min-width:14rem;">
+            <input type="number" step="any" min="1" class="form-control action-bounds-duration-value" value="${data.timing_bounds_duration_value || ''}" placeholder="e.g. 6" oninput="updatePreview()" style="flex:0 0 6rem;">
+            <select class="form-control action-bounds-duration-unit" onchange="updatePreview()" style="flex:0 0 7rem;">
+              <option value="d" ${unit === 'd' ? 'selected' : ''}>days</option>
+              <option value="wk" ${unit === 'wk' ? 'selected' : ''}>weeks</option>
+              <option value="mo" ${unit === 'mo' ? 'selected' : ''}>months</option>
+            </select>
+            <span style="color:var(--text-muted);">from start</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function onBoundsModeChange(sel) {
+  const wrapper = sel.parentElement;
+  const mode = sel.value;
+  wrapper.querySelector('.bounds-count-group').style.display = (mode === 'count') ? 'flex' : 'none';
+  wrapper.querySelector('.bounds-duration-group').style.display = (mode === 'duration') ? 'flex' : 'none';
+}
+
+function onTimingTypeChange(sel) {
+  const row = sel.closest('.item-row');
+  const boundsRow = row.querySelector('.action-bounds-row');
+  if (boundsRow) {
+    boundsRow.style.display = (sel.value === 'repeat') ? '' : 'none';
+  }
+}
+
 function collectActions() {
   const actions = [];
   document.querySelectorAll('#actionsContainer .item-row').forEach(row => {
     const isForm = row.dataset.isForm === '1';
+    const boundsMode = row.querySelector('.action-bounds-mode')?.value || null;
     const act = {
       id: row.dataset.actGuid || undefined,
       title: row.querySelector('.action-title')?.value || '',
@@ -596,6 +650,13 @@ function collectActions() {
       timing_frequency: row.querySelector('.action-timing-freq')?.value ? parseInt(row.querySelector('.action-timing-freq').value) : null,
       timing_period: row.querySelector('.action-timing-period')?.value ? parseFloat(row.querySelector('.action-timing-period').value) : null,
       timing_period_unit: row.querySelector('.action-timing-unit')?.value || null,
+      timing_bounds_mode: boundsMode || null,
+      timing_bounds_count: boundsMode === 'count' && row.querySelector('.action-bounds-count')?.value
+        ? parseInt(row.querySelector('.action-bounds-count').value) : null,
+      timing_bounds_duration_value: boundsMode === 'duration' && row.querySelector('.action-bounds-duration-value')?.value
+        ? parseFloat(row.querySelector('.action-bounds-duration-value').value) : null,
+      timing_bounds_duration_unit: boundsMode === 'duration'
+        ? (row.querySelector('.action-bounds-duration-unit')?.value || null) : null,
       transactions: [],
     };
 
@@ -739,6 +800,16 @@ function buildFhirPreview() {
         if (act.duration_value) {
           repeat.duration = act.duration_value;
           repeat.durationUnit = act.duration_unit || 'min';
+        }
+        if (act.timing_bounds_mode === 'count' && act.timing_bounds_count) {
+          repeat.count = act.timing_bounds_count;
+        } else if (act.timing_bounds_mode === 'duration' && act.timing_bounds_duration_value) {
+          repeat.boundsDuration = {
+            value: act.timing_bounds_duration_value,
+            unit: act.timing_bounds_duration_unit || 'mo',
+            system: 'http://unitsofmeasure.org',
+            code: act.timing_bounds_duration_unit || 'mo',
+          };
         }
         fhirAction.timingTiming = { repeat };
       } else if (act.timing_type === 'once' && act.duration_value) {

@@ -214,6 +214,10 @@ def create_plandefinition():
             timing_frequency=act_data.get('timing_frequency'),
             timing_period=act_data.get('timing_period'),
             timing_period_unit=act_data.get('timing_period_unit'),
+            timing_bounds_mode=act_data.get('timing_bounds_mode'),
+            timing_bounds_count=act_data.get('timing_bounds_count'),
+            timing_bounds_duration_value=act_data.get('timing_bounds_duration_value'),
+            timing_bounds_duration_unit=act_data.get('timing_bounds_duration_unit'),
             notes=_sanitize(act_data.get('notes')),
         )
         db.session.add(activity)
@@ -339,6 +343,14 @@ def update_plandefinition(guid):
             if activity:
                 activity.title = _sanitize(act_data.get('title', activity.title))
                 activity.description = _sanitize(act_data.get('description', activity.description))
+                activity.timing_type = act_data.get('timing_type')
+                activity.timing_frequency = act_data.get('timing_frequency')
+                activity.timing_period = act_data.get('timing_period')
+                activity.timing_period_unit = act_data.get('timing_period_unit')
+                activity.timing_bounds_mode = act_data.get('timing_bounds_mode')
+                activity.timing_bounds_count = act_data.get('timing_bounds_count')
+                activity.timing_bounds_duration_value = act_data.get('timing_bounds_duration_value')
+                activity.timing_bounds_duration_unit = act_data.get('timing_bounds_duration_unit')
                 Transaction.query.filter_by(activity_guid=activity.guid).delete()
             else:
                 activity = Activity(
@@ -350,6 +362,10 @@ def update_plandefinition(guid):
                     timing_frequency=act_data.get('timing_frequency'),
                     timing_period=act_data.get('timing_period'),
                     timing_period_unit=act_data.get('timing_period_unit'),
+                    timing_bounds_mode=act_data.get('timing_bounds_mode'),
+                    timing_bounds_count=act_data.get('timing_bounds_count'),
+                    timing_bounds_duration_value=act_data.get('timing_bounds_duration_value'),
+                    timing_bounds_duration_unit=act_data.get('timing_bounds_duration_unit'),
                     notes=_sanitize(act_data.get('notes')),
                 )
                 db.session.add(activity)

@@ -125,13 +125,23 @@ class FHIRService:
                                 fhir_act['description'] = act['description']
                             # Timing
                             if act.get('timing_type') == 'repeat' and act.get('timing_frequency'):
-                                fhir_act['timingTiming'] = {
-                                    'repeat': {
-                                        'frequency': act['timing_frequency'],
-                                        'period': act.get('timing_period', 1),
-                                        'periodUnit': act.get('timing_period_unit', 'd'),
-                                    }
+                                repeat = {
+                                    'frequency': act['timing_frequency'],
+                                    'period': act.get('timing_period', 1),
+                                    'periodUnit': act.get('timing_period_unit', 'd'),
                                 }
+                                bounds_mode = act.get('timing_bounds_mode')
+                                if bounds_mode == 'count' and act.get('timing_bounds_count'):
+                                    repeat['count'] = act['timing_bounds_count']
+                                elif bounds_mode == 'duration' and act.get('timing_bounds_duration_value'):
+                                    unit = act.get('timing_bounds_duration_unit') or 'mo'
+                                    repeat['boundsDuration'] = {
+                                        'value': act['timing_bounds_duration_value'],
+                                        'unit': unit,
+                                        'system': 'http://unitsofmeasure.org',
+                                        'code': unit,
+                                    }
+                                fhir_act['timingTiming'] = {'repeat': repeat}
                             fhir_actions.append(fhir_act)
                         else:
                             fhir_actions.append(act)
