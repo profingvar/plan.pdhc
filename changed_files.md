@@ -193,3 +193,9 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 |------|--------|
 | `planp/app/templates/plandefinitions/builder.html` | Added `PLAN_BASE = 'https://plan.pdhc.se'` const. `definitionCanonical` for form actions and concept-bound transaction sub-actions now emits full URL (`{PLAN_BASE}/api/v1/forms/<guid>` and `/api/v1/concepts/<guid>`) instead of relative `Questionnaire/<guid>` / `Concept/<guid>`. Goal Quantity/Range targets now include UCUM `system` (`http://unitsofmeasure.org`) + `code` on every `Quantity` (helper `qty()`); categorical targets emit `coding` array with `system = {PLAN_BASE}/api/v1/valuesets/<vs_guid>` so providers can validate against the bound valueset. |
 | `planp/app/services/fhir_service.py` | Added `PLAN_BASE = "https://plan.pdhc.se"` const. Server-side form-action emission updated to full canonical URL for `definitionCanonical`. (Regular actions inherit changes via the raw JSON pass-through that's already populated by the JS preview.) |
+
+## 2026-05-18 — Snapshot enrichment so CarePlan can emit fully-coded goal targets
+
+| File | Change |
+|------|--------|
+| `planp/app/templates/plandefinitions/builder.html` | `collectGoals()` now enriches the goal JSON with `target_unit_name` (resolved from UNITS lookup; plan.pdhc unit_name == UCUM code), and for categorical targets `target_categorical_valueset` + `target_categorical_code` + `target_categorical_display` (resolved from CONCEPTS → VALUESETS lookup). The snapshot is now self-contained — downstream consumers (request.pdhc CarePlan, providers) can emit fully-coded FHIR Quantity / CodeableConcept without resolving GUIDs back through plan.pdhc's API. |

@@ -349,9 +349,30 @@ function collectGoals() {
     } else if (targetType === 'categorical') {
       const catValue = row.querySelector('.goal-cat-value')?.value;
       g.target_categorical_text = catValue || catText || null;
+      // Enrich with valueset coding so the snapshot is self-contained
+      // for downstream consumers (request.pdhc CarePlan, providers).
+      const concept = CONCEPTS.find(c => c.guid === g.concept_guid);
+      if (concept && concept.valueset) {
+        g.target_categorical_valueset = concept.valueset;
+        const vs = VALUESETS.find(v => v.guid === concept.valueset);
+        const v = vs && vs.values && vs.values.find(x =>
+          x.value_name === g.target_categorical_text ||
+          x.value_display_text === g.target_categorical_text);
+        if (v) {
+          g.target_categorical_code = v.value_name;
+          g.target_categorical_display = v.value_display_text || v.value_name;
+        }
+      }
     }
 
-    if (unitSel?.value) g.target_unit = unitSel.value;
+    if (unitSel?.value) {
+      g.target_unit = unitSel.value;
+      // Carry the unit name (= UCUM code in plan.pdhc's catalog) so
+      // request.pdhc can emit a fully-qualified FHIR Quantity without
+      // resolving the GUID via API.
+      const u = UNITS.find(uu => uu.guid === unitSel.value);
+      if (u) g.target_unit_name = u.unit_name;
+    }
 
     goals.push(g);
   });
