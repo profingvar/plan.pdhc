@@ -186,3 +186,10 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 | `planp/app/routes/plandefinitions.py` | `create_plandef` and `edit_plandef` persist the four new fields on both new and existing Activity rows. |
 | `planp/app/api/plandefinitions.py` | `create_plandefinition` and `update_plandefinition` persist the four new fields on both new and existing Activity rows. |
 | `planp/app/services/fhir_service.py` | Form-action FHIR emission now includes `count` or `boundsDuration` on `Timing.repeat` when bounds_mode is set. Regular actions inherit the new fields automatically via the raw JSON pass-through. |
+
+## 2026-05-18 — Full canonical URL refs in FHIR emission
+
+| File | Change |
+|------|--------|
+| `planp/app/templates/plandefinitions/builder.html` | Added `PLAN_BASE = 'https://plan.pdhc.se'` const. `definitionCanonical` for form actions and concept-bound transaction sub-actions now emits full URL (`{PLAN_BASE}/api/v1/forms/<guid>` and `/api/v1/concepts/<guid>`) instead of relative `Questionnaire/<guid>` / `Concept/<guid>`. Goal Quantity/Range targets now include UCUM `system` (`http://unitsofmeasure.org`) + `code` on every `Quantity` (helper `qty()`); categorical targets emit `coding` array with `system = {PLAN_BASE}/api/v1/valuesets/<vs_guid>` so providers can validate against the bound valueset. |
+| `planp/app/services/fhir_service.py` | Added `PLAN_BASE = "https://plan.pdhc.se"` const. Server-side form-action emission updated to full canonical URL for `definitionCanonical`. (Regular actions inherit changes via the raw JSON pass-through that's already populated by the JS preview.) |

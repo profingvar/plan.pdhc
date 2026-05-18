@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 from app.models.forms_models import Questionnaire
 
+PLAN_BASE = "https://plan.pdhc.se"
+
 
 class FHIRService:
     """Builds FHIR R5 PlanDefinition JSON from a PlanDefinition model instance."""
@@ -119,7 +121,7 @@ class FHIRService:
                                         'display': 'Collect information',
                                     }]
                                 },
-                                'definitionCanonical': f'Questionnaire/{act["form_guid"]}',
+                                'definitionCanonical': f'{PLAN_BASE}/api/v1/forms/{act["form_guid"]}',
                             }
                             if act.get('description'):
                                 fhir_act['description'] = act['description']

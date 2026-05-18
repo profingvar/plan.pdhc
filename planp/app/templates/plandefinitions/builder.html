@@ -205,6 +205,11 @@ const PRODUCED_FORMS = [
   {% endfor %}
 ];
 
+// Canonical base URL for plan.pdhc-published resources. Used to emit
+// fully-qualified definitionCanonical refs so external consumers
+// (providers receiving the dispatched plan) can resolve them.
+const PLAN_BASE = 'https://plan.pdhc.se';
+
 let goalCounter = 0;
 let actionCounter = 0;
 
@@ -744,20 +749,40 @@ function buildFhirPreview() {
 
       if (g.target_type) {
         const target = {};
+        // Helper: build a FHIR Quantity with UCUM system+code so the unit
+        // identity is unambiguous to external consumers (providers).
+        const qty = (value) => {
+          const q = { value };
+          if (unit) {
+            q.unit = unit.unit_name;
+            q.system = 'http://unitsofmeasure.org';
+            q.code = unit.unit_name;
+          }
+          return q;
+        };
         if (g.target_type === 'quantity' && g.target_quantity != null) {
-          target.detailQuantity = { value: g.target_quantity };
-          if (unit) target.detailQuantity.unit = unit.unit_name;
+          target.detailQuantity = qty(g.target_quantity);
           if (g.target_operator) target.detailQuantity._operator = g.target_operator;
         } else if (g.target_type === 'range') {
           target.detailRange = {};
-          if (g.target_range_low != null) target.detailRange.low = { value: g.target_range_low };
-          if (g.target_range_high != null) target.detailRange.high = { value: g.target_range_high };
-          if (unit) {
-            if (target.detailRange.low) target.detailRange.low.unit = unit.unit_name;
-            if (target.detailRange.high) target.detailRange.high.unit = unit.unit_name;
-          }
+          if (g.target_range_low != null) target.detailRange.low = qty(g.target_range_low);
+          if (g.target_range_high != null) target.detailRange.high = qty(g.target_range_high);
         } else if (g.target_type === 'categorical' && g.target_categorical_text) {
-          target.detailCodeableConcept = { text: g.target_categorical_text };
+          // If the goal's concept has a bound valueset, emit a coded
+          // value so providers can validate against the valueset.
+          const cc = { text: g.target_categorical_text };
+          if (concept && concept.valueset) {
+            const vs = VALUESETS.find(v => v.guid === concept.valueset);
+            const v = vs && vs.values && vs.values.find(x =>
+              (x.value_name === g.target_categorical_text) ||
+              (x.value_display_text === g.target_categorical_text));
+            cc.coding = [{
+              system: `${PLAN_BASE}/api/v1/valuesets/${concept.valueset}`,
+              code: v ? v.value_name : g.target_categorical_text,
+            }];
+            if (v && v.value_display_text) cc.coding[0].display = v.value_display_text;
+          }
+          target.detailCodeableConcept = cc;
         }
         if (Object.keys(target).length > 0) fhirGoal.target = [target];
       }
@@ -783,7 +808,7 @@ function buildFhirPreview() {
             display: 'Collect information',
           }]
         };
-        fhirAction.definitionCanonical = `Questionnaire/${act.form_guid}`;
+        fhirAction.definitionCanonical = `${PLAN_BASE}/api/v1/forms/${act.form_guid}`;
       }
 
       if (!act.is_form && act.performer_type) {
@@ -829,7 +854,7 @@ function buildFhirPreview() {
           if (txn.requirement_type) subAction.requiredBehavior = txn.requirement_type;
           if (txn.allowed_use && txn.allowed_use.length > 0) subAction._pdhc_allowed_use = txn.allowed_use;
           if (concept) {
-            subAction.definitionCanonical = `Concept/${txn.concept_guid}`;
+            subAction.definitionCanonical = `${PLAN_BASE}/api/v1/concepts/${txn.concept_guid}`;
           }
           return subAction;
         });
