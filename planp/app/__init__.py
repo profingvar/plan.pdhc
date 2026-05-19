@@ -14,7 +14,39 @@ db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
 jwt = JWTManager()
-limiter = Limiter(key_func=get_remote_address)
+
+
+def _limiter_key():
+    """Per-source rate-limit bucket.
+
+    For requests carrying valid-shape service-key headers we use the
+    source-service name as the bucket key (so each trusted sibling has
+    its own bucket and cdr.pdhc + sim.pdhc + dashboard.pdhc don't compete
+    against each other through the shared Docker bridge IP). For SSO /
+    anonymous requests we fall back to the remote address.
+    """
+    from flask import request
+    from app.api.auth import KNOWN_SERVICES
+    src = request.headers.get('X-Source-Service', '').strip()
+    if src and src in KNOWN_SERVICES and request.headers.get('X-Service-Key'):
+        return f"service:{src}"
+    return get_remote_address()
+
+
+def _service_caller():
+    """Return True when the caller looks like a trusted sibling service —
+    used by `exempt_when` on the burst-prone lookup blueprints to lift
+    the rate-limit for canonicaliser warmup. Validity of the key itself
+    is enforced later by `requires_role`'s service-key path; this only
+    decides whether to BYPASS the limiter, not whether the caller is
+    actually trusted."""
+    from flask import request
+    from app.api.auth import KNOWN_SERVICES
+    src = request.headers.get('X-Source-Service', '').strip()
+    return bool(src and src in KNOWN_SERVICES and request.headers.get('X-Service-Key'))
+
+
+limiter = Limiter(key_func=_limiter_key)
 
 
 def create_app(testing=False):
@@ -71,7 +103,7 @@ def create_app(testing=False):
     app.register_blueprint(auth_bp, url_prefix='/api/v1/auth')
 
     from app.api.lookup_tables import lookup_bp
-    app.register_blueprint(lookup_bp, url_prefix='/api/v1')
+    app.register_blueprint(lookup_bp, url_prefix='/api/v1/lookup')
 
     from app.api.concepts import concepts_bp
     app.register_blueprint(concepts_bp, url_prefix='/api/v1')

@@ -798,7 +798,7 @@ function buildFhirPreview() {
               (x.value_name === g.target_categorical_text) ||
               (x.value_display_text === g.target_categorical_text));
             cc.coding = [{
-              system: `${PLAN_BASE}/api/v1/valuesets/${concept.valueset}`,
+              system: `${PLAN_BASE}/api/v1/lookup/valuesets/${concept.valueset}`,
               code: v ? v.value_name : g.target_categorical_text,
             }];
             if (v && v.value_display_text) cc.coding[0].display = v.value_display_text;
