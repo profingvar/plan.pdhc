@@ -22,7 +22,7 @@ services:
     container_name: pdhc_app
     restart: unless-stopped
     ports:
-      - "9030:9030"
+      - "127.0.0.1:9030:9030"
     env_file:
       - .env
     depends_on:
