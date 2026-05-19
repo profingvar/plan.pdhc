@@ -1,10 +1,42 @@
 import functools
 import secrets
-from flask import Blueprint, request, jsonify, redirect, session, url_for, current_app
+from flask import Blueprint, request, jsonify, redirect, session, url_for, current_app, g
 from app import limiter
 
 auth_bp = Blueprint('auth', __name__)
 limiter.limit("200/minute")(auth_bp)
+
+
+# Service-key auth bypass: trusted sibling services may POST/PUT/DELETE
+# without an SSO session by sending X-Source-Service + X-Service-Key.
+# Each entry maps a recognised source-service name to the env var holding
+# its expected key. Empty/unset key in config => that source is rejected.
+KNOWN_SERVICES = {
+    'loader.pdhc': 'PLAN_LOADER_SERVICE_KEY',
+    'sim.pdhc':    'SIM_PDHC_SERVICE_KEY',
+}
+
+
+def _service_key_outcome():
+    """Look at incoming headers and decide:
+        None  → no service-key headers present, fall through to SSO
+        True  → valid service key, request is authenticated as g.source_service
+        False → service-key headers present but invalid (signal 403)
+    """
+    source = request.headers.get('X-Source-Service', '').strip()
+    key = request.headers.get('X-Service-Key', '').strip()
+    if not source and not key:
+        return None
+    if not source or not key:
+        return False
+    cfg_var = KNOWN_SERVICES.get(source)
+    if not cfg_var:
+        return False
+    expected = current_app.config.get(cfg_var, '')
+    if not expected or key != expected:
+        return False
+    g.source_service = source
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -65,6 +97,12 @@ def requires_role(min_role):
         def wrapper(*args, **kwargs):
             if current_app.config.get('AUTH_DISABLED'):
                 return fn(*args, **kwargs)
+
+            sk = _service_key_outcome()
+            if sk is True:
+                return fn(*args, **kwargs)
+            if sk is False:
+                return jsonify({'error': 'Invalid service credentials'}), 403
 
             blob = _refresh_blob_or_clear()
             if not blob:
