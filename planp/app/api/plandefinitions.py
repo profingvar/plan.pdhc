@@ -214,6 +214,8 @@ def create_plandefinition():
             timing_frequency=act_data.get('timing_frequency'),
             timing_period=act_data.get('timing_period'),
             timing_period_unit=act_data.get('timing_period_unit'),
+            timing_duration=act_data.get('duration_value'),
+            timing_duration_unit=act_data.get('duration_unit'),
             timing_bounds_mode=act_data.get('timing_bounds_mode'),
             timing_bounds_count=act_data.get('timing_bounds_count'),
             timing_bounds_duration_value=act_data.get('timing_bounds_duration_value'),
@@ -347,6 +349,8 @@ def update_plandefinition(guid):
                 activity.timing_frequency = act_data.get('timing_frequency')
                 activity.timing_period = act_data.get('timing_period')
                 activity.timing_period_unit = act_data.get('timing_period_unit')
+                activity.timing_duration = act_data.get('duration_value')
+                activity.timing_duration_unit = act_data.get('duration_unit')
                 activity.timing_bounds_mode = act_data.get('timing_bounds_mode')
                 activity.timing_bounds_count = act_data.get('timing_bounds_count')
                 activity.timing_bounds_duration_value = act_data.get('timing_bounds_duration_value')
@@ -362,6 +366,8 @@ def update_plandefinition(guid):
                     timing_frequency=act_data.get('timing_frequency'),
                     timing_period=act_data.get('timing_period'),
                     timing_period_unit=act_data.get('timing_period_unit'),
+                    timing_duration=act_data.get('duration_value'),
+                    timing_duration_unit=act_data.get('duration_unit'),
                     timing_bounds_mode=act_data.get('timing_bounds_mode'),
                     timing_bounds_count=act_data.get('timing_bounds_count'),
                     timing_bounds_duration_value=act_data.get('timing_bounds_duration_value'),

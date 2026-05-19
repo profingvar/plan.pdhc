@@ -51,6 +51,8 @@ class Activity(db.Model):
             'timing_frequency': self.timing_frequency,
             'timing_period': self.timing_period,
             'timing_period_unit': self.timing_period_unit,
+            'duration_value': self.timing_duration,
+            'duration_unit': self.timing_duration_unit,
             'timing_bounds_mode': self.timing_bounds_mode,
             'timing_bounds_count': self.timing_bounds_count,
             'timing_bounds_duration_value': self.timing_bounds_duration_value,
