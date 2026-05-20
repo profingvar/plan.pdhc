@@ -10,7 +10,7 @@ from app.models.fhir_models import PlanDefinition
 from app.models.activity_models import (
     Activity, Transaction, PlanDefinitionGoal, PlanDefinitionActivity,
 )
-from app.models.concept_models import Concept
+from app.models.concept_models import Concept, Unit
 from app.models.forms_models import FormDefinition
 from app.services.fhir_service import FHIRService
 from app.services.name_uniqueness import NameUniquenessService
@@ -81,6 +81,14 @@ def _plandef_full_dict(pd):
                     concept = Concept.query.filter_by(guid=t.concept_guid).first()
                     td['concept_name'] = concept.concept_name if concept else ''
                     td['concept_url'] = f"{PLAN_BASE}/api/v1/concepts/{t.concept_guid}"
+                    # Unit lives on the concept (termdefinition), not the
+                    # transaction. Carry it forward so downstream consumers
+                    # (request.pdhc dispatcher) emit a Quantity with the
+                    # canonical unit envelope without having to refetch.
+                    if concept and concept.unit:
+                        unit = Unit.query.filter_by(guid=concept.unit).first()
+                        if unit:
+                            td['concept_unit_name'] = unit.unit_name
                 else:
                     td['concept_name'] = ''
                 # Carry the goal linkage onto the transaction too so
