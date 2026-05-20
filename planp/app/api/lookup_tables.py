@@ -1,7 +1,7 @@
 import uuid as uuid_mod
 import bleach
 from flask import Blueprint, request, jsonify
-from app import db, limiter
+from app import db, limiter, _service_caller
 from app.api.auth import requires_role
 from app.models.concept_models import (
     CanonicalLib, ConceptType, ResponseType, Unit, PlanDefType, IntendedUse,
@@ -10,7 +10,9 @@ from app.models.concept_models import (
 from app.services.name_uniqueness import make_unique_value_name, make_unique_valueset_name
 
 lookup_bp = Blueprint('lookup', __name__)
-limiter.limit("200/minute")(lookup_bp)
+# Exempt service-key callers (canonicaliser warmup hits canonical-libs +
+# units lookups in burst).
+limiter.limit("200/minute", exempt_when=_service_caller)(lookup_bp)
 
 
 # ---------------------------------------------------------------------------

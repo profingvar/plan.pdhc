@@ -2,7 +2,7 @@ import uuid as uuid_mod
 import bleach
 from flask import Blueprint, request, jsonify
 from sqlalchemy import or_
-from app import db, limiter
+from app import db, limiter, _service_caller
 from app.api.auth import requires_role
 from app.models.concept_models import (
     Concept, CanonicalLib, ValueSet, ValueSetValue, ValueCatalog,
@@ -10,7 +10,11 @@ from app.models.concept_models import (
 from app.services.name_uniqueness import make_unique_concept_name
 
 concepts_bp = Blueprint('concepts', __name__)
-limiter.limit("200/minute")(concepts_bp)
+# 200/minute for ordinary callers; service-key callers (sim.pdhc /
+# loader.pdhc / cdr.pdhc canonicaliser) are exempt — burst-warmup of the
+# canonicaliser cache used to push parallel writers past the limit and
+# trigger 6/400 4xx during the first seed (post_seed_followups Block A).
+limiter.limit("200/minute", exempt_when=_service_caller)(concepts_bp)
 
 
 def _is_valid_uuid(val):
