@@ -291,3 +291,30 @@ even without this plan.pdhc redeploy. Ship this on the next plan.pdhc
 release or whenever we need to support multi-goal plans (which will
 need an explicit activity→goal FK in the plan model, not just
 inference).
+
+## 2026-04-28 — Service-key auth path + 58-concept diabetes set loaded
+
+Driven by sim.pdhc's multi-CDR seed. Two changes shipped to plan.pdhc
+production (image rebuild via docker-compose, db volume preserved):
+
+1. `requires_role` accepts an `X-Source-Service` + `X-Service-Key`
+   header pair as an alternative to the SSO blob, mapped through a
+   new `KNOWN_SERVICES` dict (`loader.pdhc` → `PLAN_LOADER_SERVICE_KEY`,
+   `sim.pdhc` → `SIM_PDHC_SERVICE_KEY`). Falls through to existing SSO
+   flow if headers absent. Backwards compatible.
+2. 58 diabetes Concepts loaded via the new bulk-loader (`sim.pdhc/
+   concepts/load_to_plan.py`) using `loader.pdhc` service-key. Plus 1
+   added later via API: `inpatient_admit` (SNOMED 32485007). The
+   loader auto-created `ATC` canonical_lib + `Medication`
+   concept_type which were missing.
+
+Concept registry went from 12 (mostly draft test items) to 71. Browse
+via `/api/v1/concepts?per_page=200` (public). The diabetes set covers
+~55 distinct clinical variables across observations / diagnoses /
+medications / procedures / encounters.
+
+Known follow-up (post_seed_followups.md Block A): plan.pdhc's default
+`200/min` limiter triggered HTTP 429s under the parallel canonicaliser
+warmup — cdr.pdhc PlanClient mis-treats this as plan_miss and fails
+the FHIR write with 422. Needs both a separate higher-tier service-
+key limit on plan.pdhc AND a 429-aware retry on the cdr side.
