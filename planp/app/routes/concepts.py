@@ -1,10 +1,16 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+import io
+import os
+
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from app.api.auth import sso_login_required
 from app import db
 from app.models.concept_models import (
     Concept, CanonicalLib, ConceptType, ResponseType, Unit, ValueSet,
 )
 from app.services.name_uniqueness import NameUniquenessService
+from app.services.concept_importer import (
+    parse_xlsx, parse_csv, validate_and_import, compute_sha256, ImportError_,
+)
 
 concepts_web_bp = Blueprint('concepts_web', __name__, url_prefix='/concepts')
 
@@ -142,3 +148,66 @@ def delete_concept(guid):
     db.session.commit()
     flash(f'Concept "{concept.concept_name}" deleted.', 'success')
     return redirect(url_for('concepts_web.list_concepts'))
+
+
+@concepts_web_bp.route('/import', methods=['GET', 'POST'])
+@sso_login_required
+def import_concepts_page():
+    """Admin upload page for bulk-importing concepts (ticket #134).
+
+    Requires SU admin: a non-admin SSO user reaches the page but the
+    POST handler refuses with a flashed error.
+    """
+    blob = session.get('sso_user') or {}
+    is_admin = bool(blob.get('is_su_admin'))
+    report = None
+
+    if request.method == 'POST':
+        if not is_admin:
+            flash('Only SU admins can bulk-import concepts.', 'error')
+            return redirect(url_for('concepts_web.import_concepts_page'))
+
+        f = request.files.get('file')
+        if not f or not f.filename:
+            flash('Please choose a file to upload.', 'error')
+            return redirect(url_for('concepts_web.import_concepts_page'))
+
+        raw = f.read()
+        if not raw:
+            flash('Uploaded file is empty.', 'error')
+            return redirect(url_for('concepts_web.import_concepts_page'))
+
+        sha = compute_sha256(raw)
+        ext = os.path.splitext(f.filename)[1].lower()
+        try:
+            if ext == '.xlsx':
+                rows = parse_xlsx(io.BytesIO(raw))
+            elif ext == '.csv':
+                rows = parse_csv(io.BytesIO(raw))
+            else:
+                flash(f'Unsupported file extension {ext!r}; use .xlsx or .csv', 'error')
+                return redirect(url_for('concepts_web.import_concepts_page'))
+        except ImportError_ as e:
+            flash(f'Parse error: {e}', 'error')
+            return redirect(url_for('concepts_web.import_concepts_page'))
+
+        dry_run = (request.form.get('dry_run', '').strip().lower() == 'true')
+        operator = blob.get('email') or blob.get('user_guid') or 'sso:unknown'
+        report = validate_and_import(
+            rows, operator=operator, filename=f.filename,
+            sha256=sha, dry_run=dry_run,
+        )
+        if report['rejected']:
+            flash(
+                f'{report["summary"]["n_accepted"]} imported, '
+                f'{report["summary"]["n_rejected"]} rejected.',
+                'warning',
+            )
+        else:
+            flash(
+                f'{report["summary"]["n_accepted"]} concept(s) imported '
+                + ('(dry-run).' if report['summary']['dry_run'] else 'successfully.'),
+                'success',
+            )
+
+    return render_template('concepts/import.html', report=report)

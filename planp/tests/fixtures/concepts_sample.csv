@@ -1,0 +1,4 @@
+concept_name,display_text,canonical_lib,canonical_ref,concept_type,response_type,unit,range_low,range_high
+peak-flow-am,Peak flow (morning),LOINC,33452-4,measurement,numeric,L/min,100,800
+peak-flow-pm,Peak flow (evening),LOINC,33453-2,measurement,numeric,L/min,100,800
+asthma-symptom-cough,Asthma cough symptom,SNOMED,49727002,symptom,yes_no,,,

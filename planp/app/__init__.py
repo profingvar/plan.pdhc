@@ -197,7 +197,73 @@ def create_app(testing=False):
     with app.app_context():
         _bootstrap_superuser(app)
 
+    _register_cli(app)
+
     return app
+
+
+def _register_cli(app):
+    """Register flask-cli commands. Currently: import-concepts (#134)."""
+    import io as _io
+    import os as _os
+    import json as _json
+    import click
+
+    @app.cli.command('import-concepts')
+    @click.argument('path', type=click.Path(exists=True, dir_okay=False))
+    @click.option('--operator', default=None,
+                  help='Identity to record in the audit log.')
+    @click.option('--dry-run', is_flag=True,
+                  help='Validate only; do not commit changes.')
+    @click.option('--json-out', 'json_out', is_flag=True,
+                  help='Emit the report as JSON instead of a human summary.')
+    def import_concepts_cmd(path, operator, dry_run, json_out):
+        """Bulk-import concepts from a .xlsx or .csv file (ticket #134)."""
+        from app.services.concept_importer import (
+            parse_xlsx, parse_csv, validate_and_import,
+            compute_sha256, ImportError_,
+        )
+
+        with open(path, 'rb') as fh:
+            raw = fh.read()
+        sha = compute_sha256(raw)
+        ext = _os.path.splitext(path)[1].lower()
+        try:
+            if ext == '.xlsx':
+                rows = parse_xlsx(_io.BytesIO(raw))
+            elif ext == '.csv':
+                rows = parse_csv(_io.BytesIO(raw))
+            else:
+                click.echo(f'unsupported extension {ext!r}; use .xlsx or .csv',
+                           err=True)
+                raise SystemExit(2)
+        except ImportError_ as e:
+            click.echo(f'parse error: {e}', err=True)
+            raise SystemExit(2)
+
+        op = operator or f'cli:{_os.environ.get("USER", "unknown")}'
+        report = validate_and_import(
+            rows, operator=op, filename=_os.path.basename(path),
+            sha256=sha, dry_run=dry_run,
+        )
+
+        if json_out:
+            click.echo(_json.dumps(report, indent=2))
+        else:
+            s = report['summary']
+            click.echo(
+                f'rows: {s["n_in"]}  accepted: {s["n_accepted"]} '
+                f'(created {s["n_created"]} / updated {s["n_updated"]})  '
+                f'rejected: {s["n_rejected"]}'
+                + ('  (dry-run)' if s['dry_run'] else '')
+            )
+            for rej in report['rejected']:
+                click.echo(
+                    f'  row {rej["row"]}: {rej.get("concept_name") or "?"} '
+                    f'— {rej["reason"]}'
+                )
+
+        raise SystemExit(0 if not report['rejected'] else 1)
 
 
 def _bootstrap_superuser(app):

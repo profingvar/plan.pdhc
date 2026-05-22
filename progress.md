@@ -318,3 +318,33 @@ Known follow-up (post_seed_followups.md Block A): plan.pdhc's default
 warmup — cdr.pdhc PlanClient mis-treats this as plan_miss and fails
 the FHIR write with 422. Needs both a separate higher-tier service-
 key limit on plan.pdhc AND a 429-aware retry on the cdr side.
+
+---
+
+## 2026-05-22: Concept catalogue bulk importer (ticket #134)
+
+Provider integration guide vers2 Phase 2–3: a new provider submits a
+single .xlsx of concepts to plan.pdhc on onboarding. We needed an
+idempotent importer that reports accepted/rejected.
+
+Added:
+- `app/services/concept_importer.py` — pure logic: xlsx/csv parser +
+  upsert engine. FK fields (`canonical_lib`, `concept_type`,
+  `response_type`, `unit`) resolve by human name or GUID.
+  `canonical_lib` + `canonical_ref` are append-only identity fields —
+  changing either on an existing concept is reported as a conflict
+  rather than silently overwritten.
+- `POST /api/v1/concepts/import` (admin-only, multipart, returns 207
+  on partial success).
+- `flask import-concepts <path> [--dry-run] [--json-out]` CLI.
+- `/concepts/import` web UI for SU admins.
+- `tests/test_concept_import.py` — 8 tests cover happy path,
+  idempotent re-import, identity-conflict rejection, range_low > high,
+  invalid concept_name, unknown canonical_lib, dry-run rollback, and
+  missing-header parse error.
+- `docs/concept_import.md` — column spec + response shape.
+- `openpyxl>=3.1` added to requirements.txt.
+
+All 8 importer tests pass. Pre-existing failure in
+`tests/test_concepts.py::test_create_and_read` (cached stale path)
+is unrelated.

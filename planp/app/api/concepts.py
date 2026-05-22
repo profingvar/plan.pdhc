@@ -1,6 +1,8 @@
+import io
+import os
 import uuid as uuid_mod
 import bleach
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from sqlalchemy import or_
 from app import db, limiter, _service_caller
 from app.api.auth import requires_role
@@ -8,6 +10,9 @@ from app.models.concept_models import (
     Concept, CanonicalLib, ValueSet, ValueSetValue, ValueCatalog,
 )
 from app.services.name_uniqueness import make_unique_concept_name
+from app.services.concept_importer import (
+    parse_xlsx, parse_csv, validate_and_import, compute_sha256, ImportError_,
+)
 
 concepts_bp = Blueprint('concepts', __name__)
 # 200/minute for ordinary callers; service-key callers (sim.pdhc /
@@ -180,6 +185,65 @@ def update_concept(guid):
     concept.vers_number = (concept.vers_number or 1) + 1
     db.session.commit()
     return jsonify(concept.to_dict()), 200
+
+
+@concepts_bp.route('/concepts/import', methods=['POST'])
+@requires_role('admin')
+def import_concepts():
+    """Bulk-import concepts from an uploaded .xlsx or .csv.
+
+    Ticket #134. Idempotent on concept_name (upsert). FK fields
+    (canonical_lib, concept_type, response_type, unit) resolve by
+    human name or GUID. canonical_lib + canonical_refnumber are
+    identity fields: changing them on an existing row is a conflict
+    rather than a silent overwrite.
+
+    Form fields:
+      file:    The .xlsx/.csv (multipart upload)
+      dry_run: 'true' to validate-only without committing
+
+    Returns JSON report: {accepted, rejected, summary, operator,
+    filename, sha256}.
+    """
+    f = request.files.get('file')
+    if not f:
+        return jsonify({'error': 'file field required'}), 400
+
+    raw = f.read()
+    if not raw:
+        return jsonify({'error': 'uploaded file is empty'}), 400
+    sha = compute_sha256(raw)
+    filename = f.filename or 'unnamed'
+
+    ext = os.path.splitext(filename)[1].lower()
+    try:
+        if ext == '.xlsx':
+            rows = parse_xlsx(io.BytesIO(raw))
+        elif ext == '.csv':
+            rows = parse_csv(io.BytesIO(raw))
+        else:
+            return jsonify({
+                'error': f'unsupported file extension {ext!r}; use .xlsx or .csv'
+            }), 400
+    except ImportError_ as e:
+        return jsonify({'error': str(e), 'filename': filename, 'sha256': sha}), 400
+
+    dry_run = (request.form.get('dry_run', '').strip().lower() == 'true')
+    operator = _operator_identity()
+
+    report = validate_and_import(
+        rows, operator=operator, filename=filename, sha256=sha, dry_run=dry_run,
+    )
+    status = 200 if not report['rejected'] else 207  # 207 Multi-Status when partial
+    return jsonify(report), status
+
+
+def _operator_identity():
+    """Best-effort identity of the current operator for audit logging."""
+    blob = getattr(g, 'sso_user', None)
+    if blob:
+        return blob.get('email') or blob.get('user_guid') or 'sso:unknown'
+    return f'service:{request.headers.get("X-Source-Service", "unknown")}'
 
 
 @concepts_bp.route('/concepts/<guid>', methods=['DELETE'])
