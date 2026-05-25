@@ -240,6 +240,8 @@ def create_plandef():
             timing_period_unit=act_data.get('timing_period_unit'),
             timing_bounds_mode=act_data.get('timing_bounds_mode'),
             timing_bounds_count=act_data.get('timing_bounds_count'),
+            timing_duration=act_data.get('duration_value'),
+            timing_duration_unit=act_data.get('duration_unit'),
             timing_bounds_duration_value=act_data.get('timing_bounds_duration_value'),
             timing_bounds_duration_unit=act_data.get('timing_bounds_duration_unit'),
             notes=act_data.get('notes'),
@@ -352,6 +354,8 @@ def edit_plandef(fhir_id):
             activity.timing_period_unit = act_data.get('timing_period_unit')
             activity.timing_bounds_mode = act_data.get('timing_bounds_mode')
             activity.timing_bounds_count = act_data.get('timing_bounds_count')
+            activity.timing_duration = act_data.get('duration_value')
+            activity.timing_duration_unit = act_data.get('duration_unit')
             activity.timing_bounds_duration_value = act_data.get('timing_bounds_duration_value')
             activity.timing_bounds_duration_unit = act_data.get('timing_bounds_duration_unit')
             # Clear old transactions
@@ -368,6 +372,8 @@ def edit_plandef(fhir_id):
                 timing_period_unit=act_data.get('timing_period_unit'),
                 timing_bounds_mode=act_data.get('timing_bounds_mode'),
                 timing_bounds_count=act_data.get('timing_bounds_count'),
+                timing_duration=act_data.get('duration_value'),
+                timing_duration_unit=act_data.get('duration_unit'),
                 timing_bounds_duration_value=act_data.get('timing_bounds_duration_value'),
                 timing_bounds_duration_unit=act_data.get('timing_bounds_duration_unit'),
                 notes=act_data.get('notes'),
