@@ -114,7 +114,7 @@ class TestRoleEnforcement:
         """Professional with 'planning' phase can access write endpoints."""
         set_sso_session(client, SAMPLE_ACCESS_BLOB)
         # POST to a write endpoint (canonical-libs requires read_write)
-        resp = client.post('/api/v1/canonical-libs', json={
+        resp = client.post('/api/v1/lookup/canonical-libs', json={
             'canonical_lib_name': 'Test Lib',
         })
         # Should not be 401 or 403
@@ -123,7 +123,7 @@ class TestRoleEnforcement:
     def test_non_planning_professional_cannot_write(self, client):
         """Professional without 'planning' phase gets 403 on write endpoints."""
         set_sso_session(client, SAMPLE_READONLY_BLOB)
-        resp = client.post('/api/v1/canonical-libs', json={
+        resp = client.post('/api/v1/lookup/canonical-libs', json={
             'canonical_lib_name': 'Test Lib',
         })
         assert resp.status_code == 403
@@ -131,21 +131,21 @@ class TestRoleEnforcement:
     def test_su_admin_can_write(self, client):
         """SU admin bypasses all checks."""
         set_sso_session(client, SAMPLE_SU_BLOB)
-        resp = client.post('/api/v1/canonical-libs', json={
+        resp = client.post('/api/v1/lookup/canonical-libs', json={
             'canonical_lib_name': 'Admin Lib',
         })
         assert resp.status_code not in (401, 403)
 
     def test_unauthenticated_gets_401_on_write(self, client):
         """No session on write endpoint returns 401."""
-        resp = client.post('/api/v1/canonical-libs', json={
+        resp = client.post('/api/v1/lookup/canonical-libs', json={
             'canonical_lib_name': 'No Auth',
         })
         assert resp.status_code == 401
 
     def test_read_endpoints_are_public(self, client):
         """GET endpoints should work without authentication."""
-        resp = client.get('/api/v1/canonical-libs')
+        resp = client.get('/api/v1/lookup/canonical-libs')
         assert resp.status_code == 200
 
 
@@ -153,7 +153,11 @@ class TestHealthEndpoint:
     def test_health_returns_ok(self, client):
         resp = client.get('/api/health')
         assert resp.status_code == 200
-        assert resp.get_json() == {'status': 'ok'}
+        body = resp.get_json()
+        assert body['status'] == 'ok'
+        assert body['service'] == 'plan.pdhc'
+        assert body['database'] == 'connected'
+        assert 'version' in body
 
 
 class TestBootstrapSuperuser:

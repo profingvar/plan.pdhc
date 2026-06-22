@@ -199,3 +199,81 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 | File | Change |
 |------|--------|
 | `planp/app/templates/plandefinitions/builder.html` | `collectGoals()` now enriches the goal JSON with `target_unit_name` (resolved from UNITS lookup; plan.pdhc unit_name == UCUM code), and for categorical targets `target_categorical_valueset` + `target_categorical_code` + `target_categorical_display` (resolved from CONCEPTS → VALUESETS lookup). The snapshot is now self-contained — downstream consumers (request.pdhc CarePlan, providers) can emit fully-coded FHIR Quantity / CodeableConcept without resolving GUIDs back through plan.pdhc's API. |
+
+## 2026-06-22 — FHIR R5 terminology profile: §4 Prerequisites + §5 ADR + §6.5/§6.6 foundation
+
+| File | Change |
+|------|--------|
+| `plan_pdhc_fhir_terminology_profile_instruction.md` (parent dir) | Rewritten earlier in this session: added §4 Prerequisites, §5 Decisions, §9 Risks; renumbered work items to §6.x; sequencing updated to step 0 = characterization tests. |
+| `plan_pdhc_fhir_terminology_profile_DECISIONS.md` (parent dir, NEW) | ADR sibling. Five decisions (D1–D5) each with rationale, alternatives, consequences, reversibility. ALL APPROVED 2026-06-22. D1 expanded with deep rationale (cdr.pdhc cross-service identity argument, four-candidate comparison table, failure modes, migration playbook). |
+| `planp/tests/test_auth.py` | `/api/v1/canonical-libs` → `/api/v1/lookup/canonical-libs` (5 occurrences); `test_health_returns_ok` updated to assert CLAUDE.md §10 canonical shape (status/database/service/version). |
+| `planp/tests/test_valuesets.py` | URL prefix fix: canonical-libs, values, valuesets → /api/v1/lookup/... |
+| `planp/tests/test_concepts.py` | URL prefix fix (same); `_setup_concept_deps` lib_name switched from `id(client)` (CPython memory recycling caused collisions) to `uuid.uuid4()`. |
+| `planp/tests/test_lookup_tables.py` | URL prefix fix: canonical-libs, concept-types, response-types, units → /api/v1/lookup/... |
+| `planp/tests/test_capability.py` (NEW) | 6 tests pinning §2 capability surface (`/metadata`, `/capability-statement`, `/endpoints`) and the CDR cross-service `$validate-code` contract — URL shape + Parameters body fields consumed by `cdr.pdhc/cdr_app/app/services/plan_client.py::PlanClient._parse_parameters`. |
+| `planp/app/models/concept_models.py` | Added FHIR canonical URL helpers next to `PLAN_BASE`: `LOCAL_CODESYSTEM_ID = "plan-pdhc-local"`, `fhir_canonical_url(resource, id)`, `fhir_version(model_obj)`. Single source of truth for `{PLAN_BASE}/fhir/{Resource}/{id}` per ADR D3. No other model changes. |
+| `planp/app/api/fhir_helpers.py` (NEW) | Shared §6.5 cross-cutting helpers: `operation_outcome()`, `parameters_response()`, `fhir_json_response()`, `parse_parameters_body()`. `FHIR_CONTENT_TYPE = 'application/fhir+json'`. Existing `terminology.py` private helpers left in place for backward compat. |
+| `planp/tests/test_fhir_helpers.py` (NEW) | 20 tests: URL builder + version helper (D3/D4), all four shared helpers, D5 fast-validator wiring (round-trip via `fhir.resources` pydantic models), and the D3 lint forbidding any file other than the URL helper from hardcoding plan.pdhc `/fhir/` URLs. |
+| `planp/requirements.txt` | Added `fhir.resources>=8.0` (D5 fast-layer FHIR R5 validator). Pulls in `pydantic>=2.13`, `fhir-core`. |
+| `planp/progress.md` | Appended a "2026-06-22 — FHIR R5 terminology profile" section summarizing §4/§5/§6.5+§6.6 completion. |
+
+## 2026-06-22 — FHIR R5 terminology profile §6.1: ValueSet resource + $expand
+
+| File | Change |
+|------|--------|
+| `planp/app/api/fhir_valueset.py` (NEW) | New blueprint `fhir_valueset_bp` registered at `/api/v1`. Four routes: `GET /ValueSet/{guid}` (read), `GET /ValueSet` (searchset Bundle with `?url=&_count=&_offset=`), `GET /ValueSet/{guid}/$expand` (and `%24expand` escape variant), `POST /ValueSet/$expand` (Parameters body). Helpers: `_extract_guid_from_url` (D3 + D3.b — accepts canonical and legacy URL forms), `_value_rows`, `_build_compose` (groups by `canonical_lib_url`), `_build_expansion` (flat contains[]), `_to_fhir_valueset`. All output via `fhir_helpers.fhir_json_response` (Content-Type: application/fhir+json) and errors via `operation_outcome`. |
+| `planp/app/__init__.py` | Registered `fhir_valueset_bp` at `/api/v1` alongside `terminology_bp`. Additive; doesn't replace the existing `/api/v1/lookup/valuesets` CRUD blueprint. |
+| `planp/tests/test_fhir_valueset.py` (NEW) | 22 tests: read shape (FHIR R5 fields, D3 canonical url, D4 version), search Bundle, D3.b legacy URL acceptance in `?url=`, paging, `$expand` GET (populated + empty), `$expand` POST with Parameters body, escaped `%24expand`, D5 round-trip validation via `fhir.resources` R5 pydantic models, and a §2 regression assertion that the legacy `/api/v1/lookup/valuesets/{guid}` CRUD JSON still returns its non-FHIR shape. |
+| `planp/progress.md` | §6.1 section appended. Test count 102 → 124. |
+
+## 2026-06-22 — FHIR R5 terminology profile §6.2: scoped $validate-code
+
+| File | Change |
+|------|--------|
+| `planp/app/api/fhir_valueset.py` | Added `resolve_canonical_lib(system_or_url)` and `scoped_validate_code(vs, system, code)` (public, called from terminology.py too). Two new routes: `GET /ValueSet/<guid>/$validate-code` (and `%24` escape variant) for path-scoped validation; `POST /ValueSet/$validate-code` for Parameters-body scoped validation (url/valueSet + code). |
+| `planp/app/api/terminology.py` | Imported `ValueSet`. `validate_code()` adds a top branch: if `?url=` or `?valueSet=` present, dispatch to `scoped_validate_code` via local import (avoids startup cycle). Bare `?system=&code=` path is byte-identical to before — preserves the cdr.pdhc plan_client shim contract. |
+| `planp/tests/test_fhir_valueset.py` | +18 tests: `TestScopedValidateCodeByGuid` (8), `TestScopedValidateCodeByUrl` (5 — incl D3.b legacy url), `TestScopedValidateCodeByPost` (3), `TestCDRGlobalContractAfter62` (2 — explicit cdr.pdhc request-shape pin to catch any future drift). D5 round-trip validation on scoped responses via `fhir.resources.parameters.Parameters`. |
+| `planp/progress.md` | §6.2 section appended. Test count 124 → 142. |
+
+## 2026-06-22 — FHIR R5 terminology profile §6.4: ConceptMap + $translate
+
+| File | Change |
+|------|--------|
+| `planp/app/models/concept_models.py` | Added `LOCAL_CONCEPTMAP_ID = "plan-pdhc-canonical-bindings"` next to `LOCAL_CODESYSTEM_ID`. |
+| `planp/app/api/fhir_conceptmap.py` (NEW) | New blueprint `fhir_conceptmap_bp` registered at `/api/v1`. Four routes: `GET /ConceptMap/{id}`, `GET /ConceptMap[?url=]` (searchset Bundle, size 0 or 1), `GET /ConceptMap/$translate` (and `%24translate`), `POST /ConceptMap/$translate`. Helpers: `_build_conceptmap` (groups Concepts by canonical_lib target URL, source = LOCAL_CS_URL, relationship = `equivalent`), `_translate` (bidirectional — accepts LOCAL_CS_URL system for local→canonical, OR CanonicalLib URL/name for canonical→local), `_build_match_parameter` (Risk §9.5 — match always shaped as repeating FHIR Parameters parts), `_resolve_lib_for_input`. |
+| `planp/app/__init__.py` | Registered `fhir_conceptmap_bp` at `/api/v1` after the ValueSet blueprint. |
+| `planp/tests/test_fhir_conceptmap.py` (NEW) | 27 tests across: read (7 — shape, D1 guid-as-source-code, orphan exclusion, relationship=equivalent, R5 model validation), search Bundle (3), local→canonical translate (5 — incl. targetsystem filter, unknown concept, orphan-no-binding), canonical→local translate (5 — URL form, name form for cdr.pdhc lenience, unknown system non-404), POST Parameters (3), error paths (2), and the Risk §9.5 match-array invariant (2 — zero matches doesn't collapse the response, single match emits one repeating parameter). |
+| `planp/progress.md` | §6.4 section appended. Test count 142 → 169. |
+
+## 2026-06-22 — FHIR R5 terminology profile §6.3: CodeSystem + $lookup (termbank delegation)
+
+| File | Change |
+|------|--------|
+| `planp/app/api/fhir_codesystem.py` (NEW) | New blueprint `fhir_codesystem_bp` registered at `/api/v1`. Four routes: `GET /CodeSystem/{id}` (read with `content: 'complete'`), `GET /CodeSystem[?url=]` (searchset Bundle), `GET /CodeSystem/$lookup` (and `%24lookup` escape), `POST /CodeSystem/$lookup`. Builds the local CodeSystem from `Concept.query` with `concept[].code = Concept.guid` (ADR D1), `display = concept_display_text || concept_name`, `definition = concept_explain`, plus `canonical-lib` / `canonical-ref` / `status` properties declared at the top. `$lookup` branches: LOCAL_CS_URL → local Concept lookup; CanonicalLib URL/name → delegate to `app.termbank_client.lookup(lib_name, code)`; unknown system → 404 without touching termbank. Imports `resolve_canonical_lib` from `fhir_valueset` for consistency. |
+| `planp/app/__init__.py` | Registered `fhir_codesystem_bp` at `/api/v1` after the ConceptMap blueprint. |
+| `planp/tests/test_fhir_codesystem.py` (NEW) | 20 tests: read (5 — shape + D1 guid-as-code + display + canonical-property + R5 model validation), search Bundle (3), local $lookup (5 — guid hit, property shape, 404 unknown, missing-params, escaped `%24`), termbank delegation (4 — URL-form delegates with lib NAME, name-form delegates, miss returns 404 with "unreachable" hint, unregistered system 404 WITHOUT calling termbank), POST (3). Termbank tested via `patch.object(app.termbank_client, 'lookup', ...)`. |
+| `planp/progress.md` | §6.3 section appended. Test count 169 → 189. |
+
+## 2026-06-22 — FHIR R5 terminology profile §6.7 + §6.8: CapabilityStatement truth-up + conformance scaffolding
+
+| File | Change |
+|------|--------|
+| `planp/app/api/capability.py` | ENDPOINTS list extended with the 15 new FHIR routes (ValueSet/CodeSystem/ConceptMap reads/searches/operations). PlanDefinition `$expand` description clarified ("NOT the FHIR ValueSet $expand"). FHIR CapabilityStatement `resource[]`: rewrote ValueSet entry (two surfaces, $expand + $validate-code with cdr.pdhc/scoped dual-mode doc), rewrote CodeSystem entry (single local `plan-pdhc-local`, $lookup with termbank delegation doc), ADDED ConceptMap entry (single platform `plan-pdhc-canonical-bindings`, $translate, Risk §9.5 match-shape note). Added an explicit §7 non-goals documentation block declaring `$subsumes`, is-a / descendant filters, and hierarchical properties as deliberately unsupported. |
+| `planp/tests/test_capability.py` | +6 §6.7 tests: ValueSet declares expand + validate-code with both mode docstrings; CodeSystem declares lookup with termbank-delegation doc; ConceptMap exists with translate; §7 non-goals documented; new FHIR routes appear in `/endpoints`; PlanDefinition `$expand` doc warns it's NOT terminology. |
+| `planp/Makefile` (NEW) | `test`, `corpus`, `conformance`, `check-jar` targets. `conformance` runs HL7 R5 `validator_cli.jar` against the emitted corpus; jar location via `VALIDATOR_JAR` env (default `~/.local/share/fhir/validator_cli.jar`); `check-jar` points the operator to the release download. |
+| `planp/tests/conformance_corpus_emit.py` (NEW) | Boots a self-contained Flask test app, seeds a minimal dataset (CanonicalLib + Concept + ValueSet + ValueCatalogs), and calls every §6 FHIR endpoint to dump 13 representative JSON resources to `tests/fhir_corpus/`. End-to-end smoke-tested in this session. |
+| `planp/tests/fhir_corpus/README.md` (NEW) | How to run `make corpus` / `make conformance`, where to download the jar, two-layer validation rationale (D5 fast pydantic + D5 slow Java). |
+| `planp/progress.md` | §6.7+§6.8 section appended; §6 implementation marked COMPLETE. Test count 189 → 195. |
+
+## 2026-06-22 — Documentation review (post-§6)
+
+| File | Change |
+|------|--------|
+| `plan_pdhc_fhir_terminology_profile_instruction.md` | Status line updated: Specification → **IMPLEMENTED 2026-06-22**. Added pointers to ADR and progress.md for landing details. |
+| `readme.md` | Added a bullet to "What this service does" describing the conformant FHIR R5 terminology profile with links to the spec + ADR. |
+| `planp/docs/api_reference.md` | 44 URL-prefix fixes (`/api/v1/X` → `/api/v1/lookup/X`) across canonical-libs / concept-types / response-types / units / plandef-types / intended-uses / valuesets / values — same stale-prefix bug we caught in tests, root cause is commit `00440b7`. Added a forward-link note at the top of the ValueSets section. Added a "NOT the FHIR ValueSet $expand" warning on the PlanDefinition $expand block. Added a new ~140-line "FHIR R5 Terminology Profile" top-level section covering all new routes, D3 canonical URL convention, D3.b legacy URL acceptance, termbank delegation, dual-mode $validate-code, explicit §7 non-goals, and conformance toolchain. |
+| `plan_description.md` | Added `app/api/fhir_valueset.py` + `fhir_codesystem.py` + `fhir_conceptmap.py` + `fhir_helpers.py` to the source-files preamble. Added a new "§9) FHIR R5 terminology profile (added 2026-06-22)" section summarising the three new resources, the two preserved regression contracts (legacy CRUD + cdr.pdhc shim), and links to the spec + ADR. |
+| `DEPLOYMENT_PLAN.md` | Requirements example block extended with `Flask-Cors>=4.0`, `openpyxl>=3.1`, `fhir.resources>=8.0` (the latter is the new §6.8 D5 dep). Added an upgrade callout for existing deployments noting that no migration is needed. |
+| `newtask.txt` (NEW) | Required per Rule 2 but absent. Captures: §6 done; next-up = CI conformance job + 3 ADR open questions + server pip-install refresh. |
+| `planp/app/api/capability.py` | `DOCS_CATALOG` extended with `plan_pdhc_fhir_terminology_profile_instruction.md` and `plan_pdhc_fhir_terminology_profile_DECISIONS.md` so both are discoverable via `GET /api/v1/docs` and downloadable via `GET /api/v1/docs/<filename>` (the existing `_resolve_doc_path` already searches the project root, so no path-resolution change needed). Verified end-to-end. |
+| `planp/progress.md` | Documentation-review section appended. |

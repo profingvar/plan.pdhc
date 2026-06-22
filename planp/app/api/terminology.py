@@ -25,7 +25,7 @@ from __future__ import annotations
 from flask import Blueprint, current_app, jsonify, request
 
 from app import db
-from app.models.concept_models import CanonicalLib, Concept, ValueCatalog
+from app.models.concept_models import CanonicalLib, Concept, ValueCatalog, ValueSet
 
 
 bp = Blueprint("terminology_api", __name__)
@@ -75,7 +75,48 @@ def validate_code():
     library and ``canonical_refnumber`` equal to ``code``. We don't
     require an "active" flag — plan.pdhc's editorial state IS the
     working set; if a row exists, the code is in scope.
+
+    §6.2 — if the caller supplies a ``url`` or ``valueSet`` query
+    parameter, the question becomes scoped: "is (system, code) in *this
+    specific ValueSet*?". The scoped path is delegated to
+    ``fhir_valueset.scoped_validate_code``. The unscoped path (no
+    identifier) is unchanged and preserves the cdr.pdhc shim contract
+    in ``cdr.pdhc/cdr_app/app/services/plan_client.py``.
     """
+    scoping_url = (
+        (request.args.get("url") or "").strip()
+        or (request.args.get("valueSet") or "").strip()
+    )
+    if scoping_url:
+        # Local import — avoids any startup-time import cycle and keeps
+        # the global path fast (no extra module load on the cdr.pdhc
+        # hot path).
+        from app.api.fhir_valueset import (
+            _extract_guid_from_url,
+            scoped_validate_code,
+        )
+        target_guid = _extract_guid_from_url(scoping_url)
+        if target_guid is None:
+            return _operation_outcome(
+                "error", "value",
+                f"could not extract a ValueSet id from url={scoping_url!r}",
+                400,
+            )
+        vs = ValueSet.query.filter_by(guid=target_guid).first()
+        if vs is None:
+            return _operation_outcome(
+                "error", "not-found",
+                f"ValueSet/{target_guid} not found", 404,
+            )
+        system = (request.args.get("system") or "").strip()
+        code = (request.args.get("code") or "").strip()
+        if not code:
+            return _operation_outcome(
+                "error", "required",
+                "scoped $validate-code requires a 'code' parameter", 400,
+            )
+        return jsonify(scoped_validate_code(vs, system, code))
+
     system = (request.args.get("system") or "").strip()
     code = (request.args.get("code") or "").strip()
     if not system or not code:

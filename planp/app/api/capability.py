@@ -109,7 +109,41 @@ ENDPOINTS = [
     # FHIR PlanDefinition (read-only FHIR format)
     _endpoint('GET', '/PlanDefinition', False, 'FHIR R5 searchset Bundle'),
     _endpoint('GET', '/PlanDefinition/<fhir_id>', False, 'FHIR R5 PlanDefinition resource'),
-    _endpoint('GET', '/PlanDefinition/<fhir_id>/$expand', False, 'Force regenerate FHIR JSON'),
+    _endpoint('GET', '/PlanDefinition/<fhir_id>/$expand', False,
+              'Force regenerate FHIR JSON (note: NOT the FHIR ValueSet $expand — '
+              'see /ValueSet/<guid>/$expand below for that)'),
+
+    # FHIR R5 terminology profile (§6.1-§6.4) — additive; legacy CRUD untouched.
+    # ValueSet — FHIR resource + $expand + scoped $validate-code
+    _endpoint('GET', '/ValueSet', False, 'FHIR R5 searchset Bundle (?url=, _count, _offset)'),
+    _endpoint('GET', '/ValueSet/<guid>', False, 'FHIR R5 ValueSet resource'),
+    _endpoint('GET', '/ValueSet/<guid>/$expand', False, 'Expand by id — returns ValueSet with expansion.contains[]'),
+    _endpoint('POST', '/ValueSet/$expand', False, 'Expand by FHIR Parameters body (url or valueSet)'),
+    _endpoint('GET', '/ValueSet/$validate-code', False,
+              'Global (no url): the cdr.pdhc adoption-check shim (unchanged). '
+              'Scoped (with ?url= or ?valueSet=): FHIR ValueSet/$validate-code.'),
+    _endpoint('GET', '/ValueSet/<guid>/$validate-code', False, 'Scoped $validate-code by path id'),
+    _endpoint('POST', '/ValueSet/$validate-code', False, 'Scoped $validate-code by Parameters body'),
+
+    # CodeSystem — local concept system + $lookup with termbank delegation
+    _endpoint('GET', '/CodeSystem', False, 'FHIR R5 searchset Bundle (?url=)'),
+    _endpoint('GET', '/CodeSystem/<id>', False,
+              'Read the local CodeSystem (id=plan-pdhc-local). codes are Concept.guid (ADR D1).'),
+    _endpoint('GET', '/CodeSystem/$lookup', False,
+              'Lookup by query params. system=LOCAL → local Concept; system=CanonicalLib URL/name → delegates to termbank.'),
+    _endpoint('POST', '/CodeSystem/$lookup', False, 'Lookup by Parameters body'),
+
+    # ConceptMap — the local↔canonical mapping
+    _endpoint('GET', '/ConceptMap', False, 'FHIR R5 searchset Bundle (?url=)'),
+    _endpoint('GET', '/ConceptMap/<id>', False,
+              'Read the platform ConceptMap (id=plan-pdhc-canonical-bindings).'),
+    _endpoint('GET', '/ConceptMap/$translate', False,
+              'Bidirectional translate. system=LOCAL → canonical code; system=CanonicalLib URL/name → local guid.'),
+    _endpoint('POST', '/ConceptMap/$translate', False, 'Translate by Parameters body'),
+
+    # Termbank proxies (§0.2 — pre-existing, here for completeness)
+    _endpoint('GET', '/termbank/concept/<system>/<code>', False, 'Same-origin termbank proxy (TTL cache)'),
+    _endpoint('GET', '/termbank/search', False, 'Same-origin termbank search proxy'),
 
     # Forms (FHIR Questionnaires)
     _endpoint('GET', '/forms', 'API key or SSO', 'List form catalogue (paginated)'),
@@ -338,29 +372,44 @@ def fhir_capability_statement():
                     'type': 'ValueSet',
                     'profile': 'http://hl7.org/fhir/StructureDefinition/ValueSet',
                     'documentation': (
-                        'ValueSets are managed via /api/v1/valuesets (custom CRUD, not FHIR format). '
-                        'Each ValueSet contains ordered Values from the values catalog.'
+                        'Two surfaces, both supported. The FHIR R5 surface at /api/v1/ValueSet '
+                        '(capital V) is conformant — read, search by url, $expand, and scoped '
+                        '$validate-code. The legacy CRUD JSON at /api/v1/lookup/valuesets is '
+                        'unchanged and serves the builder UI; canonical URLs emitted from the '
+                        'legacy CRUD are accepted by FHIR routes as legacy identifiers (ADR D3.b).'
                     ),
                     'interaction': [
-                        {
-                            'code': 'read',
-                            'documentation': 'GET /api/v1/valuesets/{guid}',
-                        },
-                        {
-                            'code': 'search-type',
-                            'documentation': 'GET /api/v1/valuesets',
-                        },
-                        {
-                            'code': 'create',
-                            'documentation': 'POST /api/v1/valuesets (requires auth)',
-                        },
-                        {
-                            'code': 'update',
-                            'documentation': 'PUT /api/v1/valuesets/{guid} (requires auth)',
-                        },
-                        {
-                            'code': 'delete',
-                            'documentation': 'DELETE /api/v1/valuesets/{guid} (requires auth)',
+                        {'code': 'read',
+                         'documentation': 'GET /api/v1/ValueSet/{guid}'},
+                        {'code': 'search-type',
+                         'documentation': 'GET /api/v1/ValueSet?url=&_count=&_offset='},
+                    ],
+                    'searchParam': [
+                        {'name': 'url', 'type': 'uri',
+                         'documentation': 'Filter by canonical url; accepts FHIR canonical '
+                                          'form AND legacy /api/v1/(lookup/)?valuesets/{guid} '
+                                          '(ADR D3.b transition rule).'},
+                        {'name': '_count', 'type': 'number',
+                         'documentation': 'Page size (default 20, max 200)'},
+                        {'name': '_offset', 'type': 'number',
+                         'documentation': 'Starting offset for pagination'},
+                    ],
+                    'operation': [
+                        {'name': 'expand',
+                         'definition': 'http://hl7.org/fhir/OperationDefinition/ValueSet-expand',
+                         'documentation': 'GET /ValueSet/{guid}/$expand or POST /ValueSet/$expand '
+                                          'with Parameters body (url|valueSet). Returns ValueSet '
+                                          'with expansion.contains[].'},
+                        {'name': 'validate-code',
+                         'definition': 'http://hl7.org/fhir/OperationDefinition/ValueSet-validate-code',
+                         'documentation': (
+                             'TWO MODES: (1) global — GET /ValueSet/$validate-code?system=&code= '
+                             '(no url) answers "is this canonical adopted anywhere in plan.pdhc?" '
+                             'This is the cdr.pdhc shim contract (see '
+                             'cdr.pdhc/cdr_app/app/services/plan_client.py). Preserved unchanged. '
+                             '(2) scoped — same path with ?url=, or GET /ValueSet/{guid}/$validate-code, '
+                             'or POST with Parameters body — checks (system, code) against THIS '
+                             "ValueSet's expansion."),
                         },
                     ],
                 },
@@ -416,32 +465,83 @@ def fhir_capability_statement():
                     'type': 'CodeSystem',
                     'profile': 'http://hl7.org/fhir/StructureDefinition/CodeSystem',
                     'documentation': (
-                        'Canonical libraries (terminology authorities like SNOMED CT, LOINC, ICD-10) '
-                        'are managed via /api/v1/canonical-libs. Concepts reference these as their '
-                        'code system binding.'
+                        'Single local CodeSystem id=plan-pdhc-local (ADR D2). Each entry uses '
+                        'Concept.guid as the code (ADR D1), with concept_display_text as display '
+                        'and concept_explain as definition. The canonical_lib binding is surfaced '
+                        'as concept[].property. External authorities (LOINC, SNOMED, ICD-10, ATC, …) '
+                        'are NOT published here as CodeSystems — they live in termbank.pdhc; '
+                        '$lookup with an external system delegates to the cached TermbankClient.'
                     ),
                     'interaction': [
-                        {
-                            'code': 'read',
-                            'documentation': 'GET /api/v1/canonical-libs/{guid}',
-                        },
-                        {
-                            'code': 'search-type',
-                            'documentation': 'GET /api/v1/canonical-libs',
-                        },
-                        {
-                            'code': 'create',
-                            'documentation': 'POST /api/v1/canonical-libs (requires auth)',
-                        },
-                        {
-                            'code': 'update',
-                            'documentation': 'PUT /api/v1/canonical-libs/{guid} (requires auth)',
-                        },
-                        {
-                            'code': 'delete',
-                            'documentation': 'DELETE /api/v1/canonical-libs/{guid} (requires auth)',
+                        {'code': 'read',
+                         'documentation': 'GET /api/v1/CodeSystem/plan-pdhc-local'},
+                        {'code': 'search-type',
+                         'documentation': 'GET /api/v1/CodeSystem?url='},
+                    ],
+                    'searchParam': [
+                        {'name': 'url', 'type': 'uri',
+                         'documentation': 'Filter by canonical url'},
+                    ],
+                    'operation': [
+                        {'name': 'lookup',
+                         'definition': 'http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup',
+                         'documentation': (
+                             'GET /CodeSystem/$lookup?system=&code= or POST Parameters body. '
+                             'system=LOCAL_CS_URL → local Concept (code is the guid). '
+                             'system=CanonicalLib URL or name → delegates to termbank.pdhc '
+                             '(TTL-cached). Unknown system → 404 without touching termbank.'),
                         },
                     ],
+                },
+                {
+                    'type': 'ConceptMap',
+                    'profile': 'http://hl7.org/fhir/StructureDefinition/ConceptMap',
+                    'documentation': (
+                        'Single platform ConceptMap id=plan-pdhc-canonical-bindings projecting '
+                        "every Concept's canonical_lib + canonical_refnumber binding. Source = "
+                        'CodeSystem plan-pdhc-local; targets = each registered CanonicalLib URL. '
+                        'Relationship is always "equivalent" (plan.pdhc treats canonical bindings '
+                        'as 1:1 equivalences by design). $translate is bidirectional: LOCAL→canonical '
+                        'AND canonical→LOCAL.'
+                    ),
+                    'interaction': [
+                        {'code': 'read',
+                         'documentation': 'GET /api/v1/ConceptMap/plan-pdhc-canonical-bindings'},
+                        {'code': 'search-type',
+                         'documentation': 'GET /api/v1/ConceptMap?url='},
+                    ],
+                    'searchParam': [
+                        {'name': 'url', 'type': 'uri',
+                         'documentation': 'Filter by canonical url'},
+                    ],
+                    'operation': [
+                        {'name': 'translate',
+                         'definition': 'http://hl7.org/fhir/OperationDefinition/ConceptMap-translate',
+                         'documentation': (
+                             'GET /ConceptMap/$translate?system=&code=&targetsystem= or POST '
+                             'Parameters body. Bidirectional. Match shape: repeating FHIR '
+                             'Parameters parts named "match" — multi-binding-future-safe '
+                             '(Risk §9.5).'),
+                        },
+                    ],
+                },
+                {
+                    # Documentation block — §7 explicit non-goals.
+                    # Surfaced as a non-FHIR-resource entry whose 'type' is a
+                    # well-known invented marker, so FHIR clients still parse
+                    # the resource list cleanly. This is the truth-telling
+                    # required by ADR §7 / spec §7.
+                    'type': 'OperationDefinition',
+                    'documentation': (
+                        'EXPLICITLY UNSUPPORTED operations (per spec §7 — local data model '
+                        'is deliberately flat, no inter-concept hierarchy):\n'
+                        '  • CodeSystem/$subsumes — no parent/child relationship in the data\n'
+                        '  • ValueSet.compose is-a / descendant filters — no hierarchy to walk\n'
+                        '  • CodeSystem $lookup hierarchical properties (parent/child) — '
+                        'omitted; canonical_lib/canonical_refnumber are the only properties surfaced.\n'
+                        'A CapabilityStatement that claimed these and then failed would be worse '
+                        'than one that honestly excludes them.'
+                    ),
                 },
             ],
         }],
@@ -459,16 +559,18 @@ def list_endpoints():
 # --- Documentation API ---
 
 DOCS_CATALOG = {
-    'api_reference.md': 'Comprehensive REST API reference with examples',
+    'api_reference.md': 'Comprehensive REST API reference with examples (includes FHIR R5 terminology profile §6)',
     'db_schema_snapshot.md': 'Database schema — all 17 tables with samples and GUIDs',
-    'plan_description.md': 'Domain architecture — concepts, values, valuesets, PlanDefinitions',
+    'plan_description.md': 'Domain architecture — concepts, values, valuesets, PlanDefinitions, FHIR terminology profile',
     'readme.md': 'Deployment plan — step-by-step setup and configuration',
-    'progress.md': 'Progress log — completed and pending steps',
+    'progress.md': 'Progress log — completed and pending steps (incl. §6 IMPLEMENTATION COMPLETE 2026-06-22)',
     'top_rules.md': 'Project rules (immutable)',
     'repo_css.md': 'Frontend design system — colours, typography, components',
     'pdhc_markdown_layout_standard.md': 'Markdown formatting standard',
     'changed_files.md': 'Registry of all created and edited files',
     'nginx_implement_server19March.md': 'Nginx reverse proxy deployment template',
+    'plan_pdhc_fhir_terminology_profile_instruction.md': 'FHIR R5 terminology profile — implementation spec (Status: IMPLEMENTED 2026-06-22)',
+    'plan_pdhc_fhir_terminology_profile_DECISIONS.md': 'FHIR R5 terminology profile — ADR for the five locked design decisions',
 }
 
 

@@ -6,6 +6,41 @@ PLAN_BASE = "https://plan.pdhc.se"
 
 
 # ---------------------------------------------------------------------------
+# FHIR canonical URL + version helpers (ADR D3, D4)
+# ---------------------------------------------------------------------------
+# Single source of truth for FHIR canonical URLs emitted by the
+# terminology profile (ValueSet / CodeSystem / ConceptMap). The canonical
+# URL is a FHIR identifier and is not required to resolve — routes
+# remain under /api/v1/ for backward compatibility.
+#
+# DO NOT hardcode the "/fhir/" scheme anywhere else: import these
+# helpers. ADR Risk §9.3 + the lint test in tests/test_fhir_helpers.py
+# enforce this.
+
+LOCAL_CODESYSTEM_ID = "plan-pdhc-local"
+LOCAL_CONCEPTMAP_ID = "plan-pdhc-canonical-bindings"
+
+
+def fhir_canonical_url(resource: str, resource_id: str) -> str:
+    """Build the FHIR canonical url for a terminology resource.
+
+    Form: {PLAN_BASE}/fhir/{Resource}/{id}  (per ADR D3)
+    Example: https://plan.pdhc.se/fhir/CodeSystem/plan-pdhc-local
+    """
+    return f"{PLAN_BASE}/fhir/{resource}/{resource_id}"
+
+
+def fhir_version(model_obj) -> str:
+    """FHIR `version` field derivation (per ADR D4).
+
+    Reads `vers_number` (integer) off the model and returns str(n).
+    Defaults to "1" if the attribute is missing or None.
+    """
+    n = getattr(model_obj, 'vers_number', None) or 1
+    return str(n)
+
+
+# ---------------------------------------------------------------------------
 # Lookup tables
 # ---------------------------------------------------------------------------
 

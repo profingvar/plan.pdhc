@@ -13,3 +13,8 @@ requests>=2.31
 Flask-Limiter>=3.5
 Flask-Cors>=4.0
 openpyxl>=3.1
+
+# ADR D5 — fast-layer FHIR R5 validator (pydantic models).
+# Used in tests to validate response shape; canonical conformance still
+# requires the HL7 Java validator_cli.jar via `make conformance` (TBD).
+fhir.resources>=8.0

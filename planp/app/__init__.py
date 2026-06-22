@@ -121,6 +121,20 @@ def create_app(testing=False):
     from app.api.terminology import bp as terminology_bp
     app.register_blueprint(terminology_bp, url_prefix='/api/v1')
 
+    # FHIR R5 ValueSet resource + $expand (§6.1 — conformant terminology profile).
+    # Additive: does NOT replace the /api/v1/lookup/valuesets CRUD JSON.
+    from app.api.fhir_valueset import fhir_valueset_bp
+    app.register_blueprint(fhir_valueset_bp, url_prefix='/api/v1')
+
+    # FHIR R5 ConceptMap + $translate (§6.4 — local↔canonical mapping).
+    from app.api.fhir_conceptmap import fhir_conceptmap_bp
+    app.register_blueprint(fhir_conceptmap_bp, url_prefix='/api/v1')
+
+    # FHIR R5 CodeSystem + $lookup (§6.3 — local concepts published as
+    # CodeSystem plan-pdhc-local; external systems delegate to termbank).
+    from app.api.fhir_codesystem import fhir_codesystem_bp
+    app.register_blueprint(fhir_codesystem_bp, url_prefix='/api/v1')
+
     # Termbank HTTP client — one instance per app, with TTL cache
     from app.services.termbank_client import TermbankClient
     app.termbank_client = TermbankClient()

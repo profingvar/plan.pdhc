@@ -1,0 +1,48 @@
+Current focus
+=============
+
+§6 FHIR R5 terminology profile is COMPLETE (2026-06-22).
+See:
+  - progress.md "§6 IMPLEMENTATION COMPLETE"
+  - plan_pdhc_fhir_terminology_profile_instruction.md (Status: IMPLEMENTED)
+  - plan_pdhc_fhir_terminology_profile_DECISIONS.md (all 5 decisions APPROVED)
+
+Next-up tasks (in priority order)
+---------------------------------
+
+1. CI job that downloads validator_cli.jar on first run and runs
+   `make conformance` against PRs.
+   - Risk §9.4 in the spec — pure devops, no plan.pdhc code change.
+   - Target: GitHub Actions workflow under .github/workflows/conformance.yml.
+
+2. Open questions at the bottom of the DECISIONS ADR (none block deploy):
+   - CodeSystem concept[].property URI scheme (canonical URI to coin
+     when a downstream consumer wants to filter by concept_type).
+   - ConceptMap group cardinality (single group vs N groups when
+     multi-binding lands).
+   - POST $validate-code body shape — only needed when an external
+     consumer asks; cdr.pdhc only ever uses GET so no current driver.
+
+3. Server-side deployment refresh:
+   - On miserver, run `pip install -r planp/requirements.txt` to pull
+     fhir.resources + pydantic 2.13. No migration needed.
+   - Smoke-test /api/v1/CodeSystem, /api/v1/ConceptMap,
+     /api/v1/ValueSet endpoints behind the SSO proxy.
+
+Done in this branch
+-------------------
+
+- §4 Prerequisites: 22 URL-prefix test fixes + capability characterization
+  + cdr.pdhc cross-service contract pin.
+- §5 ADR: 5 decisions, all APPROVED 2026-06-22.
+- §6.1 ValueSet + $expand.
+- §6.2 scoped $validate-code (global cdr.pdhc contract preserved).
+- §6.3 CodeSystem + $lookup with termbank delegation.
+- §6.4 ConceptMap + $translate (bidirectional).
+- §6.5/§6.6 cross-cutting helpers + canonical URL builders.
+- §6.7 CapabilityStatement truth-up + §7 non-goals declared.
+- §6.8 fast layer (fhir.resources pydantic, every test); slow layer
+  scaffolded (make conformance + corpus emitter).
+
+Test count: 76 → 195 (+119). All green; 5 consecutive full-suite runs
+no flakes during landing.

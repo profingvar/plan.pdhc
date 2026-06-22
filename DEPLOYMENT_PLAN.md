@@ -191,9 +191,23 @@ bleach>=6.1
 pytest>=8.0
 pytest-cov>=4.1
 requests>=2.31
+Flask-Cors>=4.0
+openpyxl>=3.1
+fhir.resources>=8.0    # FHIR R5 terminology profile (§6 — added 2026-06-22)
 ```
 
 - **3.c** Install dependencies: `pip install -r planp/requirements.txt`.
+
+> **Upgrading an existing deployment** — `fhir.resources>=8.0` was
+> added 2026-06-22 alongside the conformant FHIR R5 terminology
+> profile. After pulling the new code, re-run
+> `pip install -r planp/requirements.txt` inside the venv to pull
+> `fhir.resources`, `fhir-core`, `pydantic` and `pydantic-core`. No
+> migration is required — only constants were added to
+> `app/models/concept_models.py`. See
+> `plan_pdhc_fhir_terminology_profile_instruction.md` for the spec
+> and `progress.md` "§6 IMPLEMENTATION COMPLETE" entry for landing
+> details.
 
 ### 3.2 Flask app factory
 

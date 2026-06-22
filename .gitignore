@@ -37,6 +37,10 @@ node_modules/
 # Local DB snapshots (operator-managed)
 db_backups/
 
+# Auto-generated FHIR R5 conformance corpus (refresh with `make corpus`).
+# README.md inside the dir IS committed.
+planp/tests/fhir_corpus/*.json
+
 # Claude Code project data (IDE memory, session settings)
 .claude/
 

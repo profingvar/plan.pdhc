@@ -1,11 +1,18 @@
+import uuid
+
 import pytest
 from tests.conftest import set_sso_session, SAMPLE_ACCESS_BLOB
 
 
 def _setup_concept_deps(client):
-    """Create canonical lib and return its GUID."""
-    resp = client.post('/api/v1/canonical-libs', json={
-        'canonical_lib_name': f'ConceptTestLib_{id(client)}',
+    """Create canonical lib and return its GUID.
+
+    Use a uuid4 in the name rather than ``id(client)``: CPython recycles
+    test-client memory addresses across tests, so ``id(client)`` is not
+    actually unique across the test session and collisions land here as
+    409 Conflict + KeyError 'guid'."""
+    resp = client.post('/api/v1/lookup/canonical-libs', json={
+        'canonical_lib_name': f'ConceptTestLib_{uuid.uuid4()}',
     })
     return resp.get_json()['guid']
 
@@ -105,14 +112,14 @@ class TestConceptValues:
         lib_guid = _setup_concept_deps(client)
 
         # Create valueset
-        resp = client.post('/api/v1/valuesets', json={
+        resp = client.post('/api/v1/lookup/valuesets', json={
             'valueset_name': f'ConceptVS_{id(client)}',
             'canonical_lib': lib_guid,
         })
         vs_guid = resp.get_json()['guid']
 
         # Create value
-        resp = client.post('/api/v1/values', json={
+        resp = client.post('/api/v1/lookup/values', json={
             'value_name': f'ConceptVal_{id(client)}',
             'canonical_lib': lib_guid,
         })

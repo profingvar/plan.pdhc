@@ -13,6 +13,7 @@ The description below is derived from the repository’s implementation, primari
 - `app/api/fhir_plandefinitions.py` (FHIR-facing PlanDefinition read/search/expand endpoints)
 - `app/services/fhir_service.py` (FHIR serialization, esp. `FHIRService.create_fhir_plandefinition`)
 - `app/templates/plandefinitions/builder.html` (2-column builder with inline JavaScript — form builder left, live FHIR JSON preview right)
+- `app/api/fhir_valueset.py`, `app/api/fhir_codesystem.py`, `app/api/fhir_conceptmap.py`, `app/api/fhir_helpers.py` (the conformant FHIR R5 terminology profile added 2026-06-22 — see §9 below)
 
 ---
 
@@ -614,4 +615,44 @@ If you think of the complete workflow as a service offered to clients (UI or API
 - The system persists PlanDefinitions as both:
   - relational data for editing/querying
   - FHIR JSON (`fhir_data`) for interoperability and downstream transaction engines
+
+---
+
+## 9) FHIR R5 terminology profile (added 2026-06-22)
+
+The terminology substrate is also published as a conformant **FHIR R5
+terminology API profile** so generic FHIR clients can interoperate
+without bespoke code:
+
+- **`ValueSet`** — the existing builder ValueSets are projected as
+  FHIR ValueSet resources. Read, search-by-canonical-url, `$expand`
+  (returns `expansion.contains[]`), and scoped `$validate-code`.
+- **`CodeSystem`** — every local Concept appears in a single
+  `CodeSystem` resource (`id = plan-pdhc-local`) with the Concept GUID
+  as `concept[].code` (so external systems join against an immutable
+  identifier — see [ADR D1](plan_pdhc_fhir_terminology_profile_DECISIONS.md)).
+  `$lookup` works for local concepts; for external authorities
+  (LOINC/SNOMED/ICD-10 via registered CanonicalLibs) `$lookup` delegates
+  to the existing TTL-cached `TermbankClient` and returns
+  termbank.pdhc's response transparently.
+- **`ConceptMap`** — a single platform ConceptMap
+  (`id = plan-pdhc-canonical-bindings`) projects every Concept's
+  `canonical_lib + canonical_refnumber` binding. `$translate` is
+  bidirectional: local Concept GUID → canonical code, or canonical →
+  local.
+
+Two regression contracts are explicitly preserved:
+
+1. The legacy `/api/v1/lookup/valuesets/*` CRUD JSON is byte-identical
+   to before (used by the builder UI).
+2. The cdr.pdhc `$validate-code` "is this canonical adopted anywhere?"
+   shim (called from `cdr.pdhc/cdr_app/app/services/plan_client.py`)
+   keeps its exact pre-2026-06-22 request/response shape. The same
+   route now ALSO answers FHIR-conformant scoped questions when a
+   `url`/`valueSet` identifier is passed; the original global form
+   is unchanged.
+
+For the full spec and decision record:
+- [`plan_pdhc_fhir_terminology_profile_instruction.md`](plan_pdhc_fhir_terminology_profile_instruction.md)
+- [`plan_pdhc_fhir_terminology_profile_DECISIONS.md`](plan_pdhc_fhir_terminology_profile_DECISIONS.md)
 

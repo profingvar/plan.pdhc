@@ -101,7 +101,7 @@ Terminology authorities (SNOMED CT, LOINC, ICD-10, etc.).
 ### List All
 
 ```
-GET /api/v1/canonical-libs
+GET /api/v1/lookup/canonical-libs
 ```
 
 **Response (200):**
@@ -124,7 +124,7 @@ GET /api/v1/canonical-libs
 ### Create
 
 ```
-POST /api/v1/canonical-libs
+POST /api/v1/lookup/canonical-libs
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -140,13 +140,13 @@ Content-Type: application/json
 ### Read
 
 ```
-GET /api/v1/canonical-libs/<guid>
+GET /api/v1/lookup/canonical-libs/<guid>
 ```
 
 ### Update
 
 ```
-PUT /api/v1/canonical-libs/<guid>
+PUT /api/v1/lookup/canonical-libs/<guid>
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -158,7 +158,7 @@ Content-Type: application/json
 ### Delete
 
 ```
-DELETE /api/v1/canonical-libs/<guid>
+DELETE /api/v1/lookup/canonical-libs/<guid>
 Authorization: Bearer <token>
 ```
 
@@ -172,11 +172,11 @@ Categories of concepts (observation, procedure, diagnosis, etc.).
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/concept-types` | No | List all |
-| POST | `/api/v1/concept-types` | Yes | Create (requires `concept_type_name`) |
-| GET | `/api/v1/concept-types/<guid>` | No | Read one |
-| PUT | `/api/v1/concept-types/<guid>` | Yes | Update |
-| DELETE | `/api/v1/concept-types/<guid>` | Yes | Delete |
+| GET | `/api/v1/lookup/concept-types` | No | List all |
+| POST | `/api/v1/lookup/concept-types` | Yes | Create (requires `concept_type_name`) |
+| GET | `/api/v1/lookup/concept-types/<guid>` | No | Read one |
+| PUT | `/api/v1/lookup/concept-types/<guid>` | Yes | Update |
+| DELETE | `/api/v1/lookup/concept-types/<guid>` | Yes | Delete |
 
 **Fields:** `guid`, `concept_type_name`, `concept_type_display_text`, `author`, `vers_number`, `date_created`, `date_valid`
 
@@ -188,11 +188,11 @@ Answer shapes (quantity, single choice, text, etc.).
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/response-types` | No | List all |
-| POST | `/api/v1/response-types` | Yes | Create (requires `response_type_name`) |
-| GET | `/api/v1/response-types/<guid>` | No | Read one |
-| PUT | `/api/v1/response-types/<guid>` | Yes | Update |
-| DELETE | `/api/v1/response-types/<guid>` | Yes | Delete |
+| GET | `/api/v1/lookup/response-types` | No | List all |
+| POST | `/api/v1/lookup/response-types` | Yes | Create (requires `response_type_name`) |
+| GET | `/api/v1/lookup/response-types/<guid>` | No | Read one |
+| PUT | `/api/v1/lookup/response-types/<guid>` | Yes | Update |
+| DELETE | `/api/v1/lookup/response-types/<guid>` | Yes | Delete |
 
 **Fields:** `guid`, `response_type_name`, `response_type_display_text`, `author`, `vers_number`, `date_created`, `date_valid`
 
@@ -204,11 +204,11 @@ Measurement units (kg, mmHg, mmol/L, etc.).
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/units` | No | List all |
-| POST | `/api/v1/units` | Yes | Create (requires `unit_name`) |
-| GET | `/api/v1/units/<guid>` | No | Read one |
-| PUT | `/api/v1/units/<guid>` | Yes | Update |
-| DELETE | `/api/v1/units/<guid>` | Yes | Delete |
+| GET | `/api/v1/lookup/units` | No | List all |
+| POST | `/api/v1/lookup/units` | Yes | Create (requires `unit_name`) |
+| GET | `/api/v1/lookup/units/<guid>` | No | Read one |
+| PUT | `/api/v1/lookup/units/<guid>` | Yes | Update |
+| DELETE | `/api/v1/lookup/units/<guid>` | Yes | Delete |
 
 **Fields:** `guid`, `unit_name`, `unit_display_text`, `author`, `vers_number`, `date_created`, `date_valid`
 
@@ -220,11 +220,11 @@ Selectable type values for the PlanDefinition builder.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/plandef-types` | No | List all |
-| POST | `/api/v1/plandef-types` | Yes | Create (requires `plandef_type_name`) |
-| GET | `/api/v1/plandef-types/<guid>` | No | Read one |
-| PUT | `/api/v1/plandef-types/<guid>` | Yes | Update |
-| DELETE | `/api/v1/plandef-types/<guid>` | Yes | Delete |
+| GET | `/api/v1/lookup/plandef-types` | No | List all |
+| POST | `/api/v1/lookup/plandef-types` | Yes | Create (requires `plandef_type_name`) |
+| GET | `/api/v1/lookup/plandef-types/<guid>` | No | Read one |
+| PUT | `/api/v1/lookup/plandef-types/<guid>` | Yes | Update |
+| DELETE | `/api/v1/lookup/plandef-types/<guid>` | Yes | Delete |
 
 **Fields:** `guid`, `plandef_type_name`, `plandef_type_display_text`, `author`, `vers_number`, `date_created`, `date_valid`
 
@@ -236,11 +236,11 @@ Selectable tags for transaction usage contexts.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/intended-uses` | No | List all |
-| POST | `/api/v1/intended-uses` | Yes | Create (requires `intended_use_name`) |
-| GET | `/api/v1/intended-uses/<guid>` | No | Read one |
-| PUT | `/api/v1/intended-uses/<guid>` | Yes | Update |
-| DELETE | `/api/v1/intended-uses/<guid>` | Yes | Delete |
+| GET | `/api/v1/lookup/intended-uses` | No | List all |
+| POST | `/api/v1/lookup/intended-uses` | Yes | Create (requires `intended_use_name`) |
+| GET | `/api/v1/lookup/intended-uses/<guid>` | No | Read one |
+| PUT | `/api/v1/lookup/intended-uses/<guid>` | Yes | Update |
+| DELETE | `/api/v1/lookup/intended-uses/<guid>` | Yes | Delete |
 
 **Fields:** `guid`, `intended_use_name`, `intended_use_display_text`, `author`, `vers_number`, `date_created`, `date_valid`
 
@@ -253,13 +253,13 @@ Individual selectable terms (answer options, coded terms).
 ### List All
 
 ```
-GET /api/v1/values
+GET /api/v1/lookup/values
 ```
 
 ### Create
 
 ```
-POST /api/v1/values
+POST /api/v1/lookup/values
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -278,20 +278,20 @@ Name uniqueness is enforced. On API import, names are auto-suffixed if duplicate
 ### Read
 
 ```
-GET /api/v1/values/<guid>
+GET /api/v1/lookup/values/<guid>
 ```
 
 ### Update
 
 ```
-PUT /api/v1/values/<guid>
+PUT /api/v1/lookup/values/<guid>
 Authorization: Bearer <token>
 ```
 
 ### Delete
 
 ```
-DELETE /api/v1/values/<guid>
+DELETE /api/v1/lookup/values/<guid>
 Authorization: Bearer <token>
 ```
 
@@ -301,16 +301,22 @@ Authorization: Bearer <token>
 
 Named collections of Values, reusable across Concepts.
 
+> **Note:** as of 2026-06-22 ValueSets are also published as **FHIR R5
+> `ValueSet` resources** at `/api/v1/ValueSet/<guid>` with `$expand` and
+> scoped `$validate-code` operations. The CRUD JSON below is the
+> legacy/builder-UI surface and remains unchanged. See
+> [FHIR R5 Terminology Profile](#fhir-r5-terminology-profile) below.
+
 ### List All (Paginated)
 
 ```
-GET /api/v1/valuesets?page=1&per_page=20
+GET /api/v1/lookup/valuesets?page=1&per_page=20
 ```
 
 ### Create
 
 ```
-POST /api/v1/valuesets
+POST /api/v1/lookup/valuesets
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -326,9 +332,9 @@ Content-Type: application/json
 ### Read / Update / Delete
 
 ```
-GET    /api/v1/valuesets/<guid>
-PUT    /api/v1/valuesets/<guid>
-DELETE /api/v1/valuesets/<guid>
+GET    /api/v1/lookup/valuesets/<guid>
+PUT    /api/v1/lookup/valuesets/<guid>
+DELETE /api/v1/lookup/valuesets/<guid>
 ```
 
 ### ValueSet Membership
@@ -336,7 +342,7 @@ DELETE /api/v1/valuesets/<guid>
 #### List Values in a ValueSet
 
 ```
-GET /api/v1/valuesets/<guid>/values
+GET /api/v1/lookup/valuesets/<guid>/values
 ```
 
 **Response (200):**
@@ -357,7 +363,7 @@ GET /api/v1/valuesets/<guid>/values
 #### Add a Value
 
 ```
-POST /api/v1/valuesets/<guid>/values
+POST /api/v1/lookup/valuesets/<guid>/values
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -372,7 +378,7 @@ Duplicate prevention is enforced.
 #### Update Sort Order
 
 ```
-PUT /api/v1/valuesets/<guid>/values/<value_guid>
+PUT /api/v1/lookup/valuesets/<guid>/values/<value_guid>
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -384,7 +390,7 @@ Content-Type: application/json
 #### Remove a Value
 
 ```
-DELETE /api/v1/valuesets/<guid>/values/<value_guid>
+DELETE /api/v1/lookup/valuesets/<guid>/values/<value_guid>
 Authorization: Bearer <token>
 ```
 
@@ -726,6 +732,146 @@ GET /api/v1/PlanDefinition/<fhir_id>/$expand
 ```
 
 Forces regeneration of the FHIR JSON from current relational data. Use this to ensure the resource reflects the latest state.
+
+> ⚠️ This `$expand` is **NOT** the FHIR ValueSet `$expand` operation — it
+> is a PlanDefinition-specific regen helper that long predates the
+> terminology profile. The FHIR ValueSet expansion lives at
+> `/api/v1/ValueSet/<guid>/$expand`.
+
+---
+
+## FHIR R5 Terminology Profile
+
+Added 2026-06-22. See
+[`plan_pdhc_fhir_terminology_profile_instruction.md`](../../plan_pdhc_fhir_terminology_profile_instruction.md)
+for the spec and
+[`plan_pdhc_fhir_terminology_profile_DECISIONS.md`](../../plan_pdhc_fhir_terminology_profile_DECISIONS.md)
+for the locked design decisions.
+
+Generic FHIR R5 terminology clients can be pointed at this server and
+will get conformant ValueSet/CodeSystem/ConceptMap resources plus the
+four canonical operations: `$expand`, `$validate-code`, `$lookup`, and
+`$translate`.
+
+The legacy CRUD JSON at `/api/v1/lookup/valuesets` and friends remains
+unchanged — the new FHIR routes are **additive** and live at
+capital-V/C paths.
+
+**Canonical URL convention (ADR D3):** the `url` field on each FHIR
+resource is `{base}/fhir/{Resource}/{id}` — an identifier, not a
+resolvable route. The routes themselves stay at `/api/v1/...` for
+backward compatibility. Search by `?url=` accepts both the new
+canonical form and legacy `/api/v1/(lookup/)?valuesets/{guid}` forms
+during the transition (D3.b).
+
+### FHIR ValueSet
+
+```
+GET  /api/v1/ValueSet                      # searchset Bundle
+GET  /api/v1/ValueSet?url=&_count=&_offset=
+GET  /api/v1/ValueSet/<guid>               # read
+GET  /api/v1/ValueSet/<guid>/$expand       # expand by id
+POST /api/v1/ValueSet/$expand              # expand by Parameters body (url|valueSet)
+```
+
+The `$expand` response includes `expansion.contains[]` with one entry
+per `(system, code, display)` tuple — `system` resolves to the bound
+`CanonicalLib.canonical_lib_url`.
+
+### Scoped `$validate-code` (and the global cdr.pdhc shim)
+
+```
+# Global / cdr.pdhc shim (UNCHANGED — adoption check):
+GET  /api/v1/ValueSet/$validate-code?system=&code=
+
+# Scoped (FHIR ValueSet/$validate-code semantics):
+GET  /api/v1/ValueSet/$validate-code?url=&system=&code=
+GET  /api/v1/ValueSet/<guid>/$validate-code?system=&code=
+POST /api/v1/ValueSet/$validate-code   # Parameters body with url|valueSet + code [+ system]
+```
+
+The same path serves both modes. With no `url`/`valueSet`, the
+existing global "is this canonical adopted anywhere in plan.pdhc?"
+question is answered — preserved byte-for-byte for the cdr.pdhc shim
+contract at `cdr.pdhc/cdr_app/app/services/plan_client.py`. With a
+ValueSet identifier, FHIR-conformant scoped membership check.
+
+`system` may be either the `CanonicalLib.canonical_lib_url` (FHIR
+canonical form) or its name (cdr.pdhc-friendly form). Empty `system`
+in the scoped path matches by code alone.
+
+### FHIR CodeSystem + `$lookup`
+
+```
+GET  /api/v1/CodeSystem                    # searchset Bundle (the singleton)
+GET  /api/v1/CodeSystem/plan-pdhc-local    # read
+GET  /api/v1/CodeSystem/$lookup?system=&code=
+POST /api/v1/CodeSystem/$lookup            # Parameters body
+```
+
+A single local CodeSystem `plan-pdhc-local` (ADR D2). Each
+`concept[].code` is the **`Concept.guid`** (ADR D1); `display`
+is `concept_display_text || concept_name`; `definition` is
+`concept_explain`. The `canonical_lib` binding is surfaced as a
+`concept[].property` (`canonical-lib` + `canonical-ref`).
+
+`$lookup` is a two-branch facade:
+- `system = {base}/fhir/CodeSystem/plan-pdhc-local` → local Concept
+  lookup by guid.
+- `system =` (any registered `CanonicalLib` URL or name) → delegates
+  to the cached `TermbankClient.lookup(lib_name, code)`, the same
+  client that backs `/api/v1/termbank/concept/...`.
+- `system =` unregistered → HTTP 404 OperationOutcome **without**
+  calling termbank.
+
+### FHIR ConceptMap + `$translate`
+
+```
+GET  /api/v1/ConceptMap                              # searchset Bundle
+GET  /api/v1/ConceptMap/plan-pdhc-canonical-bindings # read
+GET  /api/v1/ConceptMap/$translate?system=&code=&targetsystem=
+POST /api/v1/ConceptMap/$translate                   # Parameters body
+```
+
+A single platform ConceptMap projecting every Concept's
+`canonical_lib + canonical_refnumber` binding. Source = the local
+CodeSystem. Targets = one group per registered CanonicalLib URL.
+Relationship is always `equivalent`.
+
+`$translate` is **bidirectional**:
+
+| `system` | `code` | Behaviour |
+|---|---|---|
+| local CS URL | a `Concept.guid` | returns the canonical binding (LOINC code, SNOMED code, etc.) |
+| CanonicalLib URL | a `canonical_refnumber` | returns the local Concept guid |
+| CanonicalLib name | a `canonical_refnumber` | as above (cdr.pdhc-friendly) |
+
+`match[]` is always shaped as a repeating FHIR Parameters part —
+zero matches emit zero `match` parameters; a single match emits one;
+future multi-binding additions are additive and don't break the
+contract (Risk §9.5 of the spec).
+
+### Explicitly NOT supported (declared in CapabilityStatement)
+
+The local data model is deliberately flat — no inter-concept
+hierarchy. The following FHIR terminology operations are out of
+scope by design and are declared as such in `GET /api/v1/metadata`:
+
+- `CodeSystem/$subsumes`
+- `is-a` / descendant filters in `ValueSet.compose` and `$expand`
+- hierarchical `$lookup` properties (parent/child)
+
+### Conformance
+
+- Every test run validates outputs against `fhir.resources` R5
+  pydantic models (D5 fast layer).
+- For the canonical HL7 R5 validator: `make corpus && make conformance`
+  in `planp/`. Requires `VALIDATOR_JAR` pointing to a downloaded copy
+  of `validator_cli.jar` (`make check-jar` shows the download URL).
+- The cdr.pdhc cross-service `$validate-code` shim contract is
+  re-pinned by two regression tests:
+  `test_capability.py::TestCDRValidateCodeContract` and
+  `test_fhir_valueset.py::TestCDRGlobalContractAfter62`.
 
 ---
 

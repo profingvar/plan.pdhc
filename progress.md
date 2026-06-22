@@ -348,3 +348,329 @@ Added:
 All 8 importer tests pass. Pre-existing failure in
 `tests/test_concepts.py::test_create_and_read` (cached stale path)
 is unrelated.
+
+## 2026-06-22 — FHIR R5 terminology profile (instruction §4 + §5 + §6.5/§6.6 foundation)
+
+Implementation kicked off per `plan_pdhc_fhir_terminology_profile_instruction.md`
+in the parent repo dir. Decision record locked at
+`plan_pdhc_fhir_terminology_profile_DECISIONS.md`.
+
+### §4 Prerequisites (now green)
+
+- Audit of 76 pre-existing tests: 22 were red from a stale URL prefix
+  (commit `00440b7` moved CRUD blueprints under `/api/v1/lookup/...`
+  but tests stayed at `/api/v1/...`). Fixed across `test_auth.py`,
+  `test_concepts.py`, `test_lookup_tables.py`, `test_valuesets.py`.
+- `test_health_returns_ok` updated to assert the CLAUDE.md §10 canonical
+  shape (`status`/`database`/`service`/`version`) instead of the old
+  `{'status':'ok'}`.
+- Latent flake in `_setup_concept_deps` (CPython recycled
+  `id(client)` → duplicate lib_name → 409) fixed to `uuid.uuid4()`.
+- New `tests/test_capability.py` — 6 tests: pins `/metadata`,
+  `/capability-statement`, `/endpoints` and a CDR cross-service
+  `$validate-code` contract mirroring
+  `cdr.pdhc/cdr_app/app/services/plan_client.py::PlanClient._parse_parameters`.
+
+### §5 ADR — all five decisions APPROVED 2026-06-22
+
+- **D1**: local CodeSystem code = `Concept.guid` (HARD-reversibility).
+- **D2**: single CodeSystem `plan-pdhc-local`.
+- **D3**: routes stay at `/api/v1/...`; canonical `url` =
+  `{PLAN_BASE}/fhir/{Resource}/{id}` (identifier, may not resolve).
+  D3.b: `/api/v1/ValueSet?url=...` accepts both new and legacy forms
+  during transition.
+- **D4**: `version = str(vers_number)`, per-resource.
+- **D5**: two-layer validator — `fhir.resources>=8.0` in `pytest` for
+  fast shape-check; HL7 Java `validator_cli.jar` via `make conformance`
+  for canonical conformance (CI wiring TBD).
+
+### §6.5 + §6.6 foundation (this commit)
+
+- `app/models/concept_models.py`: added `LOCAL_CODESYSTEM_ID`,
+  `fhir_canonical_url(resource, id)`, and `fhir_version(model_obj)`
+  next to `PLAN_BASE`. Single source of truth for the FHIR canonical
+  URL form (ADR D3, Risk §9.3).
+- `app/api/fhir_helpers.py` (new): shared `operation_outcome()`,
+  `parameters_response()`, `fhir_json_response()`,
+  `parse_parameters_body()`. `FHIR_CONTENT_TYPE = 'application/fhir+json'`.
+- `app/api/terminology.py` left untouched (existing private helpers
+  preserved for backward compat per spec §6.5 "do not retrofit").
+- `requirements.txt`: added `fhir.resources>=8.0`.
+- `tests/test_fhir_helpers.py` (new): 20 tests covering the URL
+  builder, version helper, all four shared helpers, the D5 fast
+  validator wiring (round-trip through `fhir.resources` pydantic
+  models), and the D3 lint — forbids any file other than the URL
+  helper from hardcoding `plan.pdhc.se/fhir/` or `{PLAN_BASE}/fhir/`
+  patterns.
+
+Test count: 76 → 102 (+26: 6 capability, 20 fhir_helpers).
+All green; 3 consecutive full-suite runs no flakes.
+
+### §6.1 — ValueSet resource + $expand
+
+- `app/api/fhir_valueset.py` (NEW): four routes registered at `/api/v1`:
+  - `GET /ValueSet/{guid}` → FHIR R5 ValueSet (url, version, status,
+    compose, optional title/description).
+  - `GET /ValueSet?url=&_count=&_offset=` → searchset Bundle. `?url=`
+    accepts the new canonical form AND the legacy
+    `/api/v1/(lookup/)?valuesets/{guid}` forms per D3.b transition rule.
+  - `GET /ValueSet/{guid}/$expand` → expansion.contains[] (one entry
+    per `(system, code, display)` resolved from
+    `ValueSetValue → ValueCatalog → CanonicalLib.canonical_lib_url`).
+  - `POST /ValueSet/$expand` with `Parameters` body (`url` or
+    `valueSet` parameter; falls back gracefully when both forms supplied).
+- All four routes emit `application/fhir+json` and return FHIR
+  `OperationOutcome` on errors (400 invalid guid, 404 not found,
+  required-parameter missing).
+- All output validates against `fhir.resources` R5 pydantic models
+  (D5 fast layer).
+- ValueSet model unchanged. `ValueSet.to_dict()` (legacy CRUD JSON)
+  unchanged. Existing test_valuesets.py membership/CRUD tests still
+  pass (§2 regression contract held).
+- `tests/test_fhir_valueset.py` (NEW): 22 tests across read/search/
+  $expand-GET/$expand-POST/legacy-regression, including D3 canonical
+  url pin, D3.b legacy-url acceptance, D5 fast-layer validation.
+
+Test count: 102 → 124 (+22 fhir_valueset).
+All green; 5 consecutive full-suite runs no flakes.
+
+### §6.2 — scoped `$validate-code` (keeping the cdr.pdhc shim contract)
+
+Strategy per spec §6.2: the existing global behavior at
+`/api/v1/ValueSet/$validate-code` (no url, system+code only) is
+unchanged. When the caller supplies a `url` / `valueSet` identifier,
+the same route delegates to scoped logic in `fhir_valueset.py`. Two
+new dedicated scoped routes also added.
+
+- `app/api/fhir_valueset.py`:
+  - `scoped_validate_code(vs, system, code)` public helper — checks
+    membership in `vs`'s expansion; `system` may be the CanonicalLib
+    URL (FHIR-canonical) OR name (cdr.pdhc form); empty system →
+    match by code alone.
+  - `resolve_canonical_lib(system_or_url)` — tries URL then name.
+  - `GET /api/v1/ValueSet/{guid}/$validate-code?system=&code=` (+
+    `%24` escape variant).
+  - `POST /api/v1/ValueSet/$validate-code` with Parameters body
+    (`url`/`valueSet` + `code` + `system`).
+- `app/api/terminology.py`: `validate_code()` adds a branch at the
+  top — if `url`/`valueSet` query param present, dispatch to
+  `scoped_validate_code` via local import (no startup-time cycle).
+  Bare `?system=&code=` path is **byte-identical** to before, so the
+  cdr.pdhc shim contract is preserved.
+- `tests/test_fhir_valueset.py` extended: +18 §6.2 tests across
+  `TestScopedValidateCodeByGuid` (8), `TestScopedValidateCodeByUrl` (5),
+  `TestScopedValidateCodeByPost` (3), `TestCDRGlobalContractAfter62` (2
+  — re-pinning the exact cdr.pdhc request shape after the new branch).
+  D5 round-trip via `fhir.resources.parameters.Parameters` model on
+  the scoped responses.
+
+Test count: 124 → 142 (+18 §6.2).
+All green; 5 consecutive full-suite runs no flakes.
+Existing `test_terminology.py` (global $validate-code, 21 tests) +
+`test_capability.py::TestCDRValidateCodeContract` (3 tests) re-verified
+green — the cdr.pdhc cross-service contract from §4.2 holds after §6.2.
+
+### §6.4 — ConceptMap + $translate (the highest-value item)
+
+The single platform ConceptMap maps every Concept row's
+canonical_lib + canonical_refnumber binding into a FHIR R5 ConceptMap
+keyed `plan-pdhc-canonical-bindings`. Source = local CodeSystem
+`plan-pdhc-local` (ADR D2). Targets = each registered CanonicalLib's
+URL. element.code = `Concept.guid` (ADR D1). Relationship = `equivalent`.
+
+- `app/models/concept_models.py`: added
+  `LOCAL_CONCEPTMAP_ID = "plan-pdhc-canonical-bindings"`.
+- `app/api/fhir_conceptmap.py` (NEW): 4 routes at `/api/v1`:
+  - `GET /ConceptMap/{id}` — read the single ConceptMap.
+  - `GET /ConceptMap[?url=]` — searchset Bundle of size 0 or 1.
+  - `GET /ConceptMap/$translate?system=&code=&targetsystem=` (+
+    `%24` escape).
+  - `POST /ConceptMap/$translate` with Parameters body.
+- $translate is **bidirectional**:
+  - When `system` == local CodeSystem URL, source code is a
+    `Concept.guid` and target is the canonical binding (filtered by
+    `targetsystem` if present).
+  - When `system` is a CanonicalLib URL OR name (cdr.pdhc-friendly
+    lenience), source code is a `canonical_refnumber` and target is
+    the local Concept; `targetsystem`, if present, must equal the
+    local CodeSystem URL.
+- Risk §9.5 — `match` is shaped as a repeating FHIR Parameters part,
+  never collapsed to a singleton. Two dedicated invariant tests pin
+  this (zero-match shape + one-match shape).
+- `tests/test_fhir_conceptmap.py` (NEW): 27 tests across read (7),
+  search (3), local→canonical (5), canonical→local (5), POST (3),
+  error paths (2), match-array invariant (2). D5 round-trip
+  validation on ConceptMap, Bundle, and Parameters.
+
+Test count: 142 → 169 (+27 §6.4).
+All green; 5 consecutive full-suite runs no flakes.
+
+### §6.3 — CodeSystem + $lookup with termbank delegation
+
+The local concept set is now published as the single CodeSystem
+`plan-pdhc-local` (ADR D2). Every entry uses `Concept.guid` as the
+code (ADR D1) paired with `concept_display_text` as `display` and
+`concept_explain` as `definition`. The CanonicalLib binding is
+surfaced as `concept[].property` (`canonical-lib` + `canonical-ref`),
+with property definitions declared at the top of the resource.
+
+- `app/api/fhir_codesystem.py` (NEW). 4 routes at `/api/v1`:
+  - `GET /CodeSystem/{id}` — read the singleton local CodeSystem
+    with `content: 'complete'` (small platform; revisit if N>>10k).
+  - `GET /CodeSystem[?url=]` — searchset Bundle of size 0 or 1.
+  - `GET /CodeSystem/$lookup?system=&code=` (+ `%24` escape).
+  - `POST /CodeSystem/$lookup` with Parameters body.
+- `$lookup` is a two-branch facade:
+  - When `system` matches `LOCAL_CS_URL`, look up Concept by guid
+    and return Parameters with name/version/display/definition +
+    canonical-lib / canonical-ref / status properties.
+  - Otherwise resolve `system` as a CanonicalLib (URL OR name,
+    consistent with $validate-code and $translate) and delegate to
+    `app.termbank_client.lookup(lib.canonical_lib_name, code)` —
+    the existing TTL-cached client that also backs
+    `/api/v1/termbank/concept/...`. Pass-through return on hit;
+    OperationOutcome 404 on miss (text mentions "unreachable" so the
+    cdr.pdhc-style callers see the transient hint).
+  - Unregistered `system` returns 404 **without calling termbank**.
+- `tests/test_fhir_codesystem.py` (NEW): 20 tests across read (5
+  — D1 guid-as-code, display, property, R5 validation), search
+  Bundle (3), local $lookup (5), termbank-delegation (4 — URL form,
+  name form, miss-with-unreachable-hint, unregistered-skips-termbank),
+  POST (3). Termbank delegation tested via `patch.object` on
+  `app.termbank_client.lookup` — no live network.
+
+Test count: 169 → 189 (+20 §6.3).
+All green; 5 consecutive full-suite runs no flakes.
+
+### §6.7 + §6.8 — CapabilityStatement truth-up + conformance scaffolding
+
+- `app/api/capability.py`:
+  - **ENDPOINTS** list extended with all 15 new FHIR routes (ValueSet,
+    CodeSystem, ConceptMap reads/searches/operations). PlanDefinition
+    `$expand` description now explicitly says "NOT the FHIR ValueSet
+    $expand — see /ValueSet/<guid>/$expand below" so future readers
+    can't conflate the two.
+  - **ValueSet** resource entry rewritten: declares both surfaces (the
+    legacy CRUD AND the FHIR routes), `?url=` searchParam with D3.b
+    note, `$expand` and `$validate-code` operations. `$validate-code`
+    documentation explicitly calls out the global cdr.pdhc shim mode
+    vs the new scoped mode.
+  - **CodeSystem** resource entry rewritten: describes the single
+    local CodeSystem `plan-pdhc-local` (ADR D2) with `Concept.guid` as
+    code (ADR D1). `$lookup` operation calls out the termbank
+    delegation rule.
+  - **ConceptMap** resource entry added: single platform
+    `plan-pdhc-canonical-bindings`, `$translate` operation,
+    bidirectional, Risk §9.5 match-shape note.
+  - **§7 explicit non-goals** declared as an OperationDefinition
+    documentation block — `$subsumes`, is-a / descendant filters, and
+    hierarchical properties are all named as deliberately unsupported.
+- `tests/test_capability.py` extended with 6 §6.7 assertions: ValueSet
+  declares expand+validate-code (with cdr.pdhc+scoped doc-strings);
+  CodeSystem declares lookup with termbank-delegation doc; ConceptMap
+  exists with translate; §7 non-goals are documented; new FHIR routes
+  appear in `/endpoints`; PlanDefinition `$expand` doc warns it isn't
+  terminology.
+- `Makefile` (NEW): `make test`, `make corpus`, `make conformance`,
+  `make check-jar`. `conformance` is the HL7 Java validator path
+  (`VALIDATOR_JAR` env var); `corpus` emits the corpus into
+  `tests/fhir_corpus/`. The Java jar is NOT vendored — `check-jar`
+  tells the operator where to download it.
+- `tests/conformance_corpus_emit.py` (NEW): boots a self-contained
+  test app, seeds the minimum, calls every new §6 endpoint, and
+  writes JSON files. End-to-end-tested in this session — 13 files
+  emitted cleanly.
+- `tests/fhir_corpus/README.md` (NEW): how to run conformance, where
+  to download the jar, two-layer validation rationale.
+
+§6.8 fast layer (`fhir.resources` pydantic R5 models) was wired
+across §6.1-§6.4 test files as those landed. §6.8 slow layer (Java
+`validator_cli.jar`) is scaffolded but the JAR download + CI job is
+the "TBD devops" item called out in Risk §9.4.
+
+Test count: 189 → 195 (+6 §6.7).
+All green; 5 consecutive full-suite runs no flakes.
+
+---
+
+## §6 IMPLEMENTATION COMPLETE.
+
+All seven work items shipped:
+- §6.1 ValueSet + $expand (22 tests)
+- §6.2 scoped $validate-code (18 tests)
+- §6.3 CodeSystem + $lookup with termbank delegation (20 tests)
+- §6.4 ConceptMap + $translate (27 tests)
+- §6.5 cross-cutting I/O conventions (in fhir_helpers.py, 18 tests)
+- §6.6 canonical URLs + versioning (2 fields in concept_models.py)
+- §6.7 CapabilityStatement truth-up (6 tests)
+- §6.8 fast layer (D5 fhir.resources, exercised in every §6.x test);
+  slow layer scaffolded (Makefile + corpus emitter)
+
+Plus prerequisites:
+- §4 Prerequisites — 22-test URL fix + capability/CDR contract pin
+- §5 ADR (all five decisions approved 2026-06-22)
+
+Total tests: 76 → 195 (+119). Green-baseline stable across all 5
+consecutive full-suite runs. §2 regression contract (DO NOT BREAK)
+holds: cdr.pdhc plan_client global `$validate-code` shape is
+identical, verified by `TestCDRValidateCodeContract` (§4) and
+`TestCDRGlobalContractAfter62` (§6.2 explicit pin).
+
+**Outstanding** (not blocking ship):
+1. CI job that runs `make conformance` against PRs (Risk §9.4
+   long-tail).
+2. The 3 open questions at the bottom of the DECISIONS ADR
+   (CodeSystem.property URI scheme, ConceptMap multi-group future,
+   POST validate-code body shape if external consumers ask) — none
+   block §6 deployment.
+
+### Documentation review 2026-06-22
+
+Audited every doc in the repo for §6-staleness; fixed the following:
+
+- `plan_pdhc_fhir_terminology_profile_instruction.md` — status line
+  updated from "Specification for implementation. Nothing here is
+  built yet." → "**IMPLEMENTED 2026-06-22.** All §6 work items
+  shipped..."
+- `readme.md` — added a bullet describing the new FHIR R5 terminology
+  profile (with links to spec + ADR).
+- `planp/docs/api_reference.md` — TWO categories of fix:
+  (a) the same stale URL-prefix bug we caught in tests was in here
+      too: 44 substitutions across canonical-libs/concept-types/
+      response-types/units/plandef-types/intended-uses/valuesets/
+      values from `/api/v1/X` → `/api/v1/lookup/X`. Same root cause
+      as the tests (commit `00440b7` moved blueprint but didn't
+      update either tests or docs).
+  (b) added a new top-level "FHIR R5 Terminology Profile" section
+      (~140 lines) covering ValueSet/CodeSystem/ConceptMap routes,
+      $expand/$validate-code/$lookup/$translate, D3 canonical URL
+      convention, D3.b legacy URL transition rule, termbank
+      delegation rule, dual-mode $validate-code, explicit §7
+      non-goals, and the conformance toolchain. Added a forward-link
+      callout in the existing ValueSets section. Added a "NOT the
+      FHIR ValueSet $expand" warning on the PlanDefinition $expand
+      doc to prevent future confusion.
+- `plan_description.md` — added a new "§9 FHIR R5 terminology profile"
+  section + listed the four new modules in the source-files preamble.
+- `DEPLOYMENT_PLAN.md` — added `Flask-Cors`, `openpyxl`,
+  `fhir.resources>=8.0` to the requirements example block (was
+  missing the latest two from previous landings as well as the new
+  one), plus an upgrade callout for existing deployments.
+- `newtask.txt` (NEW) — Rule 2 required this file; it didn't exist.
+  Captures current focus (§6 done) and the next-up triage list.
+- `app/api/capability.py` `DOCS_CATALOG` — registered both the spec
+  and the ADR so `/api/v1/docs` and `/api/v1/docs/{name}` find them.
+  Verified end-to-end (`Docs found: 11; both new docs FOUND`).
+
+Test count unchanged (docs only): 195. All green; 3 consecutive
+post-doc runs no flakes.
+
+### Deploy to miserver 2026-06-22T12:24Z
+
+Tarball-based deploy (30 files) followed by `docker-compose build app`
+and `docker-compose up -d app` swap. ~5s outage. All five new FHIR
+routes verified 200 externally via Cloudflare; cdr.pdhc `$validate-code`
+contract shape byte-identical to pre-deploy.
+
+Full log with what-was-NOT-done section:
+[`DEPLOY_2026-06-22_FHIR_TERMINOLOGY.md`](DEPLOY_2026-06-22_FHIR_TERMINOLOGY.md).

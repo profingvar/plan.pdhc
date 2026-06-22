@@ -20,6 +20,18 @@ execute, apply, and observe against.
 - Emission of valid FHIR R5 `PlanDefinition` and `Questionnaire`
   bundles for downstream services (`request.pdhc`, `1177.pdhc`,
   provider services)
+- **Conformant FHIR R5 terminology profile** (added 2026-06-22):
+  `ValueSet` + `$expand` + scoped `$validate-code`, `CodeSystem` +
+  `$lookup` (delegating external systems to `termbank.pdhc`), and
+  `ConceptMap` + bidirectional `$translate`. Generic FHIR
+  terminology clients can be pointed at this server without bespoke
+  integration. See
+  [`plan_pdhc_fhir_terminology_profile_instruction.md`](plan_pdhc_fhir_terminology_profile_instruction.md)
+  for the spec and
+  [`plan_pdhc_fhir_terminology_profile_DECISIONS.md`](plan_pdhc_fhir_terminology_profile_DECISIONS.md)
+  for the locked design decisions (D1: code = `Concept.guid`; D2:
+  single CodeSystem `plan-pdhc-local`; D3: canonical `url` in
+  `{base}/fhir/{Resource}/{id}` form).
 - SSO-backed access control via `sso.pdhc`
 
 The PDHC platform deliberately separates **authoring** (plan.pdhc) from
