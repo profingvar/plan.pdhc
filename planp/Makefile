@@ -17,6 +17,14 @@ VALIDATOR_JAR ?= $(HOME)/.local/share/fhir/validator_cli.jar
 CORPUS_DIR := tests/fhir_corpus
 FHIR_VERSION := 5.0.0
 
+# Terminology server for resolving HL7-canonical URLs
+# (e.g. http://terminology.hl7.org/CodeSystem/restful-security-service
+# used in CapabilityStatement.security). Without this, the validator
+# emits false-positive errors on legitimate HL7 URLs it can't load
+# from its offline package store. tx.fhir.org/r5 is HL7's hosted R5
+# terminology service.
+TX_SERVER ?= https://tx.fhir.org/r5
+
 
 .PHONY: help test corpus conformance check-jar
 
@@ -41,5 +49,5 @@ check-jar:
 	fi
 
 conformance: check-jar corpus
-	@echo "Validating $(CORPUS_DIR)/*.json against FHIR R5..."
-	java -jar "$(VALIDATOR_JAR)" -version $(FHIR_VERSION) $(CORPUS_DIR)/*.json
+	@echo "Validating $(CORPUS_DIR)/*.json against FHIR R5 (tx: $(TX_SERVER))..."
+	java -jar "$(VALIDATOR_JAR)" -version $(FHIR_VERSION) -tx=$(TX_SERVER) $(CORPUS_DIR)/*.json

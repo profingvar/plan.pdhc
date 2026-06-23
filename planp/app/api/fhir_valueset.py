@@ -304,6 +304,8 @@ def search_valuesets():
     bundle = {
         'resourceType': 'Bundle',
         'type': 'searchset',
+        # bdl-18: searchsets require a self link.
+        'link': [{'relation': 'self', 'url': request.url}],
         'total': total,
         'entry': entries,
     }

@@ -283,6 +283,8 @@ def search_codesystems():
     return fhir_json_response({
         'resourceType': 'Bundle',
         'type': 'searchset',
+        # bdl-18: searchsets require a self link.
+        'link': [{'relation': 'self', 'url': request.url}],
         'total': total,
         'entry': entries,
     })

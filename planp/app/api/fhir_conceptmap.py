@@ -182,7 +182,11 @@ def _build_conceptmap() -> dict:
             f'{LOCAL_CODESYSTEM_ID}) to external canonicals registered '
             'as CanonicalLibs (LOINC, SNOMED, ICD-10, ATC, …).'
         ),
-        'sourceScopeUri': LOCAL_CS_URL,
+        # No sourceScopeUri: the FHIR R5 spec requires sourceScope[x]
+        # to reference a ValueSet (not a CodeSystem). plan.pdhc does not
+        # define a single ValueSet covering every local concept; the
+        # source CodeSystem is identified per-group via group[].source
+        # instead, which is FHIR-conformant and validates clean.
         'group': groups,
     }
 
@@ -324,6 +328,8 @@ def search_conceptmaps():
     return fhir_json_response({
         'resourceType': 'Bundle',
         'type': 'searchset',
+        # bdl-18: searchsets require a self link.
+        'link': [{'relation': 'self', 'url': request.url}],
         'total': total,
         'entry': entries,
     })

@@ -123,7 +123,12 @@ class TestReadConceptMap:
         assert body['url'] == \
             f'{PLAN_BASE}/fhir/ConceptMap/{LOCAL_CONCEPTMAP_ID}'
         assert body['status'] == 'active'
-        assert body['sourceScopeUri'] == LOCAL_CS_URL
+        # sourceScopeUri is intentionally NOT emitted — FHIR R5 requires
+        # it to reference a ValueSet (not a CodeSystem), and we don't
+        # define a single ValueSet covering every local concept. The
+        # source CodeSystem is identified per-group via group[].source
+        # instead, which is conformant and validates clean.
+        assert 'sourceScopeUri' not in body
 
     def test_groups_keyed_by_target_system(self, client, bound_concepts):
         body = client.get(f'/api/v1/ConceptMap/{LOCAL_CONCEPTMAP_ID}').get_json()
