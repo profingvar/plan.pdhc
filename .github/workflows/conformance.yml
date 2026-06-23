@@ -90,10 +90,11 @@ jobs:
 
       - name: Run HL7 R5 conformance validator
         working-directory: planp
-        env:
-          VALIDATOR_JAR: ~/.local/share/fhir/validator_cli.jar
         run: |
-          # The Makefile target uses VALIDATOR_JAR + TX_SERVER + FHIR_VERSION.
+          # The Makefile defaults VALIDATOR_JAR to $(HOME)/.local/share/fhir/
+          # validator_cli.jar (which Make expands correctly). Don't set it
+          # via the workflow env — the literal `~` from YAML isn't expanded
+          # by the Makefile's shell-level `[ ! -f ... ]` check.
           make conformance
 
       - name: Upload corpus artifact (for debugging on failure)
