@@ -82,9 +82,13 @@ def _property_part(code: str, value: str) -> dict:
     }
 
 
+# ADR D6 — property URI scheme is {LOCAL_CS_URL}#{property-code}.
+# Defined inline below as f-strings so the URIs stay in sync with
+# LOCAL_CS_URL if PLAN_BASE ever moves.
 CODESYSTEM_PROPERTY_DEFS = [
     {
         'code': 'canonical-lib',
+        'uri': f'{LOCAL_CS_URL}#canonical-lib',
         'description': (
             'Name of the CanonicalLib the Concept is bound to '
             '(e.g. loinc, snomed). Empty when the Concept is locally '
@@ -94,6 +98,7 @@ CODESYSTEM_PROPERTY_DEFS = [
     },
     {
         'code': 'canonical-ref',
+        'uri': f'{LOCAL_CS_URL}#canonical-ref',
         'description': (
             "The canonical_refnumber within the bound CanonicalLib "
             "(e.g. '4548-4' for LOINC HbA1c)."
@@ -102,6 +107,7 @@ CODESYSTEM_PROPERTY_DEFS = [
     },
     {
         'code': 'status',
+        'uri': f'{LOCAL_CS_URL}#status',
         'description': "Concept editorial status (draft, active, retired).",
         'type': 'string',
     },

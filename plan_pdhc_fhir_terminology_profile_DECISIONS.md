@@ -355,21 +355,101 @@ for §6 implementation.
 
 ---
 
-## Open questions for the reviewer (not blocking sign-off)
+## Open questions for the reviewer (RESOLVED 2026-06-23)
 
-1. **CodeSystem `concept[].property` schema.** When (not if) we want to
-   filter by `concept_type` from a FHIR client, what property URI do we
-   coin? Suggestion: `{PLAN_BASE}/fhir/CodeSystem/plan-pdhc-local#concept-type`.
-   Decide as part of §6.3 review; doesn't block sign-off here.
-2. **`ConceptMap.group` cardinality.** Today every concept has 0..1
-   canonical binding. Spec §6.4 says the response shape returns `match[]`
-   as an array (future-proof). Should the ConceptMap resource itself
-   surface multiple `group[]` entries (one per canonical_lib) or a single
-   group with all mappings? Single group is simpler; multi-group is more
-   FHIR-idiomatic. Defer to §6.4 review.
-3. **§6.2 `$validate-code` POST Parameters form.** The spec says we add
-   a POST form alongside the existing GET. Question: does the POST body
-   have to match the existing GET response on cdr.pdhc's plan_client?
-   Looking at the code, plan_client only ever uses GET — so POST is for
-   future external consumers and can be designed cleanly without legacy
-   constraints. Confirm before §6.2 work.
+### Q1 → D6 — CodeSystem `concept[].property.uri` scheme
+
+**Resolution:** APPROVED 2026-06-23. Use
+`{PLAN_BASE}/fhir/CodeSystem/plan-pdhc-local#{property-code}` as the
+canonical URI for every locally-defined property on the local
+CodeSystem.
+
+Concretely, the three local properties (`canonical-lib`,
+`canonical-ref`, `status`) get URIs:
+
+- `https://plan.pdhc.se/fhir/CodeSystem/plan-pdhc-local#canonical-lib`
+- `https://plan.pdhc.se/fhir/CodeSystem/plan-pdhc-local#canonical-ref`
+- `https://plan.pdhc.se/fhir/CodeSystem/plan-pdhc-local#status`
+
+**Rationale:** the `#fragment` form scopes the property identifier to
+the CodeSystem that declares it, which matches FHIR best practice for
+locally-defined properties. The URI is then a stable, deduplicatable
+handle a FHIR client can use to filter or interpret the property.
+
+**Consequences:** `CODESYSTEM_PROPERTY_DEFS` in `app/api/fhir_codesystem.py`
+adds a `uri` field on each property definition (FHIR R5 `CodeSystem.property.uri`
+is 0..1 but recommended). The per-`concept[]` property entries do NOT
+need `uri` — they reference by code, and the URI is declared once at
+the CodeSystem level.
+
+**Reversibility:** EASY. Property URIs are only normative when a
+consumer actually uses them to filter. Changing the URI form later is a
+single-place change in the URL builder.
+
+**Status:** ☑ APPROVED 2026-06-23 (D6).
+
+---
+
+### Q2 → D7 — `ConceptMap.group` cardinality
+
+**Resolution:** APPROVED 2026-06-23. Multi-group is the design. The
+current implementation in `_build_conceptmap()` already does this
+(groups Concepts by target `canonical_lib.canonical_lib_url`).
+
+If a Concept ever has N bindings to N different CanonicalLibs, the
+same Concept GUID appears as `element[].code` in N different `group[]`
+entries — one per target system.
+
+**Rationale:** `ConceptMap.group.target` (the target CodeSystem URL)
+is a single URI per group, not an array. Different target systems
+require different groups. This is the FHIR-canonical pattern that
+SNOMED, LOINC, etc. follow in their published ConceptMap exports.
+
+A "one group with N target entries" alternative is technically possible
+via `element.target.system` overriding `group.target`, but it's an
+edge-case escape hatch in the spec — not the idiomatic form.
+
+**Consequences:** none. Current code is already correct. Future
+multi-binding lands by simply adding more rows on `Concept` (or a
+separate binding table) without changing the ConceptMap projection
+logic.
+
+**Reversibility:** N/A — this is a confirmation, not a change.
+
+**Status:** ☑ APPROVED 2026-06-23 (D7).
+
+---
+
+### Q3 → D8 — POST `$validate-code` body shape
+
+**Resolution:** APPROVED 2026-06-23. The current POST implementation
+is correct and FHIR-clean.
+
+The POST body shape accepts a FHIR `Parameters` resource with
+`url` (or `valueSet`) for ValueSet scoping plus `code` and optional
+`system`. This matches the FHIR R5 `ValueSet/$validate-code` operation
+definition's required input parameters for the scoped case.
+
+cdr.pdhc never uses POST (it uses GET only for the global shim), so
+there was no legacy constraint on the POST design. The current
+implementation has the FHIR canonical shape without any cdr.pdhc-
+shim leakage.
+
+**Not implemented (deferred indefinitely until a consumer asks):**
+the spec's optional input params `valueSetVersion`, `context`,
+`coding` (input as Coding instead of system+code), `codeableConcept`
+(input as CodeableConcept), `date`, `abstract`, `displayLanguage`,
+`useSupplement`. None of these are required, and there's no current
+consumer that needs them.
+
+**Acceptance criterion:** as documented in the spec — a generic FHIR
+terminology client can POST `Parameters { url, code, system }` and
+get a conformant `Parameters { result, display, ... }` back. Verified
+by the tests in `test_fhir_valueset.py::TestScopedValidateCodeByPost`
+(3 tests) and the corpus emitter's `valueset_validate_code_*.json`
+fixtures (both pass conformance).
+
+**Reversibility:** EASY. Additional input params can be added
+non-breakingly later (FHIR Parameters is extensible by name).
+
+**Status:** ☑ APPROVED 2026-06-23 (D8).
