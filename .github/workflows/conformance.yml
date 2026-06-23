@@ -1,0 +1,105 @@
+name: FHIR R5 conformance
+
+# §6.8 / ADR D5 / Risk §9.4 — gate PRs on canonical HL7 FHIR R5 conformance.
+# The pydantic fast layer (fhir.resources) runs inside pytest in the main
+# test job; this job runs the slow / canonical layer: the official HL7
+# validator_cli.jar against a corpus emitted from every §6 endpoint.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      # Only run when terminology surface or its deps change.
+      - 'planp/app/api/**'
+      - 'planp/app/models/concept_models.py'
+      - 'planp/app/services/termbank_client.py'
+      - 'planp/requirements.txt'
+      - 'planp/tests/conformance_corpus_emit.py'
+      - 'planp/Makefile'
+      - '.github/workflows/conformance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'planp/app/api/**'
+      - 'planp/app/models/concept_models.py'
+      - 'planp/app/services/termbank_client.py'
+      - 'planp/requirements.txt'
+      - 'planp/tests/conformance_corpus_emit.py'
+      - 'planp/Makefile'
+      - '.github/workflows/conformance.yml'
+  workflow_dispatch: {}
+
+env:
+  # Pin the validator version so CI is reproducible. Bump after testing
+  # the new version locally with `make conformance`.
+  VALIDATOR_VERSION: '6.9.10'
+  FHIR_VERSION: '5.0.0'
+  TX_SERVER: 'https://tx.fhir.org/r5'
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache validator_cli.jar
+        id: cache-jar
+        uses: actions/cache@v4
+        with:
+          # The validator URL is /releases/latest/... so the version is in
+          # the cache key; bump VALIDATOR_VERSION above to invalidate.
+          path: ~/.local/share/fhir/validator_cli.jar
+          key: fhir-validator-${{ env.VALIDATOR_VERSION }}
+
+      - name: Download validator_cli.jar (on cache miss)
+        if: steps.cache-jar.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/share/fhir
+          curl -sSL \
+            -o ~/.local/share/fhir/validator_cli.jar \
+            'https://github.com/hapifhir/org.hl7.fhir.core/releases/download/${{ env.VALIDATOR_VERSION }}/validator_cli.jar'
+          ls -lh ~/.local/share/fhir/validator_cli.jar
+
+      - name: Install Python deps
+        working-directory: planp
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Emit corpus
+        working-directory: planp
+        run: |
+          source venv/bin/activate
+          make corpus
+
+      - name: Run HL7 R5 conformance validator
+        working-directory: planp
+        env:
+          VALIDATOR_JAR: ~/.local/share/fhir/validator_cli.jar
+        run: |
+          # The Makefile target uses VALIDATOR_JAR + TX_SERVER + FHIR_VERSION.
+          make conformance
+
+      - name: Upload corpus artifact (for debugging on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fhir-corpus
+          path: planp/tests/fhir_corpus/
+          retention-days: 7
