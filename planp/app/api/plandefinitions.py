@@ -111,6 +111,13 @@ def list_plandefinitions():
 
     query = PlanDefinition.query
 
+    # Archived plandefs are soft-deleted and must not surface in normal
+    # listings (e.g. request.pdhc's ServiceRequest picker). This mirrors
+    # the builder list view, which already filters archived out by default.
+    # ?include_archived=1 opts back in for admin/audit use.
+    if request.args.get('include_archived', '') != '1':
+        query = query.filter(PlanDefinition.archived == False)
+
     status = request.args.get('status')
     if status:
         query = query.filter(PlanDefinition.status == status)

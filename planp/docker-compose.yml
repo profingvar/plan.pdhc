@@ -4,7 +4,8 @@ services:
     container_name: pdhc_db
     restart: unless-stopped
     ports:
-      - "9031:5432"
+      # Loopback-only bind per CLAUDE.md §3 — never expose db to the LAN.
+      - "127.0.0.1:9031:5432"
     env_file:
       - .env
     volumes:

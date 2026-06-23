@@ -80,6 +80,7 @@ class PlanDefinition(db.Model):
             'title': self.title,
             'description': self.description,
             'status': self.status,
+            'archived': self.archived,
             'type': self.type,
             'version': self.version,
             'subject_type': self.subject_type,
