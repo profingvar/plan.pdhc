@@ -674,3 +674,21 @@ contract shape byte-identical to pre-deploy.
 
 Full log with what-was-NOT-done section:
 [`DEPLOY_2026-06-22_FHIR_TERMINOLOGY.md`](DEPLOY_2026-06-22_FHIR_TERMINOLOGY.md).
+
+## 2026-06-23 — post-deploy work (conformance fixes + CI + ADR D6-D8 + reconciliation + forms tests)
+
+After the 2026-06-22 §6 deploy, six more commits landed on `main`:
+
+| Commit | What | Ticket |
+|---|---|---|
+| `bb52910` | **Conformance fixes**: bdl-18 self link on all 3 searchset Bundles, ConceptMap.sourceScope dropped (FHIR R5 requires it to reference a ValueSet, not a CodeSystem), FormDefinition removed from CapabilityStatement.rest.resource[] (not a real FHIR resource type), security.service simplified to text-only CodeableConcept. **Conformance run: 13/13 corpus files PASS, 0 errors.** Redeployed to miserver. | (in-session) |
+| `090cc8b` | **CI conformance workflow** (`.github/workflows/conformance.yml`): triggers on push/PR to main + paths-filtered to terminology surface; caches `validator_cli.jar` v6.9.10; runs `make corpus && make conformance`. | #253 |
+| `1710546` | **CI tilde-expansion fix**: dropped literal `~` from `VALIDATOR_JAR` env (Makefile default `$(HOME)/.local/share/fhir/...` works correctly). | (follow-up) |
+| `ccbbf15` | **ADR D6/D7/D8 resolution**: locked the three deferred open questions. D6 wires `concept[].property.uri` as `{LOCAL_CS_URL}#{property-code}` (canonical-lib / canonical-ref / status). D7 confirmed multi-group ConceptMap. D8 confirmed POST $validate-code body shape. Redeployed; URIs visible at `https://plan.pdhc.se/api/v1/CodeSystem/plan-pdhc-local`. | #256 |
+| `57b239d` | **3 prod-only edits reconciled** into the canonical source: PlanDefinition archived-filter in `/api/v1/plandefinitions`; `to_dict()` exposes the `archived` boolean on PlanDefinition; pdhc_db port mapping changed from `9031:5432` (binds 0.0.0.0) to `127.0.0.1:9031:5432` (CLAUDE.md §3 loopback). | #254 |
+| `f57020b` | **Characterization tests** for `/api/v1/forms*` and `/form-definitions*` — orthogonal to §6 but in §2's DO-NOT-BREAK list. 22 tests pinning auth gates + broad response shape across 8 forms routes + 10 form-definitions routes. Suite 195 → 217. | #255 |
+
+Tests across this work: 195 → 217. CI gated on conformance going forward. All
+six commits deployed via the same tarball+`docker-compose build`+`up -d` swap
+pattern as the 2026-06-22 ship.
+

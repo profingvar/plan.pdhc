@@ -277,3 +277,20 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 | `newtask.txt` (NEW) | Required per Rule 2 but absent. Captures: §6 done; next-up = CI conformance job + 3 ADR open questions + server pip-install refresh. |
 | `planp/app/api/capability.py` | `DOCS_CATALOG` extended with `plan_pdhc_fhir_terminology_profile_instruction.md` and `plan_pdhc_fhir_terminology_profile_DECISIONS.md` so both are discoverable via `GET /api/v1/docs` and downloadable via `GET /api/v1/docs/<filename>` (the existing `_resolve_doc_path` already searches the project root, so no path-resolution change needed). Verified end-to-end. |
 | `planp/progress.md` | Documentation-review section appended. |
+
+## 2026-06-23 — post-deploy work (6 commits after the §6 ship)
+
+| File | Change | Commit |
+|------|--------|--------|
+| `planp/app/api/capability.py` | FormDefinition resource block removed (not a real FHIR resource type — failed conformance binding); security.service simplified to text-only CodeableConcept (HL7 restful-security-service URL unresolvable offline by HL7 validator). | bb52910 |
+| `planp/app/api/fhir_codesystem.py` + `planp/app/api/fhir_conceptmap.py` + `planp/app/api/fhir_valueset.py` | bdl-18 self link added to all 3 searchset Bundle responses; ConceptMap.sourceScopeUri dropped (R5 requires it to reference a ValueSet, plan.pdhc has no covering ValueSet — `group[].source` already identifies the source CodeSystem per group). | bb52910 |
+| `planp/Makefile` | `make conformance` target uses HL7 validator_cli.jar with `-tx=https://tx.fhir.org/r5`. | bb52910 |
+| `planp/tests/test_fhir_conceptmap.py` | `TestReadConceptMap::test_resource_shape` inverted to assert `sourceScopeUri NOT in body`. | bb52910 |
+| `.github/workflows/conformance.yml` (NEW) | CI workflow: triggers on push/PR to main + paths-filtered to terminology surface; caches `validator_cli.jar` v6.9.10; runs `make corpus && make conformance` against the corpus. Drops literal `~` from `VALIDATOR_JAR` env (Makefile's `$(HOME)/...` is correct). | 090cc8b + 1710546 |
+| `plan_pdhc_fhir_terminology_profile_DECISIONS.md` | ADR D6/D7/D8 resolved (the three previously-deferred open questions). D6 locks the `concept[].property.uri` scheme as `{LOCAL_CS_URL}#{property-code}`. D7 confirms multi-group ConceptMap is the design. D8 confirms POST $validate-code body shape is FHIR-clean (no cdr.pdhc legacy constraints). | ccbbf15 |
+| `planp/app/api/fhir_codesystem.py` | `CODESYSTEM_PROPERTY_DEFS` now carries `uri` per property (D6 wired). The 3 properties — canonical-lib, canonical-ref, status — get URIs at `{LOCAL_CS_URL}#{code}`. Verified live at `https://plan.pdhc.se/api/v1/CodeSystem/plan-pdhc-local`. | ccbbf15 |
+| `planp/app/api/plandefinitions.py` | `list_plandefinitions` filters out archived plandefs by default; `?include_archived=1` opts back in. Was a prod-only edit before, now reconciled. | 57b239d |
+| `planp/app/models/fhir_models.py` | `PlanDefinition.to_dict()` emits the `archived` boolean. Was prod-only before, now reconciled. | 57b239d |
+| `planp/docker-compose.yml` | `pdhc_db` port mapping `9031:5432` → `127.0.0.1:9031:5432` (CLAUDE.md §3 loopback bind). Was prod-only before, now reconciled. | 57b239d |
+| `planp/tests/test_forms.py` (NEW) | 8 characterization tests for `/api/v1/forms*` (catalogue, versions, produce, publish, immutability — auth gates + broad shape). | f57020b |
+| `planp/tests/test_form_definitions.py` (NEW) | 14 characterization tests for `/api/v1/form-definitions*` (all 10 routes auth-gated; SSO happy paths). | f57020b |
