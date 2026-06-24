@@ -11,39 +11,11 @@ from app.models.forms_models import Questionnaire, QuestionnaireResponse
 
 main_bp = Blueprint('main', __name__)
 
-# Documentation files and their descriptions
-DOCS_CATALOG = {
-    'api_reference.md': 'Comprehensive REST API reference with examples',
-    'db_schema_snapshot.md': 'Database schema — all 17 tables with samples and GUIDs',
-    'plan_description.md': 'Domain architecture — concepts, values, valuesets, PlanDefinitions',
-    'readme.md': 'Deployment plan — step-by-step setup and configuration',
-    'progress.md': 'Progress log — completed and pending steps',
-    'top_rules.md': 'Project rules (immutable)',
-    'repo_css.md': 'Frontend design system — colours, typography, components',
-    'pdhc_markdown_layout_standard.md': 'Markdown formatting standard',
-    'changed_files.md': 'Registry of all created and edited files',
-    'nginx_implement_server19March.md': 'Nginx reverse proxy deployment template',
-    'sso_technical_manual.md': 'SSO integration — technical architecture, handshake flow, configuration',
-    'sso_user_guide.md': 'SSO login — user guide for logging in and permissions',
-}
-
-
-def _resolve_doc_path(filename):
-    """Resolve a doc filename to its absolute path.
-
-    Search order: planp/docs/ → project root → /project-docs/ (Docker mount)
-    """
-    planp_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    search_dirs = [
-        os.path.join(planp_dir, 'docs'),
-        os.path.dirname(planp_dir),
-        '/project-docs',
-    ]
-    for d in search_dirs:
-        path = os.path.join(d, filename)
-        if os.path.isfile(path):
-            return path
-    return None
+# Single source of truth for the doc catalog lives in app.api.capability.
+# Keeping a second copy here drifted: prior to 2026-06-24 this dict
+# referenced SSO docs the API catalog didn't, and missed the two
+# terminology-profile docs the API catalog adds.
+from app.api.capability import DOCS_CATALOG, _resolve_doc_path
 
 
 def _format_size(size_bytes):

@@ -294,3 +294,12 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 | `planp/docker-compose.yml` | `pdhc_db` port mapping `9031:5432` → `127.0.0.1:9031:5432` (CLAUDE.md §3 loopback bind). Was prod-only before, now reconciled. | 57b239d |
 | `planp/tests/test_forms.py` (NEW) | 8 characterization tests for `/api/v1/forms*` (catalogue, versions, produce, publish, immutability — auth gates + broad shape). | f57020b |
 | `planp/tests/test_form_definitions.py` (NEW) | 14 characterization tests for `/api/v1/form-definitions*` (all 10 routes auth-gated; SSO happy paths). | f57020b |
+
+## 2026-06-24 — /api/v1/docs serving fix (ticket #273)
+
+| File | Change |
+|------|--------|
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/.dockerignore` | NEW. Keeps the build context small now that it covers the whole repo: excludes venvs, node_modules, .git/, db_backups, *.docx, *.pdf, secrets, IDE/macOS noise. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/Dockerfile` | Build context moved to repo root. All previous COPYs re-prefixed with `planp/`. Added explicit COPY for the 10 root-level cataloged .md files into `./docs/` so `/api/v1/docs/<filename>` resolves inside the image. Plus `COPY readme.md ./docs/readme.md` for the case mismatch between Git-tracked `README.md` and on-disk lowercase. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docker-compose.yml` | `context: .` → `context: ..`, `dockerfile: Dockerfile` → `dockerfile: planp/Dockerfile`. Dropped the `../:/project-docs:ro` volume mount (silently empty in prod because Colima's `default` profile virtiofs-mounts only `/Users/miserver`). |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/routes/main.py` | Deduplicated the second `DOCS_CATALOG` dict by importing from `app.api.capability`. The drifted local copy listed sso_* docs the API didn't and missed the two terminology-profile docs the API added. Single source of truth. |

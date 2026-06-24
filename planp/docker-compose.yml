@@ -18,8 +18,14 @@ services:
 
   app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      # Build context is the repo root so the image can COPY root-level
+      # docs (progress.md, top_rules.md, …) served via /api/v1/docs/.
+      # Trying to use the volume mount `../:/project-docs:ro` instead
+      # silently failed in prod (Colima virtiofs only mounts
+      # /Users/miserver, not /usr/local/www/), so the docs are now
+      # baked into the image. See planp/Dockerfile + .dockerignore.
+      context: ..
+      dockerfile: planp/Dockerfile
     container_name: pdhc_app
     restart: unless-stopped
     ports:
@@ -29,8 +35,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ../:/project-docs:ro
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 

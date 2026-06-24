@@ -692,3 +692,51 @@ Tests across this work: 195 → 217. CI gated on conformance going forward. All
 six commits deployed via the same tarball+`docker-compose build`+`up -d` swap
 pattern as the 2026-06-22 ship.
 
+
+## 2026-06-24 — /api/v1/docs serving fix (ticket #273)
+
+User-facing symptom: `GET /api/v1/docs` listed only 2 of 12 cataloged
+documents; `GET /api/v1/docs/<filename>` returned 404 for the missing 10.
+
+Root cause: two compounding bugs.
+
+1. **Dockerfile build context was too narrow.** `COPY docs/ ./docs/`
+   only covered the 4 files inside `planp/docs/`. The other 10
+   cataloged docs live at the **repo root** (`progress.md`,
+   `top_rules.md`, `plan_pdhc_fhir_terminology_profile_*.md`, …),
+   outside the build context.
+2. **Intended fallback — the `../:/project-docs:ro` volume mount in
+   `docker-compose.yml` — silently failed in prod.** Confirmed live on
+   miserver: the bind mount sources `/usr/local/www/plan.pdhc` (which
+   exists, populated with the .md files), but Colima's `default`
+   profile only virtiofs-mounts `/Users/miserver` — `/usr/local/www`
+   is invisible inside the VM, so the bind mount destination is
+   empty inside the container.
+
+Fix (Option C from the audit options I surfaced): bake the docs into
+the image. Concretely:
+
+- `planp/docker-compose.yml`: `context: .` → `context: ..`,
+  `dockerfile: Dockerfile` → `dockerfile: planp/Dockerfile`. Dropped
+  the now-redundant `../:/project-docs:ro` volume.
+- `planp/Dockerfile`: prefixed existing COPYs with `planp/`; added an
+  explicit `COPY <root-docs…> ./docs/` block listing the 10 root
+  docs by name (no glob — a stray root-level .md will NOT silently end
+  up in the image); plus a `COPY readme.md ./docs/readme.md` for the
+  case-mismatch between `README.md` (Git tracked) and the lowercase
+  on-disk variant on miserver.
+- `.dockerignore` (new at repo root): keeps the build context small
+  now that it covers the whole repo — excludes `venv/`,
+  `node_modules/`, `.git/`, `db_backups/`, `*.docx`, `*.pdf`, secrets,
+  IDE/macOS noise, etc.
+- `planp/app/routes/main.py`: deduplicated the second `DOCS_CATALOG`
+  dict here (was drifting — referenced sso_* docs that the API
+  catalog didn't, and missed the two terminology-profile docs the API
+  catalog adds) by importing the single source of truth from
+  `app/api/capability.py`. Same dict serves both the `/docs/` UI and
+  `/api/v1/docs` API.
+
+Live verification post-deploy: 12/12 cataloged docs serve `200` on
+`https://plan.pdhc.se/api/v1/docs/<filename>`, and the docs index lists
+all 12. Tagged the prior image as `planp-app:rollback` before rebuild
+for fast revert.

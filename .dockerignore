@@ -1,0 +1,58 @@
+# Build context is the repo root (see planp/docker-compose.yml). Exclude
+# everything that doesn't need to land in the image to keep the build
+# context small and the layer cache stable.
+
+# Python virtualenvs (huge, host-only)
+venv/
+planp/venv/
+**/.venv
+
+# Node / frontend artefacts
+node_modules/
+planp/node_modules/
+package-lock.json
+planp/package-lock.json
+planp/package.json
+planp/agentation-loader.jsx
+
+# Git + IDE + macOS noise
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+.claude/
+.DS_Store
+**/.DS_Store
+*.swp
+
+# Secrets — never bake into image
+.env
+planp/.env
+planp/.env.example
+
+# Tests, caches, local DB
+.pytest_cache/
+planp/.pytest_cache/
+planp/instance/
+db_backups/
+planp/db_backups/
+
+# Backups, large binaries, non-md memos
+*.docx
+*.pdf
+drawing_plandefviewer.pdf
+
+# Old prototype dir
+_obs_gateway_repo/
+
+# CI helpers (not needed in app image)
+Makefile
+planp/Makefile
+
+# Plain-text scratch
+newtask.txt
+
+# Result dirs
+results/
+planp/results/
