@@ -41,8 +41,13 @@ class Activity(db.Model):
                                    primaryjoin='Activity.guid == Transaction.activity_guid')
 
     def to_dict(self):
+        # #294 RFC D3 (2026-06-28): emit both generic `guid` and
+        # role-specific `activity_guid`. Activity is the parent of
+        # Transaction; the activity_guid name keeps consumers
+        # unambiguous when joining PlanDefinition snapshots.
         return {
             'guid': self.guid,
+            'activity_guid': self.guid,
             'title': self.title,
             'description': self.description,
             'performer_type': self.performer_type,
@@ -79,8 +84,12 @@ class Transaction(db.Model):
     date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
+        # #294 RFC D3 (2026-06-28): emit both generic `guid` and
+        # role-specific `transaction_guid` during the transition.
+        # `guid` will be dropped after one release cycle.
         d = {
             'guid': self.guid,
+            'transaction_guid': self.guid,
             'url': f"{PLAN_BASE}/api/v1/transactions/{self.guid}",
             'activity_guid': self.activity_guid,
             'concept_guid': self.concept_guid,
@@ -120,8 +129,11 @@ class PlanDefinitionGoal(db.Model):
     date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
+        # #294 RFC D3: emit both generic `guid` and role-specific
+        # `goal_guid` during the transition.
         d = {
             'guid': self.guid,
+            'goal_guid': self.guid,
             'plandefinition_guid': self.plandefinition_guid,
             'concept_guid': self.concept_guid,
             'concept_name': self.concept_name,

@@ -73,7 +73,12 @@ class PlanDefinition(db.Model):
 
     def to_dict(self):
         return {
+            # #294 RFC D3 (2026-06-28): emit both generic `guid` and
+            # role-specific `plan_definition_guid` during the transition.
+            # `guid` will be dropped from emitted JSON after one release
+            # cycle. Consumers should read `plan_definition_guid`.
             'guid': self.guid,
+            'plan_definition_guid': self.guid,
             'url': f"{PLAN_BASE}/api/v1/plandefinitions/{self.guid}",
             'fhir_id': self.fhir_id,
             'name': self.name,

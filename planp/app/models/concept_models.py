@@ -344,8 +344,12 @@ class Concept(db.Model):
                                     primaryjoin='Concept.valueset == ValueSet.guid')
 
     def to_dict(self):
+        # #294 RFC D3 (2026-06-28): emit both generic `guid` and
+        # role-specific `concept_guid` during the transition. `guid`
+        # will be dropped after one release cycle.
         d = {
             'guid': self.guid,
+            'concept_guid': self.guid,
             'url': f"{PLAN_BASE}/api/v1/concepts/{self.guid}",
             'canonical_lib': self.canonical_lib,
             'canonical_refnumber': self.canonical_refnumber,
