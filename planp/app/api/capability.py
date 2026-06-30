@@ -561,6 +561,7 @@ DOCS_CATALOG = {
     'pdhc_markdown_layout_standard.md': 'Markdown formatting standard',
     'changed_files.md': 'Registry of all created and edited files',
     'nginx_implement_server19March.md': 'Nginx reverse proxy deployment template',
+    'SSO_INTEGRATION_PLAN.md': 'SSO handshake spec (H1-H4) + per-request bearer revalidation + service-key bypass',
     'plan_pdhc_fhir_terminology_profile_instruction.md': 'FHIR R5 terminology profile — implementation spec (Status: IMPLEMENTED 2026-06-22)',
     'plan_pdhc_fhir_terminology_profile_DECISIONS.md': 'FHIR R5 terminology profile — ADR for the five locked design decisions',
 }

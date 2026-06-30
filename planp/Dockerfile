@@ -30,6 +30,7 @@ COPY plan_description.md \
      pdhc_markdown_layout_standard.md \
      changed_files.md \
      nginx_implement_server19March.md \
+     SSO_INTEGRATION_PLAN.md \
      plan_pdhc_fhir_terminology_profile_instruction.md \
      plan_pdhc_fhir_terminology_profile_DECISIONS.md \
      ./docs/
