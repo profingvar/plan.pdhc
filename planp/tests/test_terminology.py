@@ -260,9 +260,25 @@ class TestTermbankClientUnit:
 
     def test_search_unreachable_returns_error_dict(self):
         c = TermbankClient(base_url="https://t.example")
-        with patch("requests.get", side_effect=requests.RequestException("boom")):
+        with patch("requests.get", side_effect=requests.ConnectionError("boom")):
             r = c.search("metformin")
         assert r["error"] == "unreachable"
+        assert r["results"] == []
+
+    def test_search_timeout_returns_timeout_error_dict(self):
+        c = TermbankClient(base_url="https://t.example")
+        with patch("requests.get", side_effect=requests.Timeout("too slow")):
+            r = c.search("metformin")
+        assert r["error"] == "timeout"
+        assert r["results"] == []
+
+    def test_search_other_request_error_returns_request_error(self):
+        c = TermbankClient(base_url="https://t.example")
+        # Bare RequestException — not Timeout, not ConnectionError; catches
+        # SSL errors, chunked-encoding errors, malformed URLs in flight, etc.
+        with patch("requests.get", side_effect=requests.RequestException("?")):
+            r = c.search("metformin")
+        assert r["error"] == "request_error"
         assert r["results"] == []
 
     def test_search_empty_query_short_circuits(self):

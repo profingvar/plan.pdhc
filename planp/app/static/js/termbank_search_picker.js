@@ -138,9 +138,20 @@
   function renderResults(panel, body) {
     var box = panel.querySelector("[data-termbank-results]");
     if (!body || body.error) {
+      var err = body && body.error;
+      var msg;
+      if (err === "timeout") {
+        msg = "Termbank slow — try again.";
+      } else if (err === "unreachable") {
+        msg = "Termbank unavailable.";
+      } else if (typeof err === "string" && err.indexOf("http_") === 0) {
+        msg = "Termbank error (" + err.slice(5) + ").";
+      } else {
+        msg = "Termbank unavailable.";
+      }
       box.innerHTML =
         '<p style="color:var(--text-muted);font-style:italic;">' +
-        "Termbank unavailable." +
+        msg +
         "</p>";
       return;
     }

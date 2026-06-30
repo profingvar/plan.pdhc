@@ -70,8 +70,17 @@ class TermbankClient:
         url = f"{self.base_url}/CodeSystem/{system}/{code}"
         try:
             resp = requests.get(url, timeout=self.timeout)
+        except requests.Timeout as e:
+            log.warning("termbank lookup timeout (>%ss) for %s/%s: %s",
+                        self.timeout, system, code, e)
+            return None
+        except requests.ConnectionError as e:
+            log.warning("termbank lookup unreachable for %s/%s: %s",
+                        system, code, e)
+            return None
         except requests.RequestException as e:
-            log.warning("termbank lookup unreachable: %s", e)
+            log.warning("termbank lookup request_error for %s/%s: %s",
+                        system, code, e)
             return None
         if resp.status_code == 200:
             data = resp.json()
@@ -112,9 +121,18 @@ class TermbankClient:
                 params=params,
                 timeout=self.timeout,
             )
-        except requests.RequestException as e:
-            log.warning("termbank search unreachable: %s", e)
+        except requests.Timeout as e:
+            log.warning(
+                "termbank search timeout (>%ss) for q=%r: %s",
+                self.timeout, q, e,
+            )
+            return {"error": "timeout", "results": [], "query": q}
+        except requests.ConnectionError as e:
+            log.warning("termbank search unreachable for q=%r: %s", q, e)
             return {"error": "unreachable", "results": [], "query": q}
+        except requests.RequestException as e:
+            log.warning("termbank search request_error for q=%r: %s", q, e)
+            return {"error": "request_error", "results": [], "query": q}
         if resp.status_code != 200:
             return {
                 "error": f"http_{resp.status_code}",
