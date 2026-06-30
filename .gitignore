@@ -43,9 +43,3 @@ planp/tests/fhir_corpus/*.json
 
 # Claude Code project data (IDE memory, session settings)
 .claude/
-
-# Internal docs — intentionally not published (kept on disk for the maintainer)
-MEMO_DataTransferDesign.md
-MEMO_DataTransferDesign.docx
-nginx_implement_server19March.md
-SSO_INTEGRATION_PLAN.md
