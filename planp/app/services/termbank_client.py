@@ -27,7 +27,11 @@ log = logging.getLogger(__name__)
 
 
 DEFAULT_BASE_URL = "https://termbank.pdhc.se"
-DEFAULT_TIMEOUT_SECONDS = 5.0
+# 10s, up from the original 5s. The /search ranking join on a 4.7M-row
+# concept_designations table can sit just under 1s P50 with pg_trgm
+# indexes, but cold-cache or contended queries occasionally cross the
+# old 5s ceiling; 10s gives headroom without leaving the UI hanging.
+DEFAULT_TIMEOUT_SECONDS = 10.0
 DEFAULT_CACHE_TTL_SECONDS = 60.0
 
 
