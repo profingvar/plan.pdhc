@@ -33,10 +33,11 @@ COPY plan_description.md \
      plan_pdhc_fhir_terminology_profile_instruction.md \
      plan_pdhc_fhir_terminology_profile_DECISIONS.md \
      ./docs/
-# readme.md — catalog uses lowercase. On miserver and on case-insensitive
-# macOS dev boxes either case resolves; on a case-sensitive Linux build
-# context (e.g. CI) you must ensure the lowercase variant exists on disk.
-COPY readme.md ./docs/readme.md
+# Source name is README.md (capital, as git tracks it). Destination keeps
+# the lowercase variant the docs catalogue references (capability.py).
+# The Docker build context runs inside Colima's Linux VM (case-sensitive),
+# so we cannot rely on case-insensitive macOS-host resolution.
+COPY README.md ./docs/readme.md
 
 RUN chmod +x entrypoint.sh
 
