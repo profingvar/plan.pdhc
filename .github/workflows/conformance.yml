@@ -9,10 +9,15 @@ on:
   pull_request:
     branches: [main]
     paths:
-      # Only run when terminology surface or its deps change.
+      # Run when ANY FHIR-emitting surface or its deps change. Per ticket
+      # #340 (rollup #325) the original filter was too narrow: changes to
+      # fhir_service.py (PlanDefinition emission) and app/__init__.py did
+      # not trigger conformance.
       - 'planp/app/api/**'
       - 'planp/app/models/concept_models.py'
+      - 'planp/app/services/fhir_service.py'
       - 'planp/app/services/termbank_client.py'
+      - 'planp/app/__init__.py'
       - 'planp/requirements.txt'
       - 'planp/tests/conformance_corpus_emit.py'
       - 'planp/Makefile'
@@ -22,7 +27,9 @@ on:
     paths:
       - 'planp/app/api/**'
       - 'planp/app/models/concept_models.py'
+      - 'planp/app/services/fhir_service.py'
       - 'planp/app/services/termbank_client.py'
+      - 'planp/app/__init__.py'
       - 'planp/requirements.txt'
       - 'planp/tests/conformance_corpus_emit.py'
       - 'planp/Makefile'

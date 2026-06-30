@@ -740,3 +740,61 @@ Live verification post-deploy: 12/12 cataloged docs serve `200` on
 `https://plan.pdhc.se/api/v1/docs/<filename>`, and the docs index lists
 all 12. Tagged the prior image as `planp-app:rollback` before rebuild
 for fast revert.
+
+---
+
+## 2026-06-30 — rollup #325 surgical pass
+
+Audit-driven hardening pass triggered by `Divergencies_code_vs_docs.md` (2026-06-30). Nine surgical tickets from rollup #325 landed in one session; seven design-flavoured tickets (#326 #328 #331 #332 #334 #336 #338) are deferred until the user makes the design choices.
+
+Test suite: 222 → **225 passed** in 1.75s (3 new tests). No regressions.
+
+### #335 — Delete or relocate orphan `planp/agentation-loader.jsx` — DONE — Relocated to `planp/app/static/src/agentation-loader.jsx` (it imports `agentation` from package.json deps, so it's the legitimate source of `static/js/agentation.bundle.js`). Added `static/src/BUILD.md` with the esbuild rebuild command.
+### #333 — Delete `POST /api/v1/PlanDefinition` 501 stub — DONE — Handler at `fhir_plandefinitions.py:86-92` removed; test updated to assert 405 (Flask's default for unbound method on registered route).
+### #327 — Delete dead JWT machinery — DONE — Dropped JWT_* config keys, `JWTManager` import/init, `Flask-JWT-Extended` dep, `JWT_SECRET_KEY` from `.env.example`. App boots clean; all 225 tests pass.
+### #329 — Fix `/api/v1/lookup` serializer URLs — DONE — `ValueSet.to_dict` (line 245) and `Concept.to_dict.valueset_url` (line 380) now emit `/api/v1/lookup/valuesets/{guid}`. New test file `test_lookup_url_consistency.py` covers both.
+### #330 — `Concept.update_concept` should bump `date_valid` — DONE — Added `concept.date_valid = datetime.now(timezone.utc)` before commit. New `test_update_bumps_date_valid` (1.05s sleep + strict-greater assertion) added to `test_concepts.py::TestConceptCRUD`.
+### #337 — Fix `SSO_CALLBACK_URL` default + add SSO_* vars to `.env.example` — DONE — `config.py:30` default now `http://localhost:9030/api/v1/auth/callback`. `.env.example` gained SSO_BASE_URL/SSO_CLIENT_ID/SSO_CLIENT_SECRET/SSO_CALLBACK_URL block with note that `AUTH_DISABLED=true` skips SSO entirely for local dev.
+### #339 — Fix `README.md` "Running locally" — DONE — Three-step `./start.sh`-based flow; new "How loopback-only exposure works" paragraph explains the compose port map is the gate, not the gunicorn flag.
+### #340 — Update FHIR deploy doc + broaden conformance `paths:` filter + drop "no automated tests" framing — DONE — `DEPLOY_2026-06-22_FHIR_TERMINOLOGY.md` items #2/#3 marked RESOLVED 2026-06-23; `.github/workflows/conformance.yml` `paths:` broadened to include `fhir_service.py` + `app/__init__.py` for both `push:` and `pull_request:`; FHIR instruction §2 and §4 updated to cite the live 222-test suite.
+### #341 — Add a pytest CI job — DONE — `.github/workflows/test.yml` runs `pytest tests -x -q --maxfail=3` on every push + PR. Python 3.14, pip-cached, 10-min timeout.
+
+### Not yet closed in ticket queue
+Each child ticket is still open on `ticket.mitidbok.se` so the operator can manually `/respond` (which auto-closes) after a code review. No `/respond` was posted automatically.
+
+## 2026-06-30 — rollup #325 design pass
+
+Follow-on session — the 7 design-flavoured tickets the surgical pass deferred. User made 4 explicit design choices via AskUserQuestion before this pass ran:
+
+| Ticket | User decision |
+|--------|---------------|
+| #328 rate-limit | Global default + exempt the free routes |
+| #331 D4 carve-out | Lift both CodeSystem + ConceptMap to fhir_version() |
+| #332 PlanDef URL | Hard cutover to {PLAN_BASE}/fhir/PlanDefinition/<id> |
+| #338 doc rewrite | Rewrite in place + drop DEPLOYMENT_PLAN from /api/v1/docs |
+
+Test suite: 225 → **244 passed** (19 new tests across the 7 tickets). No regressions.
+
+### #328 — Rate-limit redesign: RATELIMIT_DEFAULT + exempt — DONE — `Limiter(default_limits=['200/minute'])` in `app/__init__.py`; `RATELIMIT_DEFAULT` set; `@limiter.exempt` on `/api/health` + `/capability-statement` + `/metadata` + `/endpoints`; service-key callers globally exempted via `@limiter.request_filter`. Eight blueprint-level `limiter.limit("200/minute")(<bp>)` no-ops removed across `auth.py`, `capability.py`, `dispatch.py`, `form_definitions.py`, `forms.py`, `fhir_plandefinitions.py`, `plandefinitions.py`, `lookup_tables.py`, `concepts.py`. New `test_rate_limit.py` (3 tests) asserts 201st request returns 429 and exempt endpoints never 429.
+
+### #326 — Capability rewrite — DONE — Auth block lists only the real GET routes + service-key bypass; rate-limit block reflects the actual 200/min + exempts; all lookup endpoints corrected to `/api/v1/lookup/...` prefix (the test surfaced ~40 endpoints had wrong paths!). New `test_capability_truth.py` (4 tests) walks every advertised endpoint and asserts it resolves to a real route via `app.url_map`.
+
+### #331 — D4 carve-out: lift BOTH CodeSystem + ConceptMap to fhir_version() — DONE — Added `_codesystem_version()` (returns `str(max(Concept.vers_number))`) in `fhir_codesystem.py` and `_conceptmap_version()` (filtered to rows where `canonical_lib IS NOT NULL`) in `fhir_conceptmap.py`. Both replace hardcoded `'1'` on the read endpoint AND on the $lookup `version` reply. DECISIONS.md D4 "TBD" carve-out replaced with RESOLVED text. New `test_fhir_version_uniform.py` (6 tests) asserts version derives correctly and never empty.
+
+### #332 — PlanDefinition canonical URL hard cutover — DONE — `fhir_service.py:31` and three more spots in `fhir_plandefinitions.py` (bundle `fullUrl`, bundle resource `url`, single-read `url`) all switched to `fhir_canonical_url('PlanDefinition', fhir_id)`. New `test_plandefinition_canonical_url.py` (3 tests) pins the new shape and asserts the legacy `pdhc.se/PlanDefinition/` form is no longer emitted.
+
+### #334 — Drop legacy `/CarePlan/<guid>/dispatch` alias — DEFERRED — Gunicorn in `pdhc_app` is not configured with `--access-logfile`, so docker logs only capture migration + startup INFO. There is no way to count `/CarePlan/...` hits in the last 7 days without first enabling access logging on the production container. Per the ticket's stop rule the deprecated handler stays in place. Follow-up: enable gunicorn access logging in `entrypoint.sh` (add `--access-logfile -`), redeploy, wait ≥7 days, then revisit #334.
+
+### #336 — DB-name docs sweep — DONE — Set `pdhc_gateway` as the default in `.env.example` and `config.py` (both with a comment explaining the legacy-name retention and pointing to memory `feedback_db_safety.md`); patched `planp/db_schema_snapshot.md`. `DEPLOYMENT_PLAN.md` + `SSO_INTEGRATION_PLAN.md` were rewritten under #338 and pick up `pdhc_gateway` there. The running database was NOT renamed.
+
+### #338 — Rewrite-in-place + drop DEPLOYMENT_PLAN from /api/v1/docs — DONE —
+- `DEPLOYMENT_PLAN.md`: 966 → ~140 lines. Container-based deploy model, SSO model, no JWT, no ghost scripts, no `_obs_gateway_repo`, `pdhc_gateway` DB name.
+- `SSO_INTEGRATION_PLAN.md`: 223 → ~110 lines. H1-H4 handshake + per-request revalidation + service-key bypass. No `safe_restart.sh`/`server_deploy.sh`/JWT refresh.
+- `plan_description.md` §6: key order corrected to match `services/fhir_service.py:19-30`.
+- `plan_description.md` §7.1: SSO model + 200/min global default; no JWT login/refresh; no 10/min claim.
+- `plan_description.md` §7.2: all paths under `/api/v1/lookup/` with explanatory note.
+- `planp/docs/api_reference.md` lines 10-77: auth section rewritten (SSO redirect handshake, per-request revalidation, service-key bypass, ghost-route note); rate-limit block updated. The rest of `api_reference.md` was untouched.
+- Confirmed `DEPLOYMENT_PLAN.md` is NOT in `DOCS_CATALOG` so it's already not served via `/api/v1/docs`. New `test_docs_serving.py` (3 tests) pins this contract.
+
+### Not yet closed in ticket queue
+Each child ticket (#326 #328 #331 #332 #336 #338) and the still-deferred #334 remain open on `ticket.mitidbok.se` so the operator can manually `/respond` (auto-closes) after reviewing the diff. No `/respond` was posted automatically.

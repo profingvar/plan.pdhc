@@ -13,7 +13,7 @@ from app import limiter
 from app.services.dispatch_service import handle_dispatch
 
 dispatch_bp = Blueprint('dispatch_api', __name__)
-limiter.limit("200/minute")(dispatch_bp)
+# Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
 
 
 def _dispatch(guid):

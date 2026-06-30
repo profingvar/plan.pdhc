@@ -45,6 +45,18 @@ from app.models.concept_models import (
 )
 
 
+def _codesystem_version() -> str:
+    """FHIR `version` for the local CodeSystem (ADR D4).
+
+    The local CodeSystem is the union of all Concepts; its effective
+    version is the max ``Concept.vers_number`` — monotonically increasing
+    as any concept gets bumped, matching FHIR semantics. Returns "1" when
+    the table is empty (first deploy, before any imports).
+    """
+    n = db.session.query(db.func.max(Concept.vers_number)).scalar()
+    return str(n or 1)
+
+
 fhir_codesystem_bp = Blueprint('fhir_codesystem', __name__)
 
 # Local CodeSystem canonical URL — emitted on every read and matched
@@ -165,7 +177,7 @@ def _build_codesystem(*, include_concepts: bool = True) -> dict:
         'resourceType': 'CodeSystem',
         'id': LOCAL_CODESYSTEM_ID,
         'url': LOCAL_CS_URL,
-        'version': '1',
+        'version': _codesystem_version(),
         'name': LOCAL_CS_NAME,
         'title': 'plan.pdhc local concept system',
         'status': 'active',
@@ -198,7 +210,7 @@ def _build_local_lookup_response(c: Concept) -> dict:
     """FHIR Parameters body for a local-system $lookup hit."""
     parts: list[dict] = [
         {'name': 'name', 'valueString': LOCAL_CS_NAME},
-        {'name': 'version', 'valueString': '1'},
+        {'name': 'version', 'valueString': _codesystem_version()},
         {'name': 'display', 'valueString': _local_display(c)},
     ]
     if c.concept_explain:

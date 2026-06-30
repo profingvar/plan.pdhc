@@ -1,7 +1,7 @@
 # PDHC PlanDef Builder — Database Schema Snapshot
 
 **Date:** 2026-03-20
-**Database:** pdhc_planp (PostgreSQL 16)
+**Database:** pdhc_gateway (PostgreSQL 16) — legacy name; see rollup #325 / ticket #336
 **Tables:** 17
 
 ---

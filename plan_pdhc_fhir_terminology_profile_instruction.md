@@ -49,10 +49,15 @@ explicitly listed in §6. Treat this list as a regression contract.
 | Termbank proxies | `GET /api/v1/termbank/concept/<system>/<code>`, `/api/v1/termbank/search` | `app/api/terminology.py`, `app/services/termbank_client.py` |
 | Relational CRUD | `/api/v1/concepts`, `/values`, `/valuesets`, `/canonical-libs`, … | `app/api/*.py` |
 
-**Important caveat about this regression contract:** there are currently **no
-automated tests** for any of the endpoints above. `planp/tests/` is empty of
-`.py` files. The "do not break" guarantee is therefore unverifiable until
-characterization tests are added — see §4 Prerequisites.
+**Regression contract status (updated 2026-06-30, ticket #340):** the
+"no automated tests" caveat that originally lived here is now obsolete.
+`planp/tests/` currently holds a 222-test pytest suite (~3,335 lines
+across 16 files) covering the relational CRUD, FHIR shape, capability
+statement, and the cdr.pdhc compatibility shim. The "do not break"
+guarantee is verifiable by `pytest planp/tests -x -q` (locally) and by
+`.github/workflows/conformance.yml` (HL7 Java validator gates merges on
+the terminology surface). Broader CI coverage (lint, full FHIR surface)
+is in progress under rollup #325.
 
 **Two behaviours that look like FHIR terminology operations but are NOT, and must
 be preserved as-is:**
@@ -100,9 +105,13 @@ delegated to termbank.pdhc.
 ## 4. Prerequisites — write the regression contract first
 
 The §2 "do not break" guarantee is the load-bearing constraint of this whole
-spec. As of today it is **unenforced**: there are no tests for the §2 endpoints,
-and the cross-service contract with cdr.pdhc's `$validate-code` shim is held
-together by hope. Before any §6 work begins, these tests must exist.
+spec. **Status update 2026-06-30 (ticket #340):** the §2 surface is now
+covered by the 222-test suite in `planp/tests/` (notably
+`test_fhir_*.py`, `test_capability.py`, `test_concepts.py`) and by the
+HL7 validator in `.github/workflows/conformance.yml`. The cross-service
+contract with cdr.pdhc's `$validate-code` shim is exercised in
+`test_fhir_endpoints.py`. The §4 subsections below remain as a record of
+how that coverage was built up; they are no longer outstanding work.
 
 ### 4.1 Characterization tests for the §2 surface
 

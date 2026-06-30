@@ -151,15 +151,18 @@ are real work items.
    this stays unrun.
 
 2. **Conformance run via HL7 Java `validator_cli.jar` did not execute.**
-   The corpus emitter + `make conformance` target are deployed and
-   work; the JAR itself is NOT vendored. The D5 fast-layer
-   `fhir.resources` pydantic validation IS exercised on every pytest
-   run, including the 195/195 pre-deploy local run. The slow-layer
-   canonical-conformance check is a follow-up.
+   **RESOLVED 2026-06-23** — `.github/workflows/conformance.yml` now
+   runs `make conformance` on every PR that touches terminology
+   surfaces; the validator JAR is fetched in-workflow rather than
+   vendored. Follow-up: broaden the workflow `paths:` filter so
+   changes to other FHIR-emitting modules (e.g. `fhir_service.py`,
+   `app/__init__.py`) also trigger conformance — tracked in rollup #325.
 
 3. **CI job for conformance is not wired.**
-   `.github/workflows/` was not touched. Risk §9.4 from the spec
-   doc is exactly this devops task. Mentioned in `newtask.txt`.
+   **RESOLVED 2026-06-23** — `.github/workflows/conformance.yml` added
+   (commits `090cc8b` + `1710546`). Risk §9.4 from the spec doc is
+   closed for the terminology-resource code paths; broader CI
+   (pytest, lint, full FHIR surface) is tracked in rollup #325.
 
 4. **GitHub push not made.**
    Local commits (or git history) for the §6 work were NOT pushed

@@ -303,3 +303,56 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 | `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/Dockerfile` | Build context moved to repo root. All previous COPYs re-prefixed with `planp/`. Added explicit COPY for the 10 root-level cataloged .md files into `./docs/` so `/api/v1/docs/<filename>` resolves inside the image. Plus `COPY readme.md ./docs/readme.md` for the case mismatch between Git-tracked `README.md` and on-disk lowercase. |
 | `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docker-compose.yml` | `context: .` → `context: ..`, `dockerfile: Dockerfile` → `dockerfile: planp/Dockerfile`. Dropped the `../:/project-docs:ro` volume mount (silently empty in prod because Colima's `default` profile virtiofs-mounts only `/Users/miserver`). |
 | `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/routes/main.py` | Deduplicated the second `DOCS_CATALOG` dict by importing from `app.api.capability`. The drifted local copy listed sso_* docs the API didn't and missed the two terminology-profile docs the API added. Single source of truth. |
+
+## 2026-06-30 — Rollup #325 surgical pass
+
+| File | Ticket | Note |
+|------|--------|------|
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/static/src/agentation-loader.jsx` | #335 | Moved from repo-root `planp/agentation-loader.jsx`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/static/src/BUILD.md` | #335 | Three-line esbuild rebuild note for the moved jsx. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_plandefinitions.py` | #333 | Deleted `POST /api/v1/PlanDefinition` 501 stub. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_plandefinitions.py` | #333 | `test_post_returns_501` → `test_post_returns_405` (Flask's default). |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/config.py` | #327 + #337 | Dropped JWT_SECRET_KEY / JWT_ACCESS_TOKEN_EXPIRES / JWT_REFRESH_TOKEN_EXPIRES + `from datetime import timedelta`; fixed SSO_CALLBACK_URL default to `…/api/v1/auth/callback`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/__init__.py` | #327 | Removed `flask_jwt_extended` import, `jwt = JWTManager()`, and conditional `jwt.init_app(app)` block. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/requirements.txt` | #327 | Dropped `Flask-JWT-Extended>=4.6`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/.env.example` | #327 + #337 | Removed `JWT_SECRET_KEY=`; appended SSO_BASE_URL / SSO_CLIENT_ID / SSO_CLIENT_SECRET / SSO_CALLBACK_URL block with AUTH_DISABLED note. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/models/concept_models.py` | #329 | `ValueSet.to_dict` and `Concept.to_dict.valueset_url` now emit `/api/v1/lookup/valuesets/{guid}`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_lookup_url_consistency.py` | #329 | NEW. Two tests asserting both serializers emit `/api/v1/lookup/`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/concepts.py` | #330 | `update_concept` now bumps `date_valid` alongside `vers_number`. Added `from datetime import datetime, timezone`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_concepts.py` | #330 | NEW test `test_update_bumps_date_valid` asserting strict-greater on `date_valid`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/README.md` | #339 | "Running locally" rewritten to `./start.sh` + curl health; added "How loopback-only exposure works" paragraph. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/DEPLOY_2026-06-22_FHIR_TERMINOLOGY.md` | #340 | "What was NOT done" items #2 and #3 marked RESOLVED 2026-06-23 with commit refs. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/.github/workflows/conformance.yml` | #340 | `paths:` broadened to include `fhir_service.py`, `app/__init__.py` (for both push and PR triggers). |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/plan_pdhc_fhir_terminology_profile_instruction.md` | #340 | §2 "no automated tests" + §4 "unenforced" framing replaced with the live 222-test pytest reality. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/.github/workflows/test.yml` | #341 | NEW. pytest CI on every push + PR, Python 3.14, `pytest tests -x -q --maxfail=3`. |
+
+## 2026-06-30 — Rollup #325 design pass
+
+| File | Ticket | Note |
+|------|--------|------|
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/__init__.py` | #328 | `Limiter(default_limits=['200/minute'])`, `RATELIMIT_DEFAULT` set, `@limiter.exempt` on `/api/health`, global `request_filter` for service-key bypass. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/auth.py` | #328 | Removed blueprint-level `limiter.limit("200/minute")(auth_bp)` no-op. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/dispatch.py` | #328 | Removed blueprint-level limiter.limit no-op. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/form_definitions.py` | #328 | Removed blueprint-level limiter.limit no-op. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/forms.py` | #328 | Removed blueprint-level limiter.limit no-op. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_plandefinitions.py` | #328 + #332 | Removed limiter.limit no-op; imported `fhir_canonical_url` and switched bundle `fullUrl` + read-handler `url` defaults to it. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/plandefinitions.py` | #328 | Removed blueprint-level limiter.limit no-op. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/lookup_tables.py` | #328 | Removed blueprint-level `limiter.limit(..., exempt_when=_service_caller)`; the exempt-when semantics are now global. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/concepts.py` | #328 | Removed blueprint-level `limiter.limit(..., exempt_when=_service_caller)`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_rate_limit.py` | #328 | NEW. Asserts 201st request to `/api/v1/lookup/units` returns 429 and the exempt endpoints don't. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/capability.py` | #326 + #328 | Auth block rewritten to advertise the real GET routes + service-key bypass description; rate-limit advertisement rewritten to reflect global default + exempts; `@limiter.exempt` on `/capability-statement`, `/metadata`, `/endpoints`; all lookup-bucket endpoint paths corrected to `/lookup/...` prefix. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_capability_truth.py` | #326 | NEW. Walks /capability-statement response and asserts every advertised endpoint resolves; checks SSO model + truthful rate-limit block. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_codesystem.py` | #331 | New `_codesystem_version()` helper using `max(Concept.vers_number)`; CodeSystem `version` + $lookup `version` derive from it. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_conceptmap.py` | #331 | New `_conceptmap_version()` helper using `max(Concept.vers_number)` filtered to bound rows; ConceptMap `version` derives from it. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/plan_pdhc_fhir_terminology_profile_DECISIONS.md` | #331 | D4 "TBD" carve-out replaced with the RESOLVED 2026-06-30 derivation rule for CodeSystem and ConceptMap. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_fhir_version_uniform.py` | #331 | NEW. 6 tests: CodeSystem version from max(vers_number); ConceptMap version from max bound vers_number; both never empty. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/services/fhir_service.py` | #332 | `url` builder uses `fhir_canonical_url('PlanDefinition', fhir_id)`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_plandefinition_canonical_url.py` | #332 | NEW. 3 tests asserting PlanDefinition URL uses `{PLAN_BASE}/fhir/PlanDefinition/<id>` shape, never the legacy `pdhc.se/PlanDefinition/<id>`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/.env.example` | #336 | `POSTGRES_DB`/`DATABASE_URL` default now `pdhc_gateway` with explanatory comment about legacy name retention. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/config.py` | #336 | `SQLALCHEMY_DATABASE_URI` default DB renamed to `pdhc_gateway` with explanatory comment. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/db_schema_snapshot.md` | #336 | `**Database:** pdhc_planp` → `pdhc_gateway (legacy name)`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/DEPLOYMENT_PLAN.md` | #338 | Full rewrite — container-based deploy, pdhc_gateway DB, SSO model, no JWT, no ghost scripts. ~140 lines. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/SSO_INTEGRATION_PLAN.md` | #338 | Full rewrite — H1-H4 handshake, per-request revalidation, service-key bypass, config keys. ~110 lines. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/plan_description.md` | #338 | §6 key order corrected; §7.1 auth rewritten to SSO model + global 200/min default; §7.2 paths now use `/api/v1/lookup/`. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/api_reference.md` | #338 | Auth section rewritten: SSO redirect handshake, per-request revalidation, service-key bypass; rate-limit block updated. |
+| `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_docs_serving.py` | #338 | NEW. Asserts `DEPLOYMENT_PLAN.md` is NOT in `DOCS_CATALOG` (already true) — pins the contract going forward. |

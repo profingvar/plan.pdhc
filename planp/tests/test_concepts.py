@@ -58,6 +58,32 @@ class TestConceptCRUD:
         assert resp.status_code == 200
         assert resp.get_json()['vers_number'] == 2
 
+    def test_update_bumps_date_valid(self, client):
+        """Ticket #330: update_concept must bump date_valid alongside vers_number."""
+        import time
+        from app.models.concept_models import Concept
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)
+        lib_guid = _setup_concept_deps(client)
+
+        resp = client.post('/api/v1/concepts', json={
+            'concept_name': 'date_valid_bump_concept',
+            'canonical_lib': lib_guid,
+        })
+        guid = resp.get_json()['guid']
+        original = Concept.query.filter_by(guid=guid).first().date_valid
+
+        time.sleep(1.05)
+
+        resp = client.put(f'/api/v1/concepts/{guid}', json={
+            'concept_display_text': 'Updated label',
+        })
+        assert resp.status_code == 200
+        assert resp.get_json()['vers_number'] == 2
+
+        bumped = Concept.query.filter_by(guid=guid).first().date_valid
+        assert original is not None and bumped is not None
+        assert bumped > original
+
     def test_delete(self, client):
         set_sso_session(client, SAMPLE_ACCESS_BLOB)
         lib_guid = _setup_concept_deps(client)

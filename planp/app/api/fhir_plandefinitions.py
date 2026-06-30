@@ -1,10 +1,11 @@
 from flask import Blueprint, request, jsonify
+from app.models.concept_models import fhir_canonical_url
 from app.models.fhir_models import PlanDefinition
 from app.services.fhir_service import FHIRService
 from app import db, limiter
 
 fhir_plandef_bp = Blueprint('fhir_plandefinitions', __name__)
-limiter.limit("200/minute")(fhir_plandef_bp)
+# Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
 
 
 @fhir_plandef_bp.route('/PlanDefinition', methods=['GET'])
@@ -36,10 +37,10 @@ def search_plan_definitions():
                 'value': pd.name or pd.fhir_id,
             }]
         if 'url' not in resource:
-            resource['url'] = f'https://pdhc.se/PlanDefinition/{pd.fhir_id}'
+            resource['url'] = fhir_canonical_url('PlanDefinition', pd.fhir_id)
 
         entries.append({
-            'fullUrl': f'https://pdhc.se/PlanDefinition/{pd.fhir_id}',
+            'fullUrl': fhir_canonical_url('PlanDefinition', pd.fhir_id),
             'resource': resource,
         })
 
@@ -65,7 +66,7 @@ def read_plan_definition(fhir_id):
             'value': pd.name or pd.fhir_id,
         }]
     if 'url' not in resource:
-        resource['url'] = f'https://pdhc.se/PlanDefinition/{pd.fhir_id}'
+        resource['url'] = fhir_canonical_url('PlanDefinition', pd.fhir_id)
 
     return jsonify(resource), 200
 
@@ -81,12 +82,3 @@ def expand_plan_definition(fhir_id):
     pd.fhir_data = resource
     db.session.commit()
     return jsonify(resource), 200
-
-
-@fhir_plandef_bp.route('/PlanDefinition', methods=['POST'])
-def create_plan_definition_fhir():
-    """Not yet implemented — use the web builder."""
-    return jsonify({
-        'error': 'FHIR PlanDefinition creation via API is not yet supported. '
-                 'Please use the web builder at /plandefinitions/builder.'
-    }), 501

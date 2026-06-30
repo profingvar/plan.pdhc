@@ -285,8 +285,14 @@ version invents work and ambiguity. The plain integer is precise:
 
 **Consequences:**
 - `Concept.vers_number` → `CodeSystem.concept[]` properties carry their
-  per-concept version (or roll up into a single `vers_number` on the
-  parent CodeSystem — TBD in §6.3 review).
+  per-concept version.
+- `CodeSystem.version` = `str(max(Concept.vers_number))` across all
+  concepts (RESOLVED 2026-06-30, rollup #325 / ticket #331). Monotonically
+  increases as any concept gets bumped; defaults to `"1"` when the table
+  is empty.
+- `ConceptMap.version` = `str(max(Concept.vers_number))` across rows
+  carrying a canonical binding (RESOLVED 2026-06-30, rollup #325 /
+  ticket #331). Same semantics; defaults to `"1"` when no bindings exist.
 - `ValueSet.vers_number` → `ValueSet.version`.
 - The CapabilityStatement keeps its own `API_VERSION` constant unchanged.
 

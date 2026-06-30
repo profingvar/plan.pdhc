@@ -13,7 +13,7 @@ from app.models.forms_models import Questionnaire
 from app import limiter
 
 forms_bp = Blueprint('forms_api', __name__)
-limiter.limit("200/minute")(forms_bp)
+# Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
 
 
 def require_api_key_or_role(fn):

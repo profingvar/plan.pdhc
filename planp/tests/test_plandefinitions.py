@@ -16,9 +16,9 @@ class TestFHIRPlanDefinitionAPI:
         resp = client.get('/api/v1/PlanDefinition/nonexistent-id')
         assert resp.status_code == 404
 
-    def test_post_returns_501(self, client):
+    def test_post_returns_405(self, client):
         resp = client.post('/api/v1/PlanDefinition', json={})
-        assert resp.status_code == 501
+        assert resp.status_code == 405
 
     def test_search_with_filters(self, client):
         resp = client.get('/api/v1/PlanDefinition?status=draft&_count=5&_offset=0')

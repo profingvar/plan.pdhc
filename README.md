@@ -49,10 +49,19 @@ should happen" side of the boundary.
 
 ```bash
 cp planp/.env.example planp/.env   # then fill in the values
-docker compose up -d db            # postgres on 9031
-flask db upgrade
-python -m gunicorn --bind 127.0.0.1:9030 'app:create_app()'
+./start.sh                         # docker compose up -d --build (db + app)
+curl http://127.0.0.1:9030/api/v1/health
 ```
+
+Both the Postgres `db` and the Flask `app` containers come up via
+`docker-compose.yml` (see `planp/`). Migrations and the gunicorn entry
+point run *inside* the app container — see `planp/entrypoint.sh`.
+
+### How loopback-only exposure works
+The gunicorn process inside the container binds `0.0.0.0:9030`
+(`planp/entrypoint.sh:8`). Loopback-only exposure is enforced by the
+compose port map `127.0.0.1:9030:9030` (`planp/docker-compose.yml:32`),
+not by the gunicorn flag.
 
 See `planp/.env.example` for required environment.
 

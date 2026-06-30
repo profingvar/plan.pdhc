@@ -9,72 +9,63 @@
 
 ## Authentication
 
-All write endpoints require a JWT Bearer token. Read endpoints are public.
+Auth is delegated to **sso.pdhc.se**. This service does NOT issue tokens of its own. Read endpoints are public; write endpoints require the bearer token established by the SSO handshake (or a valid service-key pair). See `SSO_INTEGRATION_PLAN.md` for the full H1–H4 spec.
 
-### Login
-
-```
-POST /api/v1/auth/login
-Content-Type: application/json
-
-{
-  "username": "admin",
-  "password": "your-password"
-}
-```
-
-**Response (200):**
-
-```json
-{
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ...",
-  "user": {
-    "guid": "fbbb5a49-...",
-    "username": "admin",
-    "role": "admin"
-  }
-}
-```
-
-Access tokens expire after 1 hour. Refresh tokens expire after 30 days.
-
-### Refresh Token
+### Login redirect
 
 ```
-POST /api/v1/auth/refresh
-Authorization: Bearer <refresh_token>
+GET /api/v1/auth/login
 ```
 
-**Response (200):**
+302-redirects to sso.pdhc with a `state` nonce + the registered `redirect_uri`.
 
-```json
-{
-  "access_token": "eyJ..."
-}
+### Callback
+
 ```
+GET /api/v1/auth/callback?code=<sso-code>&state=<nonce>
+```
+
+The SSO redirect target. Plan.pdhc validates `state`, exchanges `code` for an access token via sso.pdhc, calls `sso.pdhc /api/auth/me/service` (with `X-SSO-Client-Id` + `X-SSO-Client-Secret`) to fetch the user blob, and sets a short-lived session cookie. **Bearer tokens are re-validated against sso.pdhc on every subsequent request — there is no token caching, no `/refresh` route.**
 
 ### Current User
 
 ```
 GET /api/v1/auth/me
-Authorization: Bearer <access_token>
 ```
+
+Returns the SSO-validated user blob.
 
 ### Logout
 
 ```
+GET  /api/v1/auth/logout
 POST /api/v1/auth/logout
-Authorization: Bearer <access_token>
 ```
+
+Clears the session cookie and 302-redirects to sso.pdhc's logout endpoint.
+
+### Service-key bypass (service-to-service)
+
+Trusted sibling services may bypass SSO entirely by sending two headers on every request:
+
+```
+X-Source-Service: <name>     # one of: loader.pdhc, sim.pdhc
+X-Service-Key: <key>         # must match the env var named in
+                             # KNOWN_SERVICES (auth.py:14)
+```
+
+These callers are also exempt from rate limiting via the global `request_filter` (`app/__init__.py`).
+
+There is no `POST /api/v1/auth/login` and no `POST /api/v1/auth/refresh` — both were advertised by the pre-2026-06-30 capability statement but never wired in code; rollup #325 / ticket #326 corrected the capability.
 
 ---
 
 ## Rate Limiting
 
-- **Default:** 200 requests/minute per IP
-- **Login:** 10 requests/minute per IP
-- **Headers:** `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+- **Default:** 200 requests/minute per source, applied globally via `RATELIMIT_DEFAULT` (rollup #325 / ticket #328).
+- **Exempt endpoints:** `/api/health`, `/api/v1/capability-statement`, `/api/v1/metadata`, `/api/v1/endpoints`.
+- **Service-key callers** are exempt globally via a Limiter `request_filter`.
+- **Headers:** `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`.
 
 ---
 

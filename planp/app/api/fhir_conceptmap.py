@@ -45,6 +45,21 @@ from app.models.concept_models import (
 )
 
 
+def _conceptmap_version() -> str:
+    """FHIR `version` for the platform ConceptMap (ADR D4).
+
+    The ConceptMap represents the union of all Concept.canonical_lib /
+    Concept.canonical_refnumber bindings. Its effective version is the
+    max ``Concept.vers_number`` across all rows that carry a binding —
+    monotonically increasing as any binding gets edited. Returns "1"
+    when no bindings exist yet.
+    """
+    n = db.session.query(db.func.max(Concept.vers_number)).filter(
+        Concept.canonical_lib.isnot(None)
+    ).scalar()
+    return str(n or 1)
+
+
 fhir_conceptmap_bp = Blueprint('fhir_conceptmap', __name__)
 
 # The local CodeSystem URL — used as the ``source`` of every group and
@@ -170,7 +185,7 @@ def _build_conceptmap() -> dict:
         'resourceType': 'ConceptMap',
         'id': LOCAL_CONCEPTMAP_ID,
         'url': fhir_canonical_url('ConceptMap', LOCAL_CONCEPTMAP_ID),
-        'version': '1',
+        'version': _conceptmap_version(),
         'name': 'PlanPDHCCanonicalBindings',
         'title': 'plan.pdhc local concepts ↔ external canonicals',
         'status': 'active',

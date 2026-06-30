@@ -13,7 +13,7 @@ from app.services.form_definitions_service import (
 from app.api.forms import require_api_key_or_role
 
 form_defs_bp = Blueprint('form_defs_api', __name__)
-limiter.limit("200/minute")(form_defs_bp)
+# Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
 
 
 def _handle_error(e):

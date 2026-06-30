@@ -4,7 +4,6 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
-from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -13,7 +12,6 @@ from dotenv import load_dotenv
 db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
-jwt = JWTManager()
 
 
 def _limiter_key():
@@ -46,7 +44,7 @@ def _service_caller():
     return bool(src and src in KNOWN_SERVICES and request.headers.get('X-Service-Key'))
 
 
-limiter = Limiter(key_func=_limiter_key)
+limiter = Limiter(key_func=_limiter_key, default_limits=['200/minute'])
 
 
 def create_app(testing=False):
@@ -61,16 +59,23 @@ def create_app(testing=False):
             'TEST_DATABASE_URL', app.config['SQLALCHEMY_DATABASE_URI']
         )
 
+    app.config.setdefault('RATELIMIT_DEFAULT', '200/minute')
+
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
     limiter.init_app(app)
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-    # Flask-JWT-Extended only needed when AUTH_DISABLED (local dev uses local JWT).
-    # In production, SSO issues tokens — we validate via /api/auth/me/service.
-    if app.config.get('AUTH_DISABLED'):
-        jwt.init_app(app)
+    # Trusted sibling services (X-Source-Service + X-Service-Key) bypass
+    # the rate limiter globally — the canonicaliser warmup hits lookup +
+    # concepts in burst and would otherwise trip the default. Validity of
+    # the key is still enforced by requires_role's service-key path; this
+    # only decides whether to BYPASS the limiter, not whether the caller
+    # is trusted.
+    @limiter.request_filter
+    def _service_caller_bypass():
+        return _service_caller()
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     # Session config for SSO token storage
     app.permanent_session_lifetime = timedelta(hours=24)
@@ -176,6 +181,7 @@ def create_app(testing=False):
     # Health endpoint (required by SSO service registry).
     # Shape per CLAUDE.md §10 — matches cgm.pdhc pattern.
     @app.route('/api/health')
+    @limiter.exempt
     def health():
         from flask import jsonify
         from sqlalchemy import text

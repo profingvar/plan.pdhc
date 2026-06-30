@@ -18,7 +18,7 @@ from app.services.name_uniqueness import NameUniquenessService
 PLAN_BASE = "https://plan.pdhc.se"
 
 plandefinitions_bp = Blueprint('plandefinitions_api', __name__)
-limiter.limit("200/minute")(plandefinitions_bp)
+# Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
 
 
 def _is_valid_uuid(val):

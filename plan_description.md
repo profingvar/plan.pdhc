@@ -441,13 +441,13 @@ When editing (`/plandefinitions/<id>/edit` POST), the backend:
 
 ## 6) How FHIR PlanDefinition serialization works (in this repo)
 
-The serializer `FHIRService.create_fhir_plandefinition(plandef)` builds an ordered JSON object with:
+The serializer `FHIRService.create_fhir_plandefinition(plandef)` builds an ordered JSON object with (emission order, per `services/fhir_service.py:19-30`):
 
-- `meta.versionId` and `meta.lastUpdated`
 - `resourceType = "PlanDefinition"`
 - `id = plandef.fhir_id`
+- `meta.versionId` and `meta.lastUpdated`
 - `identifier` using system `https://pdhc.se/plan-definitions` and value `plandef.name or plandef.fhir_id`
-- `url` as `https://pdhc.se/PlanDefinition/<fhir_id>`
+- `url` as `https://plan.pdhc.se/fhir/PlanDefinition/<fhir_id>` (via `fhir_canonical_url('PlanDefinition', fhir_id)`; rollup #325 / ticket #332 unified this with the terminology resources per ADR D3)
 - `version` from `plandef.version` (default `"1.0.0"`)
 - `name`, `title`, `status`
 - `type`:
@@ -474,63 +474,69 @@ This section is a “what endpoints are needed” checklist, aligned to what thi
 
 ### 7.1 Authentication (prerequisite for most write operations)
 
-- `POST /api/v1/auth/login`: obtain JWT (access + refresh tokens).
-- `POST /api/v1/auth/logout`: client discards token.
-- `GET /api/v1/auth/me`: current user info.
-- `POST /api/v1/auth/refresh`: refresh access token using refresh token.
+Auth is delegated to `sso.pdhc.se`. Plan.pdhc does NOT issue tokens of its own — see `SSO_INTEGRATION_PLAN.md` for the full handshake (H1–H4).
 
-Rate limiting: 10 requests/minute on login, 200 requests/minute on all other endpoints.
+- `GET /api/v1/auth/login`: 302 redirect to sso.pdhc to begin the SSO handshake.
+- `GET /api/v1/auth/callback`: SSO redirect target — exchanges `code` for an access token, calls `sso.pdhc /api/auth/me/service` to validate, sets the session cookie.
+- `GET|POST /api/v1/auth/logout`: clears the session cookie.
+- `GET /api/v1/auth/me`: current user info.
+
+There is no `POST /auth/login` and no `/auth/refresh` — bearer tokens are re-validated against sso.pdhc per request, with no caching.
+
+Service-to-service callers (`loader.pdhc`, `sim.pdhc`) bypass SSO via `X-Source-Service` + `X-Service-Key` headers; the global limiter `request_filter` also exempts them.
+
+Rate limiting: a global default of 200 requests/minute per source applies to every endpoint via `RATELIMIT_DEFAULT` (rollup #325 / ticket #328). The following endpoints are exempt: `/api/health`, `/api/v1/capability-statement`, `/api/v1/metadata`, `/api/v1/endpoints`. Service-key callers are exempt globally.
 
 Practical requirement:
 
 - Terminology CRUD and PlanDefinition creation are protected by role checks (`read_write`).
 - Read endpoints are public (no auth required).
-- Local dev runs with `AUTH_DISABLED=true` — all auth bypassed.
+- Local dev runs with `AUTH_DISABLED=true` — all auth bypassed; never ship with that flag on.
 
 ### 7.2 Terminology / lookup management endpoints
 
-These endpoints provide the “definition of values” and “definition of valuesets”, plus supporting lookup tables.
+These endpoints provide the "definition of values" and "definition of valuesets", plus supporting lookup tables. All routes below live under the `/api/v1/lookup` prefix (`app/__init__.py:106`). Pre-rollup #325 this section listed bare `/api/v1/values` / `/api/v1/valuesets` paths — those return 404. Use the `/lookup/` paths.
 
 Canonical libraries:
 
-- `GET /api/v1/canonical-libs`
-- `POST /api/v1/canonical-libs`
-- (plus update/delete endpoints if you need full CRUD parity; the API file follows a standard pattern)
+- `GET /api/v1/lookup/canonical-libs`
+- `POST /api/v1/lookup/canonical-libs`
+- `GET /api/v1/lookup/canonical-libs/<guid>` / `PUT` / `DELETE`
 
 Concept types:
 
-- `GET /api/v1/concept-types`
-- `POST /api/v1/concept-types`
+- `GET /api/v1/lookup/concept-types`
+- `POST /api/v1/lookup/concept-types`
 
 Response types:
 
-- `GET /api/v1/response-types`
-- `POST /api/v1/response-types`
+- `GET /api/v1/lookup/response-types`
+- `POST /api/v1/lookup/response-types`
 
 Units:
 
-- `GET /api/v1/units` (optional auth in this repo)
-- `POST /api/v1/units`
+- `GET /api/v1/lookup/units` (public, like every other lookup GET)
+- `POST /api/v1/lookup/units`
 
 PlanDefinition types:
 
-- `GET /api/v1/plandef-types?all=true` (used by builder)
+- `GET /api/v1/lookup/plandef-types?all=true` (used by builder)
 
 Values catalog:
 
-- `GET /api/v1/values` (or `/api/v1/values_catalog` in docs; verify which one is wired in routing)
-- `POST /api/v1/values`
+- `GET /api/v1/lookup/values`
+- `POST /api/v1/lookup/values`
 
 ValueSets:
 
-- `GET /api/v1/valuesets`
-- `POST /api/v1/valuesets`
+- `GET /api/v1/lookup/valuesets`
+- `POST /api/v1/lookup/valuesets`
 
 ValueSet membership:
 
-- `GET /api/v1/valuesets/<valueset_id>/values`
-- `POST /api/v1/valuesets/<valueset_id>/values`
-- `DELETE /api/v1/valuesets/<valueset_id>/values/<value_id>`
+- `GET /api/v1/lookup/valuesets/<valueset_guid>/values`
+- `POST /api/v1/lookup/valuesets/<valueset_guid>/values`
+- `DELETE /api/v1/lookup/valuesets/<valueset_guid>/values/<value_guid>`
 
 ### 7.3 Concept management endpoints
 

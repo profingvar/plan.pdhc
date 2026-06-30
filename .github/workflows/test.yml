@@ -1,0 +1,50 @@
+name: pytest
+
+# Ticket #341 (rollup #325) — adds the missing pytest job. The existing
+# conformance.yml workflow runs the HL7 validator on the terminology
+# surface only; this job runs the full ~222-test suite under
+# planp/tests/.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: 'pip'
+          cache-dependency-path: planp/requirements.txt
+
+      - name: Install dependencies
+        working-directory: planp
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        working-directory: planp
+        env:
+          # conftest.py builds its own SQLite db via tempfile; this just
+          # ensures no production URL is inherited from any environment.
+          DATABASE_URL: 'sqlite:////tmp/test.db'
+          FLASK_ENV: 'testing'
+          FLASK_SECRET_KEY: 'ci-secret'
+          BOOTSTRAP_SU_USERNAME: 'admin'
+          BOOTSTRAP_SU_PASSWORD: 'admin123'
+          AUTH_DISABLED: 'false'
+          SSO_BASE_URL: 'http://sso-test:9000'
+          SSO_CLIENT_ID: 'test-client-id'
+          SSO_CLIENT_SECRET: 'test-client-secret'
+          SSO_CALLBACK_URL: 'http://localhost:9030/api/v1/auth/callback'
+        run: pytest tests -x -q --maxfail=3

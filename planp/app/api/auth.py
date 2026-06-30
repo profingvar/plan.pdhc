@@ -1,10 +1,12 @@
 import functools
 import secrets
 from flask import Blueprint, request, jsonify, redirect, session, url_for, current_app, g
-from app import limiter
+from app import limiter  # noqa: F401  (kept for parity with sibling blueprints)
 
 auth_bp = Blueprint('auth', __name__)
-limiter.limit("200/minute")(auth_bp)
+# Rate limiting is set globally via RATELIMIT_DEFAULT='200/minute' in
+# app/__init__.py. Per-view exemptions are added with @limiter.exempt
+# where needed (e.g. /capability, /api/health).
 
 
 # Service-key auth bypass: trusted sibling services may POST/PUT/DELETE

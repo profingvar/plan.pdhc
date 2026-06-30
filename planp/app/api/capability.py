@@ -3,7 +3,9 @@ from flask import Blueprint, jsonify, send_file, abort
 from app import limiter
 
 capability_bp = Blueprint('capability', __name__)
-limiter.limit("200/minute")(capability_bp)
+# Rate limiting is set globally via RATELIMIT_DEFAULT in app/__init__.py.
+# /capability is intended to be freely pollable by service-discovery, so
+# its view is decorated with @limiter.exempt below.
 
 API_VERSION = '1.0.0'
 BASE = '/api/v1'
@@ -19,73 +21,79 @@ def _endpoint(method, path, auth, description):
 
 
 ENDPOINTS = [
-    # Auth
-    _endpoint('POST', '/auth/login', False, 'Authenticate and receive JWT tokens'),
-    _endpoint('POST', '/auth/logout', True, 'Logout (client discards token)'),
+    # Auth — SSO redirect handshake. Plan.pdhc does not issue tokens
+    # itself; bearer tokens are validated per-request against sso.pdhc.
+    # Trusted sibling services may bypass SSO with X-Source-Service +
+    # X-Service-Key headers (see KNOWN_SERVICES in app/api/auth.py).
+    _endpoint('GET', '/auth/login', False,
+              '302 redirect to sso.pdhc to begin the SSO handshake'),
+    _endpoint('GET', '/auth/callback', False,
+              'SSO redirect target — exchanges code for access token and sets session'),
+    _endpoint('GET', '/auth/logout', True, 'Logout (clears session)'),
+    _endpoint('POST', '/auth/logout', True, 'Logout (clears session)'),
     _endpoint('GET', '/auth/me', True, 'Get current authenticated user'),
-    _endpoint('POST', '/auth/refresh', True, 'Refresh access token using refresh token'),
 
-    # Canonical Libraries
-    _endpoint('GET', '/canonical-libs', False, 'List all canonical libraries'),
-    _endpoint('POST', '/canonical-libs', True, 'Create a canonical library'),
-    _endpoint('GET', '/canonical-libs/<guid>', False, 'Read a canonical library'),
-    _endpoint('PUT', '/canonical-libs/<guid>', True, 'Update a canonical library'),
-    _endpoint('DELETE', '/canonical-libs/<guid>', True, 'Delete a canonical library'),
+    # Canonical Libraries (lookup blueprint, /api/v1/lookup prefix)
+    _endpoint('GET', '/lookup/canonical-libs', False, 'List all canonical libraries'),
+    _endpoint('POST', '/lookup/canonical-libs', True, 'Create a canonical library'),
+    _endpoint('GET', '/lookup/canonical-libs/<guid>', False, 'Read a canonical library'),
+    _endpoint('PUT', '/lookup/canonical-libs/<guid>', True, 'Update a canonical library'),
+    _endpoint('DELETE', '/lookup/canonical-libs/<guid>', True, 'Delete a canonical library'),
 
     # Concept Types
-    _endpoint('GET', '/concept-types', False, 'List all concept types'),
-    _endpoint('POST', '/concept-types', True, 'Create a concept type'),
-    _endpoint('GET', '/concept-types/<guid>', False, 'Read a concept type'),
-    _endpoint('PUT', '/concept-types/<guid>', True, 'Update a concept type'),
-    _endpoint('DELETE', '/concept-types/<guid>', True, 'Delete a concept type'),
+    _endpoint('GET', '/lookup/concept-types', False, 'List all concept types'),
+    _endpoint('POST', '/lookup/concept-types', True, 'Create a concept type'),
+    _endpoint('GET', '/lookup/concept-types/<guid>', False, 'Read a concept type'),
+    _endpoint('PUT', '/lookup/concept-types/<guid>', True, 'Update a concept type'),
+    _endpoint('DELETE', '/lookup/concept-types/<guid>', True, 'Delete a concept type'),
 
     # Response Types
-    _endpoint('GET', '/response-types', False, 'List all response types'),
-    _endpoint('POST', '/response-types', True, 'Create a response type'),
-    _endpoint('GET', '/response-types/<guid>', False, 'Read a response type'),
-    _endpoint('PUT', '/response-types/<guid>', True, 'Update a response type'),
-    _endpoint('DELETE', '/response-types/<guid>', True, 'Delete a response type'),
+    _endpoint('GET', '/lookup/response-types', False, 'List all response types'),
+    _endpoint('POST', '/lookup/response-types', True, 'Create a response type'),
+    _endpoint('GET', '/lookup/response-types/<guid>', False, 'Read a response type'),
+    _endpoint('PUT', '/lookup/response-types/<guid>', True, 'Update a response type'),
+    _endpoint('DELETE', '/lookup/response-types/<guid>', True, 'Delete a response type'),
 
     # Units
-    _endpoint('GET', '/units', False, 'List all units'),
-    _endpoint('POST', '/units', True, 'Create a unit'),
-    _endpoint('GET', '/units/<guid>', False, 'Read a unit'),
-    _endpoint('PUT', '/units/<guid>', True, 'Update a unit'),
-    _endpoint('DELETE', '/units/<guid>', True, 'Delete a unit'),
+    _endpoint('GET', '/lookup/units', False, 'List all units'),
+    _endpoint('POST', '/lookup/units', True, 'Create a unit'),
+    _endpoint('GET', '/lookup/units/<guid>', False, 'Read a unit'),
+    _endpoint('PUT', '/lookup/units/<guid>', True, 'Update a unit'),
+    _endpoint('DELETE', '/lookup/units/<guid>', True, 'Delete a unit'),
 
     # PlanDef Types
-    _endpoint('GET', '/plandef-types', False, 'List all PlanDefinition types'),
-    _endpoint('POST', '/plandef-types', True, 'Create a PlanDefinition type'),
-    _endpoint('GET', '/plandef-types/<guid>', False, 'Read a PlanDefinition type'),
-    _endpoint('PUT', '/plandef-types/<guid>', True, 'Update a PlanDefinition type'),
-    _endpoint('DELETE', '/plandef-types/<guid>', True, 'Delete a PlanDefinition type'),
+    _endpoint('GET', '/lookup/plandef-types', False, 'List all PlanDefinition types'),
+    _endpoint('POST', '/lookup/plandef-types', True, 'Create a PlanDefinition type'),
+    _endpoint('GET', '/lookup/plandef-types/<guid>', False, 'Read a PlanDefinition type'),
+    _endpoint('PUT', '/lookup/plandef-types/<guid>', True, 'Update a PlanDefinition type'),
+    _endpoint('DELETE', '/lookup/plandef-types/<guid>', True, 'Delete a PlanDefinition type'),
 
     # Intended Uses
-    _endpoint('GET', '/intended-uses', False, 'List all intended uses'),
-    _endpoint('POST', '/intended-uses', True, 'Create an intended use'),
-    _endpoint('GET', '/intended-uses/<guid>', False, 'Read an intended use'),
-    _endpoint('PUT', '/intended-uses/<guid>', True, 'Update an intended use'),
-    _endpoint('DELETE', '/intended-uses/<guid>', True, 'Delete an intended use'),
+    _endpoint('GET', '/lookup/intended-uses', False, 'List all intended uses'),
+    _endpoint('POST', '/lookup/intended-uses', True, 'Create an intended use'),
+    _endpoint('GET', '/lookup/intended-uses/<guid>', False, 'Read an intended use'),
+    _endpoint('PUT', '/lookup/intended-uses/<guid>', True, 'Update an intended use'),
+    _endpoint('DELETE', '/lookup/intended-uses/<guid>', True, 'Delete an intended use'),
 
     # Values
-    _endpoint('GET', '/values', False, 'List all values'),
-    _endpoint('POST', '/values', True, 'Create a value'),
-    _endpoint('GET', '/values/<guid>', False, 'Read a value'),
-    _endpoint('PUT', '/values/<guid>', True, 'Update a value'),
-    _endpoint('DELETE', '/values/<guid>', True, 'Delete a value'),
+    _endpoint('GET', '/lookup/values', False, 'List all values'),
+    _endpoint('POST', '/lookup/values', True, 'Create a value'),
+    _endpoint('GET', '/lookup/values/<guid>', False, 'Read a value'),
+    _endpoint('PUT', '/lookup/values/<guid>', True, 'Update a value'),
+    _endpoint('DELETE', '/lookup/values/<guid>', True, 'Delete a value'),
 
     # ValueSets
-    _endpoint('GET', '/valuesets', False, 'List all valuesets (paginated)'),
-    _endpoint('POST', '/valuesets', True, 'Create a valueset'),
-    _endpoint('GET', '/valuesets/<guid>', False, 'Read a valueset'),
-    _endpoint('PUT', '/valuesets/<guid>', True, 'Update a valueset'),
-    _endpoint('DELETE', '/valuesets/<guid>', True, 'Delete a valueset'),
+    _endpoint('GET', '/lookup/valuesets', False, 'List all valuesets (paginated)'),
+    _endpoint('POST', '/lookup/valuesets', True, 'Create a valueset'),
+    _endpoint('GET', '/lookup/valuesets/<guid>', False, 'Read a valueset'),
+    _endpoint('PUT', '/lookup/valuesets/<guid>', True, 'Update a valueset'),
+    _endpoint('DELETE', '/lookup/valuesets/<guid>', True, 'Delete a valueset'),
 
     # ValueSet Membership
-    _endpoint('GET', '/valuesets/<guid>/values', False, 'List values in a valueset'),
-    _endpoint('POST', '/valuesets/<guid>/values', True, 'Add a value to a valueset'),
-    _endpoint('PUT', '/valuesets/<guid>/values/<value_guid>', True, 'Update sort order of a value in a valueset'),
-    _endpoint('DELETE', '/valuesets/<guid>/values/<value_guid>', True, 'Remove a value from a valueset'),
+    _endpoint('GET', '/lookup/valuesets/<guid>/values', False, 'List values in a valueset'),
+    _endpoint('POST', '/lookup/valuesets/<guid>/values', True, 'Add a value to a valueset'),
+    _endpoint('PUT', '/lookup/valuesets/<guid>/values/<value_guid>', True, 'Update sort order of a value in a valueset'),
+    _endpoint('DELETE', '/lookup/valuesets/<guid>/values/<value_guid>', True, 'Remove a value from a valueset'),
 
     # Concepts
     _endpoint('GET', '/concepts', False, 'List/search concepts (paginated, filterable)'),
@@ -179,6 +187,7 @@ ENDPOINTS = [
 
 
 @capability_bp.route('/capability-statement', methods=['GET'])
+@limiter.exempt
 def capability_statement():
     resources = {}
     for ep in ENDPOINTS:
@@ -201,12 +210,30 @@ def capability_statement():
             'type': 'SSO (sso.pdhc.se)',
             'login': f'{BASE}/auth/login',
             'callback': f'{BASE}/auth/callback',
-            'note': 'Authentication delegated to sso.pdhc.se via SSO handshake. '
-                    'Read endpoints are public. Write endpoints require "planning" phase access.',
+            'me': f'{BASE}/auth/me',
+            'note': 'Authentication is delegated to sso.pdhc.se. GET '
+                    f'{BASE}/auth/login returns a 302 redirect to sso.pdhc; '
+                    'sso.pdhc then redirects back to /auth/callback with a '
+                    'code that this service exchanges for an access token '
+                    'and validates per-request against sso.pdhc /api/auth/me/service. '
+                    'No JWTs are issued by this service. Read endpoints are public; '
+                    'write endpoints require the "planning" phase.',
+            'service_key_bypass': {
+                'description': 'Trusted sibling services may bypass SSO by '
+                               'sending the headers below. Each service\'s '
+                               'expected key is held in the service\'s env var.',
+                'headers': ['X-Source-Service', 'X-Service-Key'],
+                'known_sources': ['loader.pdhc', 'sim.pdhc'],
+            },
         },
         'rate_limiting': {
-            'default': '200 requests/minute per IP',
-            'login': '10 requests/minute per IP',
+            'default': '200 requests/minute per source',
+            'exempt': [f'{BASE}/capability-statement', f'{BASE}/metadata',
+                       f'{BASE}/endpoints', '/api/health'],
+            'service_key_exempt': True,
+            'note': 'A global default of 200/min applies via RATELIMIT_DEFAULT. '
+                    'Endpoints listed in "exempt" and any request that carries '
+                    'a valid X-Source-Service + X-Service-Key bypass the limiter.',
             'headers': ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
         },
         'roles': {
@@ -220,6 +247,7 @@ def capability_statement():
 
 
 @capability_bp.route('/metadata', methods=['GET'])
+@limiter.exempt
 def fhir_capability_statement():
     """FHIR R5-conformant CapabilityStatement resource."""
     from datetime import datetime, timezone
@@ -512,6 +540,7 @@ def fhir_capability_statement():
 
 
 @capability_bp.route('/endpoints', methods=['GET'])
+@limiter.exempt
 def list_endpoints():
     return jsonify({
         'total': len(ENDPOINTS),

@@ -242,7 +242,7 @@ class ValueSet(db.Model):
     def to_dict(self, include_values=True):
         d = {
             'guid': self.guid,
-            'url': f"{PLAN_BASE}/api/v1/valuesets/{self.guid}",
+            'url': f"{PLAN_BASE}/api/v1/lookup/valuesets/{self.guid}",
             'canonical_lib': self.canonical_lib,
             'canonical_refnumber': self.canonical_refnumber,
             'valueset_name': self.valueset_name,
@@ -377,7 +377,7 @@ class Concept(db.Model):
         if self.unit:
             d['unit_url'] = f"{PLAN_BASE}/api/v1/lookup/units/{self.unit}"
         if self.valueset:
-            d['valueset_url'] = f"{PLAN_BASE}/api/v1/valuesets/{self.valueset}"
+            d['valueset_url'] = f"{PLAN_BASE}/api/v1/lookup/valuesets/{self.valueset}"
         if self.canonical_lib:
             d['canonical_lib_url'] = f"{PLAN_BASE}/api/v1/lookup/canonical-libs/{self.canonical_lib}"
         return d

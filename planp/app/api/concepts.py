@@ -1,10 +1,11 @@
 import io
 import os
 import uuid as uuid_mod
+from datetime import datetime, timezone
 import bleach
 from flask import Blueprint, request, jsonify, g
 from sqlalchemy import or_
-from app import db, limiter, _service_caller
+from app import db  # limiter exemption handled globally via request_filter in app/__init__.py
 from app.api.auth import requires_role
 from app.models.concept_models import (
     Concept, CanonicalLib, ValueSet, ValueSetValue, ValueCatalog,
@@ -15,11 +16,12 @@ from app.services.concept_importer import (
 )
 
 concepts_bp = Blueprint('concepts', __name__)
-# 200/minute for ordinary callers; service-key callers (sim.pdhc /
-# loader.pdhc / cdr.pdhc canonicaliser) are exempt — burst-warmup of the
-# canonicaliser cache used to push parallel writers past the limit and
-# trigger 6/400 4xx during the first seed (post_seed_followups Block A).
-limiter.limit("200/minute", exempt_when=_service_caller)(concepts_bp)
+# Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
+# Service-key callers (sim.pdhc / loader.pdhc / cdr.pdhc canonicaliser)
+# are exempted via the global request_filter registered there — the
+# burst-warmup of the canonicaliser cache used to push parallel writers
+# past the limit and trigger 6/400 4xx during the first seed
+# (post_seed_followups Block A).
 
 
 def _is_valid_uuid(val):
@@ -183,6 +185,7 @@ def update_concept(guid):
             setattr(concept, f, data[f])
 
     concept.vers_number = (concept.vers_number or 1) + 1
+    concept.date_valid = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify(concept.to_dict()), 200
 

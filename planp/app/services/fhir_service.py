@@ -2,6 +2,7 @@ import json
 from collections import OrderedDict
 from datetime import datetime, timezone
 
+from app.models.concept_models import fhir_canonical_url
 from app.models.forms_models import Questionnaire
 
 PLAN_BASE = "https://plan.pdhc.se"
@@ -28,7 +29,10 @@ class FHIRService:
             'system': 'https://pdhc.se/plan-definitions',
             'value': plandef.name or fhir_id,
         }]
-        resource['url'] = f'https://pdhc.se/PlanDefinition/{fhir_id}'
+        # Canonical URL uses the platform-wide form per ADR D3 — same shape
+        # as CodeSystem/ValueSet/ConceptMap. Pre-#332 this emitted
+        # `https://pdhc.se/PlanDefinition/<id>` (two divergent schemes).
+        resource['url'] = fhir_canonical_url('PlanDefinition', fhir_id)
         resource['version'] = plandef.version or '1.0.0'
         resource['name'] = plandef.name
         resource['title'] = plandef.title

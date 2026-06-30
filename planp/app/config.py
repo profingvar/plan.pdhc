@@ -1,20 +1,17 @@
 import os
-from datetime import timedelta
 
 
 class Config:
+    # DB name "pdhc_gateway" is the legacy name retained for data continuity
+    # (rollup #325 / ticket #336). Pre-2026 the service was called
+    # "PDHC Gateway"; renaming the volume would risk data loss.
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         'DATABASE_URL',
-        'postgresql://pdhc_admin:change-me@localhost:9031/pdhc_planp'
+        'postgresql://pdhc_admin:change-me@localhost:9031/pdhc_gateway'
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'change-me')
-
-    # Legacy JWT config — only used when AUTH_DISABLED=true (local dev).
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'change-me')
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
-    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
 
     FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
     DEBUG = FLASK_ENV == 'development'
@@ -27,7 +24,7 @@ class Config:
     SSO_BASE_URL = os.environ.get('SSO_BASE_URL', 'http://localhost:9000')
     SSO_CLIENT_ID = os.environ.get('SSO_CLIENT_ID', '')
     SSO_CLIENT_SECRET = os.environ.get('SSO_CLIENT_SECRET', '')
-    SSO_CALLBACK_URL = os.environ.get('SSO_CALLBACK_URL', 'http://localhost:9030/callback')
+    SSO_CALLBACK_URL = os.environ.get('SSO_CALLBACK_URL', 'http://localhost:9030/api/v1/auth/callback')
 
     # Forms builder API key (for external service-to-service access)
     API_KEY = os.environ.get('API_KEY', '')
