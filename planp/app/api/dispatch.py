@@ -1,10 +1,10 @@
 """Dispatch endpoint — validates a PlanDefinition dispatch request.
 
-The canonical route is `/PlanDefinition/<guid>/dispatch`. The
-legacy `/CarePlan/<guid>/dispatch` alias is kept for one release
-cycle because pre-#310 the platform used "CarePlan" as a URL-level
-misnomer for PlanDefinition (#318). Both routes call the same
-handler. Callers should switch to the canonical name.
+Canonical route is `/PlanDefinition/<guid>/dispatch`. The
+legacy `/CarePlan/<guid>/dispatch` alias existed pre-#310 when the
+URL misnamed PlanDefinition as CarePlan (#318); it was dropped by
+#334 after a 24h access-log soak (2026-06-30 → 2026-07-01) showed
+zero callers.
 """
 
 import bleach
@@ -32,12 +32,4 @@ def _dispatch(guid):
 def dispatch_plan_definition(guid):
     """Validate a PlanDefinition dispatch: checks PlanDefinition exists
     and contract is active."""
-    return _dispatch(guid)
-
-
-@dispatch_bp.route('/CarePlan/<guid>/dispatch', methods=['POST'])
-def dispatch_careplan_legacy(guid):
-    """DEPRECATED legacy alias of /PlanDefinition/<guid>/dispatch
-    kept for one release cycle (#318). Drop after no caller uses it.
-    """
     return _dispatch(guid)
