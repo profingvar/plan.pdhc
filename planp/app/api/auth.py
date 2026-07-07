@@ -4,6 +4,14 @@ from flask import Blueprint, request, jsonify, redirect, session, url_for, curre
 from app import limiter  # noqa: F401  (kept for parity with sibling blueprints)
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def _phases(blob):
+    """Reform-canonical phases (M0 #421): prefer session_phases (Option C),
+    fall back to the dual-emitted legacy effective_phases for pre-reform
+    tokens. Plan is orthogonal (no patient data); 'planning' appears in both
+    lists identically, so this is a consistency adoption, not a gate change."""
+    return blob.get('session_phases') or blob.get('effective_phases') or []
 # Rate limiting is set globally via RATELIMIT_DEFAULT='200/minute' in
 # app/__init__.py. Per-view exemptions are added with @limiter.exempt
 # where needed (e.g. /capability, /api/health).
@@ -126,7 +134,7 @@ def requires_role(min_role):
             # Determine effective role from access blob
             effective = 1  # read_only — any authenticated user
             if blob.get('user_type') == 'professional':
-                if 'planning' in blob.get('effective_phases', []):
+                if 'planning' in _phases(blob):
                     effective = 2  # read_write
             if effective < required:
                 return jsonify({'error': 'Insufficient permissions'}), 403

@@ -356,3 +356,8 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 | `/Users/martiningvar/T7_sidewinder/plan.pdhc/plan_description.md` | #338 | §6 key order corrected; §7.1 auth rewritten to SSO model + global 200/min default; §7.2 paths now use `/api/v1/lookup/`. |
 | `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/api_reference.md` | #338 | Auth section rewritten: SSO redirect handshake, per-request revalidation, service-key bypass; rate-limit block updated. |
 | `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_docs_serving.py` | #338 | NEW. Asserts `DEPLOYMENT_PLAN.md` is NOT in `DOCS_CATALOG` (already true) — pins the contract going forward. |
+
+## 2026-07-07 — M0 #421: plan adopts reform session_phases (consistency)
+- planp/app/api/auth.py — _phases() helper (session_phases w/ effective_phases
+  fallback) at the planning gate. No org filter (Plan is orthogonal).
+- planp/app/tests/test_reform_phases.py — NEW, 4 tests.
