@@ -3,6 +3,7 @@
 import requests as http_requests
 from flask import current_app
 from app.models.fhir_models import PlanDefinition
+from app.services.session_headers import outbound_session_headers
 
 
 def handle_dispatch(plan_definition_guid, provider_org_guid):
@@ -28,7 +29,8 @@ def handle_dispatch(plan_definition_guid, provider_org_guid):
     # Find matching contract via contract.pdhc
     contract_base = current_app.config['CONTRACT_BASE_URL'].rstrip('/')
     try:
-        resp = http_requests.get(f"{contract_base}/fhir/Contract", timeout=15)
+        resp = http_requests.get(f"{contract_base}/fhir/Contract",
+                                 headers=outbound_session_headers(), timeout=15)
         if resp.status_code != 200:
             return {'error': 'Contract service unavailable'}, 502
 

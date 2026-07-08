@@ -23,6 +23,8 @@ from typing import Any
 
 import requests
 
+from app.services.session_headers import outbound_session_headers
+
 log = logging.getLogger(__name__)
 
 
@@ -69,7 +71,7 @@ class TermbankClient:
             return cached  # cached value, possibly None for a known-miss
         url = f"{self.base_url}/CodeSystem/{system}/{code}"
         try:
-            resp = requests.get(url, timeout=self.timeout)
+            resp = requests.get(url, headers=outbound_session_headers(), timeout=self.timeout)
         except requests.Timeout as e:
             log.warning("termbank lookup timeout (>%ss) for %s/%s: %s",
                         self.timeout, system, code, e)
@@ -119,6 +121,7 @@ class TermbankClient:
             resp = requests.get(
                 f"{self.base_url}/search",
                 params=params,
+                headers=outbound_session_headers(),
                 timeout=self.timeout,
             )
         except requests.Timeout as e:
