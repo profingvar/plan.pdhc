@@ -1061,6 +1061,52 @@ Returns a simplified representation suitable for UI rendering. Supports API key 
 
 ---
 
+## Authoring Assistant (optional, epic #516)
+
+Opt-in surface to help build correct concepts/plan definitions. The whole
+surface is gated by `AUTHORING_ASSISTANT_ENABLED` (default off); when off every
+endpoint returns `{"enabled": false}`. All three require the `read_write`
+(planning) role. **None of these mutate data** — they only check and suggest.
+
+### List Assistant Models
+`GET /api/v1/authoring/models`
+
+Returns the selectable Claude models and whether a key is configured, so a UI
+can render (or grey out) the model picker.
+
+```json
+{ "enabled": true, "key_configured": false,
+  "models": ["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"],
+  "default_model": "claude-sonnet-5" }
+```
+
+### Validate a Draft (Layer 1 — no key needed)
+`POST /api/v1/authoring/validate`
+
+Body: `{ "kind": "concept" | "plandef", "payload": { ...draft... } }`.
+Runs the deterministic validators and returns structured issues.
+
+```json
+{ "ok": false, "error_count": 1, "warning_count": 0, "kind": "concept",
+  "issues": [ { "code": "E-UNIT-REQUIRED", "severity": "error",
+                "field": "unit", "message": "A quantity concept must have a unit of measure.",
+                "hint": "Set a unit (e.g. mmHg, mmol/L, /min)." } ] }
+```
+
+Issue codes: `E-UNIT-REQUIRED`, `E-VALUESET-REQUIRED`, `E-RESPONSE-TYPE-UNKNOWN`,
+`E-TERM-MISSING`, `W-TERM-UNVERIFIED`, `W-UNIT-CONTRADICTS`, `E-DANGLING-REF`,
+`E-RANGE-INVERTED`, `W-EMPTY-PLANDEF`.
+
+### Assist (Layer 2 — Claude, needs a key)
+`POST /api/v1/authoring/assist`
+
+Body: `{ "intent": "track morning peak flow", "model": "claude-sonnet-5" }`
+(`model` optional → server default). Returns reuse candidates, a proposed
+concept draft, a plain-language rationale, and the Layer-1 self-check of that
+proposal. Degrades gracefully (`assistant_available: false` with a `reason`
+such as `no_api_key` / `assistant_unreachable` / `model_not_allowed`) and never
+raises. No patient data is sent to the model.
+
 ## Error Responses
 
 All errors follow a consistent format:
@@ -1103,4 +1149,5 @@ All errors follow a consistent format:
 | 15 | Form Definitions | 14 | Mixed |
 | 16 | Capability | 2 | Public |
 | 17 | Documentation | 2 | Public |
-| | **Total** | **82** | |
+| 18 | Authoring Assistant (opt-in, #516) | 3 | read_write |
+| | **Total** | **85** | |

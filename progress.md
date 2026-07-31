@@ -798,3 +798,48 @@ Test suite: 225 → **244 passed** (19 new tests across the 7 tickets). No regre
 
 ### Not yet closed in ticket queue
 Each child ticket (#326 #328 #331 #332 #336 #338) and the still-deferred #334 remain open on `ticket.mitidbok.se` so the operator can manually `/respond` (auto-closes) after reviewing the diff. No `/respond` was posted automatically.
+
+### epic #516 — Guided PlanDef authoring assistant (opt-in, Claude-assisted) — GA-1/2/3/6 DONE (2026-07-31)
+Motivation: an authoring-surface audit found plan.pdhc has almost no guardrails
+for a non-expert PlanDef author — model is permissive, response_type is a
+free-text lookup (not an enum), terminology codes are never verified, and the
+one real cross-field rule (choice⇒valueset) lives only in the web route so the
+JSON API bypasses it. Two-layer tool, opt-in (flag default OFF), reviewed-draft
+only. MDR-aware (thresholds feed request.pdhc alerts).
+
+- **GA-1 (#517) plandef_validation.py** — deterministic Layer-1 floor shared by
+  web + API. 9 codes: E-UNIT-REQUIRED, E-VALUESET-REQUIRED, E-RESPONSE-TYPE-UNKNOWN,
+  E-TERM-MISSING, W-TERM-UNVERIFIED, W-UNIT-CONTRADICTS, E-DANGLING-REF,
+  E-RANGE-INVERTED, W-EMPTY-PLANDEF. No LLM, no required network (termbank
+  injected/optional). 16 tests.
+- **GA-2 (#518) plandef_assistant.py** — Layer-2 Claude co-author. Anthropic
+  Messages API over requests; model allowlist (default claude-sonnet-5; also
+  claude-opus-4-8, claude-haiku-4-5); ANTHROPIC_API_KEY from env only.
+  Search-first (existing concepts + termbank), self-checks its own proposal
+  against GA-1, degrades gracefully (never raises), sends no PHI. 7 tests (HTTP
+  mocked).
+- **GA-3 (#519) /api/v1/authoring** — opt-in blueprint (models/validate/assist),
+  @requires_role('read_write'); whole surface gated by AUTHORING_ASSISTANT_ENABLED
+  (default false). Config + .env.example added. 6 tests.
+- **GA-6 (#522)** — docs/plandef_authoring_assistant_design.md (+ .docx), offline.
+
+Full suite: **280 passed** (was 260 + 20 new; import-test collision avoided by a
+non-colliding test canonical-lib name). Nothing touches existing save paths.
+
+Deferred / open: **GA-4 (#520)** builder UI Check/Assist panel; **GA-5 (#521)**
+promote L1 to fail-closed on save — OPERATOR SIGN-OFF required (changes
+accept/reject of a live device-scope service; needs a data audit of rows that
+would newly fail). Epic **#516** stays open as umbrella.
+Not deployed — local build only; server deploy needs operator go-ahead (no
+migration; config-only + new files).
+
+### #516 post-deploy fix (2026-07-31) — validator prod-vocabulary alignment
+Live functional test in pdhc_app revealed prod response_type lookup names
+['Free text','Single choice','multiple choice','numerical','Integer','Slider'].
+Two were absent from forms_service.RESPONSE_TYPE_MAP ('numerical','Free text'),
+so the validator would false-positive E-RESPONSE-TYPE-UNKNOWN on real concepts.
+Fix (validator-scoped, forms path untouched): _RESPONSE_TYPE_ALIASES
+{numerical->numeric, free text->text}; and E-UNIT-REQUIRED now fires only for
+numeric (quantity), not slider/integer (dimensionless). +3 tests; suite 283 green.
+Follow-up: forms_service.RESPONSE_TYPE_MAP has the same latent gap for form
+production (out of scope here) — candidate for a small alignment ticket.

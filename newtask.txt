@@ -1,48 +1,30 @@
 Current focus
 =============
 
-§6 FHIR R5 terminology profile is COMPLETE (2026-06-22).
-See:
-  - progress.md "§6 IMPLEMENTATION COMPLETE"
-  - plan_pdhc_fhir_terminology_profile_instruction.md (Status: IMPLEMENTED)
-  - plan_pdhc_fhir_terminology_profile_DECISIONS.md (all 5 decisions APPROVED)
+epic #516 — Guided PlanDef authoring assistant (opt-in, Claude-assisted).
 
-Next-up tasks (in priority order)
----------------------------------
+DONE (2026-07-31, local build, all tests green — 280 passed):
+  - GA-1 #517  app/services/plandef_validation.py   (deterministic Layer-1 floor)
+  - GA-2 #518  app/services/plandef_assistant.py     (Claude Layer-2, selectable model)
+  - GA-3 #519  app/api/authoring.py + config flag     (opt-in /api/v1/authoring, default OFF)
+  - GA-6 #522  docs/plandef_authoring_assistant_design.md (+ .docx)
 
-1. CI job that downloads validator_cli.jar on first run and runs
-   `make conformance` against PRs.
-   - Risk §9.4 in the spec — pure devops, no plan.pdhc code change.
-   - Target: GitHub Actions workflow under .github/workflows/conformance.yml.
+The tool is OPT-IN and does NOT change existing concept/plandef save behaviour.
+Enable with AUTHORING_ASSISTANT_ENABLED=true; set ANTHROPIC_API_KEY to turn on
+the Claude assistant (Layer 2). Without a key, Layer-1 /authoring/validate still
+works.
 
-2. Open questions at the bottom of the DECISIONS ADR (none block deploy):
-   - CodeSystem concept[].property URI scheme (canonical URI to coin
-     when a downstream consumer wants to filter by concept_type).
-   - ConceptMap group cardinality (single group vs N groups when
-     multi-binding lands).
-   - POST $validate-code body shape — only needed when an external
-     consumer asks; cdr.pdhc only ever uses GET so no current driver.
+Next-up
+-------
+1. GA-4 #520 — builder UI: wire a non-blocking Check/Assist panel into
+   templates/plandefinitions/builder.html (+ concept form). Model picker from
+   GET /api/v1/authoring/models; hidden when disabled/no key. Purely additive.
+2. GA-5 #521 — OPERATOR SIGN-OFF: promote validate_concept/validate_plandef to
+   fail-closed on the write paths (web + API) so ERROR-severity rejects the save.
+   Requires a data audit of existing rows that would newly fail + an audited
+   per-field override escape hatch. Do NOT deploy without go-ahead.
+3. Server deploy (when authorised): scp the new files + config; no migration.
+   Set AUTHORING_ASSISTANT_ENABLED + ANTHROPIC_API_KEY in server .env; restart
+   own gunicorn. Verify GET /api/v1/authoring/models behind SSO.
 
-3. Server-side deployment refresh:
-   - On miserver, run `pip install -r planp/requirements.txt` to pull
-     fhir.resources + pydantic 2.13. No migration needed.
-   - Smoke-test /api/v1/CodeSystem, /api/v1/ConceptMap,
-     /api/v1/ValueSet endpoints behind the SSO proxy.
-
-Done in this branch
--------------------
-
-- §4 Prerequisites: 22 URL-prefix test fixes + capability characterization
-  + cdr.pdhc cross-service contract pin.
-- §5 ADR: 5 decisions, all APPROVED 2026-06-22.
-- §6.1 ValueSet + $expand.
-- §6.2 scoped $validate-code (global cdr.pdhc contract preserved).
-- §6.3 CodeSystem + $lookup with termbank delegation.
-- §6.4 ConceptMap + $translate (bidirectional).
-- §6.5/§6.6 cross-cutting helpers + canonical URL builders.
-- §6.7 CapabilityStatement truth-up + §7 non-goals declared.
-- §6.8 fast layer (fhir.resources pydantic, every test); slow layer
-  scaffolded (make conformance + corpus emitter).
-
-Test count: 76 → 195 (+119). All green; 5 consecutive full-suite runs
-no flakes during landing.
+Prior focus (still valid): §6 FHIR R5 terminology profile COMPLETE (2026-06-22).

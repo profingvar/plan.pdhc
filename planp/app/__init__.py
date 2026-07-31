@@ -140,6 +140,12 @@ def create_app(testing=False):
     from app.api.fhir_codesystem import fhir_codesystem_bp
     app.register_blueprint(fhir_codesystem_bp, url_prefix='/api/v1')
 
+    # Opt-in guided-authoring assistant (epic #516). Gated by
+    # AUTHORING_ASSISTANT_ENABLED (default off); when off the endpoints report
+    # disabled and existing concept/plandef saving is unaffected.
+    from app.api.authoring import authoring_bp
+    app.register_blueprint(authoring_bp, url_prefix='/api/v1')
+
     # Termbank HTTP client — one instance per app, with TTL cache
     from app.services.termbank_client import TermbankClient
     app.termbank_client = TermbankClient()

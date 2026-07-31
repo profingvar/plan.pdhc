@@ -564,6 +564,7 @@ DOCS_CATALOG = {
     'SSO_INTEGRATION_PLAN.md': 'SSO handshake spec (H1-H4) + per-request bearer revalidation + service-key bypass',
     'plan_pdhc_fhir_terminology_profile_instruction.md': 'FHIR R5 terminology profile — implementation spec (Status: IMPLEMENTED 2026-06-22)',
     'plan_pdhc_fhir_terminology_profile_DECISIONS.md': 'FHIR R5 terminology profile — ADR for the five locked design decisions',
+    'plandef_authoring_assistant_design.md': 'Guided PlanDef authoring assistant (epic #516) — opt-in Claude-assisted, guard-railed builder design',
 }
 
 

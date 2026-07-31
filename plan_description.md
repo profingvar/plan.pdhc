@@ -662,3 +662,53 @@ For the full spec and decision record:
 - [`plan_pdhc_fhir_terminology_profile_instruction.md`](plan_pdhc_fhir_terminology_profile_instruction.md)
 - [`plan_pdhc_fhir_terminology_profile_DECISIONS.md`](plan_pdhc_fhir_terminology_profile_DECISIONS.md)
 
+
+## 10) Guided authoring assistant (optional, epic #516)
+
+An **opt-in** helper that makes building a correct PlanDefinition easier and
+safer for someone who is **not** a clinical-terminology specialist. It is off
+by default (`AUTHORING_ASSISTANT_ENABLED`) and **changes nothing** about how
+concepts or plan definitions are saved — it only *checks* and *suggests*.
+
+It has two layers, with two different guarantees:
+
+**Layer 1 — the checker (always available when the tool is on).**
+A deterministic validator that inspects a draft concept or plan and returns a
+plain-language list of what is wrong. It catches the mistakes the plain forms
+let through today, e.g.:
+
+- a **quantity with no unit** (`E-UNIT-REQUIRED`);
+- a **single/multiple-choice concept with no value set** (`E-VALUESET-REQUIRED`);
+- an **unrecognised response type** that would break form/FHIR production
+  (`E-RESPONSE-TYPE-UNKNOWN`);
+- a **missing terminology code** (`E-TERM-MISSING`) or one that can't be
+  confirmed in termbank (`W-TERM-UNVERIFIED`, a warning);
+- a **threshold whose unit contradicts the concept's unit**
+  (`W-UNIT-CONTRADICTS`);
+- a **reference to a concept / value that doesn't exist** (`E-DANGLING-REF`);
+- an **inverted range** (`E-RANGE-INVERTED`) or an **empty plan**
+  (`W-EMPTY-PLANDEF`).
+
+`error` items are real defects; `warning` items are worth a look but don't block.
+
+**Layer 2 — the Claude assistant (needs an API key).**
+Type what you want to collect in plain words ("track morning peak flow") and
+the assistant proposes the right value type, unit and terminology code, and
+explains its choice. It **searches for an existing concept first** so you reuse
+rather than duplicate, and it **runs the Layer-1 checker on its own proposal**
+so it never hands you something invalid without saying so. You pick which Claude
+**model** to use (default `claude-sonnet-5`; `claude-opus-4-8` for the hardest
+terminology calls; `claude-haiku-4-5` for quick cheap checks).
+
+Everything the assistant returns is a **reviewed draft** — it pre-fills the form
+for you to confirm; it never saves on its own. No patient data is ever sent to
+the model. If the key or network is unavailable, or the tool is off, the
+assistant simply degrades to the Layer-1 checker (or reports "disabled") and
+never errors.
+
+> Safety note (MDR): because a plan's thresholds drive the alerts in
+> request.pdhc, the checker (Layer 1) is deterministic and reviewed, and the
+> assistant's output is always a reviewed draft — never an automatic save.
+
+Full design rationale:
+[`plandef_authoring_assistant_design.md`](plandef_authoring_assistant_design.md).

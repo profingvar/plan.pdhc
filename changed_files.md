@@ -361,3 +361,21 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - planp/app/api/auth.py — _phases() helper (session_phases w/ effective_phases
   fallback) at the planning gate. No org filter (Plan is orthogonal).
 - planp/app/tests/test_reform_phases.py — NEW, 4 tests.
+
+## 2026-07-31 — epic #516 Guided PlanDef authoring assistant (opt-in, Claude-assisted)
+- planp/app/config.py — EDIT. AUTHORING_ASSISTANT_ENABLED (default false), ANTHROPIC_API_KEY, ANTHROPIC_API_BASE, AUTHORING_ASSISTANT_MODELS allowlist + DEFAULT_MODEL + MAX_TOKENS + TIMEOUT.
+- planp/.env.example — EDIT. Documented the opt-in assistant block (default off, blank key).
+- planp/app/__init__.py — EDIT. Register authoring_bp at /api/v1 (before the termbank client init).
+- planp/app/services/plandef_validation.py — NEW (#517 GA-1). Deterministic Layer-1 validators (validate_concept / validate_plandef / summarise); 9 invariant codes; termbank optional/injected; no LLM, no required network.
+- planp/app/services/plandef_assistant.py — NEW (#518 GA-2). Claude Messages API wrapper; selectable model allowlist; search-first reuse candidates; self-check via GA-1; graceful degradation (never raises); no PHI sent.
+- planp/app/api/authoring.py — NEW (#519 GA-3). Opt-in blueprint: GET /authoring/models, POST /authoring/validate, POST /authoring/assist; @requires_role('read_write'); disabled -> {"enabled": false}.
+- planp/tests/test_plandef_validation.py — NEW. 16 tests, one per invariant incl. the API-bypass (choice-without-valueset) case.
+- planp/tests/test_plandef_assistant.py — NEW. 7 tests; HTTP mocked (disabled/no-key/bad-model/happy/malformed/http-error/unknown-unit).
+- planp/tests/test_authoring_api.py — NEW. 6 tests; blueprint wiring + disabled-flag + auth gate.
+- planp/docs/plandef_authoring_assistant_design.md (+ .docx) — NEW (#522 GA-6). Offline design rationale.
+- plan_description.md — EDIT. New §10 "Guided authoring assistant (optional, #516)" — user-facing manual section.
+- planp/docs/api_reference.md — EDIT. New "Authoring Assistant" endpoint section (models/validate/assist) + summary total 82->85.
+- planp/app/api/capability.py — EDIT. DOCS_CATALOG: registered plandef_authoring_assistant_design.md so it's served via /api/v1/docs.
+- planp/app/services/plandef_validation.py — EDIT (post-deploy fix). Recognise prod response-type names absent from RESPONSE_TYPE_MAP ('numerical'->numeric, 'Free text'->text) so they aren't wrongly flagged E-RESPONSE-TYPE-UNKNOWN; require a unit only for numeric (quantity), not slider/integer (dimensionless).
+- planp/tests/test_plandef_validation.py — EDIT. +3 tests for the prod vocabulary aliases + slider-no-unit.
+- planp/docs/plandef_authoring_assistant_design.md (+ .docx) — EDIT. §4 table wording for the unit rule + alias handling.

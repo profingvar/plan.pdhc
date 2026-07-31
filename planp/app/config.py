@@ -42,3 +42,43 @@ class Config:
     RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT', '200 per minute')
     RATELIMIT_STORAGE_URI = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')
     RATELIMIT_HEADERS_ENABLED = True
+
+    # ------------------------------------------------------------------
+    # Guided PlanDef authoring assistant (epic #516, GA-1..GA-6)
+    # ------------------------------------------------------------------
+    # Opt-in tool that helps a non-expert author build a correct PlanDef.
+    # OFF by default: when disabled the /api/v1/authoring/* endpoints report
+    # "service disabled" and NOTHING about existing concept/plandef saving
+    # changes. The deterministic validator (Layer 1) is usable independently
+    # of the Claude assistant (Layer 2); Layer 2 additionally needs a key.
+    AUTHORING_ASSISTANT_ENABLED = os.environ.get(
+        'AUTHORING_ASSISTANT_ENABLED', 'false'
+    ).lower() in ('true', '1', 'yes')
+
+    # Anthropic Messages API — the assistant (Layer 2) calls Claude with this.
+    # NEVER hardcode a key; it is read from the environment only. With no key
+    # the assistant degrades to validation-only and never raises.
+    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+    ANTHROPIC_API_BASE = os.environ.get(
+        'ANTHROPIC_API_BASE', 'https://api.anthropic.com'
+    )
+
+    # Selectable Claude models (allowlist). The caller picks one per request;
+    # a model not in this list is rejected. Comma-separated env override.
+    AUTHORING_ASSISTANT_MODELS = [
+        m.strip() for m in os.environ.get(
+            'AUTHORING_ASSISTANT_MODELS',
+            'claude-sonnet-5,claude-opus-4-8,claude-haiku-4-5-20251001',
+        ).split(',') if m.strip()
+    ]
+    AUTHORING_ASSISTANT_DEFAULT_MODEL = os.environ.get(
+        'AUTHORING_ASSISTANT_DEFAULT_MODEL', 'claude-sonnet-5'
+    )
+    # Bound the assistant's output + wall-clock so a slow call can't hang a
+    # worker. Kept modest — a concept suggestion is small.
+    AUTHORING_ASSISTANT_MAX_TOKENS = int(
+        os.environ.get('AUTHORING_ASSISTANT_MAX_TOKENS', '1500')
+    )
+    AUTHORING_ASSISTANT_TIMEOUT_SECONDS = float(
+        os.environ.get('AUTHORING_ASSISTANT_TIMEOUT_SECONDS', '30')
+    )
