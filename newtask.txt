@@ -16,7 +16,9 @@ works.
 
 Next-up
 -------
-1. GA-4 #520 — builder UI: wire a non-blocking Check/Assist panel into
+1. GA-4 #520 — DONE (2026-07-31): opt-in Check/Assist panel wired into concept
+   create/edit forms + the plandef builder (app/static/js/authoring_assistant.js).
+   [superseded] original note: wire a non-blocking Check/Assist panel into
    templates/plandefinitions/builder.html (+ concept form). Model picker from
    GET /api/v1/authoring/models; hidden when disabled/no key. Purely additive.
 2. GA-5 #521 — OPERATOR SIGN-OFF: promote validate_concept/validate_plandef to

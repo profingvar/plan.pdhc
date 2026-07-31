@@ -135,6 +135,9 @@
     </div>
   </form>
 </div>
+
+<!-- GA-4 #516: opt-in authoring assistant panel (renders only when enabled) -->
+<div data-authoring-assistant="concept"></div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -176,4 +179,5 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', filename='js/termbank_search_picker.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/authoring_assistant.js') }}"></script>
 {% endblock %}

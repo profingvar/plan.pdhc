@@ -379,3 +379,8 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - planp/app/services/plandef_validation.py — EDIT (post-deploy fix). Recognise prod response-type names absent from RESPONSE_TYPE_MAP ('numerical'->numeric, 'Free text'->text) so they aren't wrongly flagged E-RESPONSE-TYPE-UNKNOWN; require a unit only for numeric (quantity), not slider/integer (dimensionless).
 - planp/tests/test_plandef_validation.py — EDIT. +3 tests for the prod vocabulary aliases + slider-no-unit.
 - planp/docs/plandef_authoring_assistant_design.md (+ .docx) — EDIT. §4 table wording for the unit rule + alias handling.
+- planp/app/static/js/authoring_assistant.js — NEW (#520 GA-4). Self-contained opt-in Check/Assist panel; calls /api/v1/authoring/{models,validate,assist}; renders only when enabled; Assist hidden without a key; "Apply to form" = reviewed draft.
+- planp/app/templates/concepts/create.html — EDIT. Mount div + script include.
+- planp/app/templates/concepts/edit.html — EDIT. Mount div + script include.
+- planp/app/templates/plandefinitions/builder.html — EDIT. Plandef Check mount + script include.
+- planp/tests/test_authoring_ui.py — NEW. Renders the 3 templates; asserts mount + script present.

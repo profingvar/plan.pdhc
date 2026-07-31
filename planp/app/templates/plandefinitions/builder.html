@@ -177,6 +177,9 @@
         <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> {% if plandef %}Update{% else %}Create{% endif %} PlanDefinition</button>
         <a href="{{ url_for('plandefinitions_web.list_plandefs') }}" class="btn btn-secondary">Cancel</a>
       </div>
+
+      <!-- GA-4 #516: opt-in authoring assistant panel (renders only when enabled) -->
+      <div data-authoring-assistant="plandef"></div>
     </form>
   </div>
 
@@ -987,4 +990,5 @@ document.addEventListener('DOMContentLoaded', function() {
   updatePreview();
 });
 </script>
+<script src="{{ url_for('static', filename='js/authoring_assistant.js') }}"></script>
 {% endblock %}
