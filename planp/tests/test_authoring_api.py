@@ -81,3 +81,61 @@ def test_authoring_requires_auth(client, app, monkeypatch):
         sess.clear()
     r = client.get('/api/v1/authoring/models')
     assert r.status_code in (401, 403)
+
+
+# ---- openEHR-realisability proxy (#523) --------------------------------
+class _FakeR:
+    def __init__(self, status_code, payload):
+        self.status_code = status_code
+        self._p = payload
+    def json(self):
+        return self._p
+
+
+def test_openehr_realisable_disabled(client, app, monkeypatch):
+    monkeypatch.setitem(app.config, 'AUTHORING_ASSISTANT_ENABLED', False)
+    set_sso_session(client, SAMPLE_ACCESS_BLOB)
+    r = client.post('/api/v1/authoring/openehr-realisable', json={'concept_guids': []})
+    assert r.status_code == 200 and r.get_json()['enabled'] is False
+
+
+def test_openehr_realisable_not_configured(client, app, monkeypatch):
+    monkeypatch.setitem(app.config, 'AUTHORING_ASSISTANT_ENABLED', True)
+    monkeypatch.setitem(app.config, 'ROSETTA_BASE_URL', '')
+    set_sso_session(client, SAMPLE_ACCESS_BLOB)
+    r = client.post('/api/v1/authoring/openehr-realisable', json={'concept_guids': []})
+    body = r.get_json()
+    assert body['available'] is False and body['reason'] == 'rosetta_not_configured'
+
+
+def test_openehr_realisable_forwards_to_rosetta(client, app, monkeypatch):
+    import app.api.authoring as authoring
+    monkeypatch.setitem(app.config, 'AUTHORING_ASSISTANT_ENABLED', True)
+    monkeypatch.setitem(app.config, 'ROSETTA_BASE_URL', 'http://rosetta.test')
+    monkeypatch.setitem(app.config, 'ROSETTA_SERVICE_KEY', 'k')
+    captured = {}
+    def fake_post(url, json=None, headers=None, timeout=None):
+        captured['url'] = url; captured['json'] = json; captured['headers'] = headers
+        return _FakeR(200, {'total': 1, 'realisable_count': 1, 'all_realisable': True,
+                            'templates': ['pdhc_vitals.v1'], 'concepts': [], 'pending': [], 'unmapped': []})
+    monkeypatch.setattr(authoring.requests, 'post', fake_post)
+    set_sso_session(client, SAMPLE_ACCESS_BLOB)
+    r = client.post('/api/v1/authoring/openehr-realisable',
+                    json={'transactions': [{'concept_guid': 'g1'}]})
+    body = r.get_json()
+    assert body['available'] is True and body['all_realisable'] is True
+    assert captured['url'] == 'http://rosetta.test/api/v1/openehr/realisable'
+    assert captured['headers']['X-Service-Key'] == 'k'
+
+
+def test_openehr_realisable_unreachable_degrades(client, app, monkeypatch):
+    import app.api.authoring as authoring
+    import requests as _rq
+    monkeypatch.setitem(app.config, 'AUTHORING_ASSISTANT_ENABLED', True)
+    monkeypatch.setitem(app.config, 'ROSETTA_BASE_URL', 'http://rosetta.test')
+    def boom(*a, **k):
+        raise _rq.ConnectionError('nope')
+    monkeypatch.setattr(authoring.requests, 'post', boom)
+    set_sso_session(client, SAMPLE_ACCESS_BLOB)
+    r = client.post('/api/v1/authoring/openehr-realisable', json={'concept_guids': ['g']})
+    assert r.get_json()['reason'] == 'rosetta_unreachable'

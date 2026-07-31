@@ -260,9 +260,47 @@
     return payload;
   }
 
+  function renderRealisability(target, res) {
+    target.innerHTML = "";
+    if (!res || res.available === false) {
+      var why = res && res.reason === "rosetta_not_configured"
+        ? "openEHR export target not configured yet."
+        : "openEHR check unavailable (" + ((res && res.reason) || "error") + ").";
+      target.appendChild(h("div", { style: "color:#a67c00;" }, [why]));
+      return;
+    }
+    var head = res.realisable_count + " of " + res.total +
+               " data point(s) are openEHR-realisable" +
+               (res.all_realisable ? " ✓" : "");
+    target.appendChild(h("div", { style: "font-weight:600;margin-bottom:0.35rem;" }, [head]));
+    if (res.templates && res.templates.length) {
+      target.appendChild(h("div", { style: "font-size:0.82rem;color:#666;margin-bottom:0.35rem;" },
+        ["Template(s): " + res.templates.join(", ")]));
+    }
+    (res.concepts || []).forEach(function (c) {
+      var color = c.status === "realisable" ? "#4a6"
+                : c.status === "pending" ? "#e6a100" : "#c33";
+      var bg = c.status === "realisable" ? "#eef7f0"
+             : c.status === "pending" ? "#fdf8ec" : "#fdf0f0";
+      var box = h("div", {
+        style: "border-left:3px solid " + color + ";background:" + bg +
+               ";padding:0.35rem 0.6rem;margin-bottom:0.3rem;border-radius:3px;font-size:0.88rem;"
+      });
+      box.appendChild(h("span", { style: "font-weight:600;text-transform:uppercase;color:" + color + ";" },
+        [c.status]));
+      box.appendChild(h("span", { style: "margin-left:0.4rem;" },
+        [c.concept_name || c.concept_guid]));
+      (c.blockers || []).forEach(function (b) {
+        box.appendChild(h("div", { style: "color:#555;margin-top:0.15rem;" }, ["→ " + b]));
+      });
+      target.appendChild(box);
+    });
+  }
+
   function buildBuilderPanel(mount, models) {
     var card = h("div", { style: CARD });
     card.appendChild(h("h4", { style: "margin:0 0 0.5rem 0;" }, ["Check this plan (optional)"]));
+
     var btn = h("button", { type: "button", style: BTN }, ["✓ Check plan"]);
     var out = h("div", { style: "margin-top:0.5rem;" });
     btn.addEventListener("click", function () {
@@ -274,8 +312,24 @@
       }).then(function (res) { renderIssues(out, res); })
         .catch(function () { out.textContent = "Check unavailable right now."; });
     });
+
+    var oe = h("button", { type: "button", style: BTN + "margin-left:0.5rem;" },
+      ["⇄ Check openEHR export"]);
+    var oeOut = h("div", { style: "margin-top:0.5rem;" });
+    oe.addEventListener("click", function () {
+      oeOut.innerHTML = "Checking openEHR export readiness…";
+      fetchJSON(API + "/openehr-realisable", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(plandefPayload())
+      }).then(function (res) { renderRealisability(oeOut, res); })
+        .catch(function () { oeOut.textContent = "openEHR check unavailable right now."; });
+    });
+
     card.appendChild(btn);
+    card.appendChild(oe);
     card.appendChild(out);
+    card.appendChild(oeOut);
     mount.appendChild(card);
   }
 

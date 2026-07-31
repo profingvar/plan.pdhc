@@ -82,3 +82,10 @@ class Config:
     AUTHORING_ASSISTANT_TIMEOUT_SECONDS = float(
         os.environ.get('AUTHORING_ASSISTANT_TIMEOUT_SECONDS', '30')
     )
+
+    # openEHR-realisability check (#523): the builder's "Check openEHR export"
+    # button proxies to rosetta.pdhc's /api/v1/openehr/realisable. Both unset =
+    # the button degrades gracefully ("rosetta_not_configured"). ROSETTA_SERVICE_KEY
+    # must match rosetta's own ROSETTA_SERVICE_KEY.
+    ROSETTA_BASE_URL = os.environ.get('ROSETTA_BASE_URL', '')
+    ROSETTA_SERVICE_KEY = os.environ.get('ROSETTA_SERVICE_KEY', '')

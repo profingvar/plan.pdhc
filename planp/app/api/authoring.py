@@ -18,6 +18,7 @@ nothing about existing concept/plandef saving is affected. All endpoints are
 """
 from __future__ import annotations
 
+import requests
 from flask import Blueprint, current_app, jsonify, request
 
 from app.api.auth import requires_role
@@ -72,3 +73,37 @@ def authoring_assist():
         return jsonify({"error": "intent is required"}), 400
     result = assistant.suggest_concept(intent, model, termbank=_termbank())
     return jsonify(result), 200
+
+
+@authoring_bp.route("/authoring/openehr-realisable", methods=["POST"])
+@requires_role("read_write")
+def authoring_openehr_realisable():
+    """Proxy to rosetta's openEHR-realisability check (#523).
+
+    Same-origin for the builder; server-side forwards the concept set to
+    rosetta.pdhc with the service key. Degrades gracefully (``available:false``
+    + reason) when rosetta isn't configured or is unreachable — never raises.
+    """
+    if not _enabled():
+        return jsonify({"enabled": False, "reason": assistant.R_DISABLED}), 200
+    base = (current_app.config.get("ROSETTA_BASE_URL") or "").rstrip("/")
+    if not base:
+        return jsonify({"available": False, "reason": "rosetta_not_configured"}), 200
+    body = request.get_json(silent=True) or {}
+    try:
+        r = requests.post(
+            base + "/api/v1/openehr/realisable",
+            json=body,
+            headers={"X-Service-Key": current_app.config.get("ROSETTA_SERVICE_KEY", "")},
+            timeout=15,
+        )
+    except requests.RequestException:
+        return jsonify({"available": False, "reason": "rosetta_unreachable"}), 200
+    if r.status_code != 200:
+        return jsonify({"available": False, "reason": "rosetta_http_%d" % r.status_code}), 200
+    try:
+        data = r.json()
+    except ValueError:
+        return jsonify({"available": False, "reason": "rosetta_bad_response"}), 200
+    data["available"] = True
+    return jsonify(data), 200

@@ -384,3 +384,7 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - planp/app/templates/concepts/edit.html — EDIT. Mount div + script include.
 - planp/app/templates/plandefinitions/builder.html — EDIT. Plandef Check mount + script include.
 - planp/tests/test_authoring_ui.py — NEW. Renders the 3 templates; asserts mount + script present.
+- planp/app/config.py — EDIT (#523). ROSETTA_BASE_URL + ROSETTA_SERVICE_KEY (both unset = button degrades to rosetta_not_configured).
+- planp/app/api/authoring.py — EDIT (#523). POST /authoring/openehr-realisable proxy to rosetta; graceful degradation.
+- planp/app/static/js/authoring_assistant.js — EDIT (#523). "Check openEHR export" button + realisable/pending/unmapped renderer in the builder panel.
+- planp/tests/test_authoring_api.py — EDIT (#523). +4 proxy tests (disabled/not-configured/forwards/unreachable).
