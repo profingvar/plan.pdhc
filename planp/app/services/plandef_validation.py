@@ -180,12 +180,15 @@ def validate_concept(
     # -- terminology binding --------------------------------------------------
     refnumber = _s(payload.get("canonical_refnumber"))
     if not refnumber:
+        # WARNING, not error (#521 decision 2026-08-01): some legitimate concepts
+        # — free-text info fields, PROMs like QOL, self-reported values — have no
+        # standard LOINC/SNOMED code. Surface it, but don't block the save.
         issues.append(Issue(
-            "E-TERM-MISSING", ERROR,
+            "W-TERM-MISSING", WARNING,
             "No terminology code (canonical_refnumber) is set — the concept is unbound.",
             field="canonical_refnumber",
             hint="Bind the concept to a code in its canonical library (e.g. a LOINC or "
-                 "SNOMED code). Use the termbank search to find the right one.",
+                 "SNOMED code) where one exists. Use the termbank search to find it.",
         ))
     elif verify_terminology and termbank is not None:
         system = _terminology_system(payload.get("canonical_lib"))

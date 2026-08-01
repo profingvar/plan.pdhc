@@ -114,7 +114,7 @@ future fail-closed save (GA-5); `warning` always informs but never blocks.
 | `E-UNIT-REQUIRED` | error | a quantity (`numeric`/`numerical`) `response_type` **must** have a `unit` (sliders/integers are dimensionless and exempt) | a quantity with no unit is meaningless downstream and to `request.pdhc` thresholds |
 | `E-VALUESET-REQUIRED` | error | single/multiple-choice **must** reference a `valueset` | closes the API bypass; a coded concept with no answer set can't be answered or validated |
 | `E-RESPONSE-TYPE-UNKNOWN` | error | `response_type` name must be in the recognised vocabulary (`RESPONSE_TYPE_MAP` + validator aliases for prod names like `numerical`/`Free text`) | a typo silently breaks the form/FHIR mapping |
-| `E-TERM-MISSING` | error | `canonical_refnumber` must be present | "full terminology binding" is the whole point; blank = unbound |
+| `W-TERM-MISSING` | warning | `canonical_refnumber` absent (warns, does not block — #521) | terminology binding matters, but free-text info fields / PROMs / self-reported values legitimately may have no standard code |
 | `W-TERM-UNVERIFIED` | warning | the `(canonical_lib, canonical_refnumber)` pair does not resolve in termbank | catches a wrong/typo'd code; warning (not error) because termbank may be unreachable |
 | `W-UNIT-CONTRADICTS` | warning | `Transaction.unit` / `Goal.target_unit` differs from the concept's own `Unit` | the free-string duplicate units can silently diverge from the concept |
 | `E-DANGLING-REF` | error | `Transaction.concept_guid` / `Goal.concept_guid` / `target_value_guid` must exist | nullable/plain-string refs today allow orphans |

@@ -147,14 +147,16 @@ def test_missing_response_type_is_error(app, seed):
     assert 'E-RESPONSE-TYPE-UNKNOWN' in _codes(issues)
 
 
-def test_missing_terminology_binding_is_error(app, seed):
+def test_missing_terminology_binding_is_warning_not_error(app, seed):
+    # #521: a missing terminology code warns but does NOT block the save.
     with app.app_context():
         issues = v.validate_concept({
             'response_type': seed['rt_qty'],
             'unit': seed['unit'],
             'canonical_lib': seed['lib'],
         })
-    assert 'E-TERM-MISSING' in _codes(issues)
+    assert 'W-TERM-MISSING' in _codes(issues)
+    assert v.summarise(issues)['ok'] is True  # warning must not flip ok
 
 
 def test_inverted_range_is_error(app, seed):

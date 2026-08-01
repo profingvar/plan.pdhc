@@ -1094,7 +1094,7 @@ Runs the deterministic validators and returns structured issues.
 ```
 
 Issue codes: `E-UNIT-REQUIRED`, `E-VALUESET-REQUIRED`, `E-RESPONSE-TYPE-UNKNOWN`,
-`E-TERM-MISSING`, `W-TERM-UNVERIFIED`, `W-UNIT-CONTRADICTS`, `E-DANGLING-REF`,
+`W-TERM-MISSING`, `W-TERM-UNVERIFIED`, `W-UNIT-CONTRADICTS`, `E-DANGLING-REF`,
 `E-RANGE-INVERTED`, `W-EMPTY-PLANDEF`.
 
 ### Assist (Layer 2 — Claude, needs a key)
