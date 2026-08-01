@@ -388,3 +388,14 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - planp/app/api/authoring.py — EDIT (#523). POST /authoring/openehr-realisable proxy to rosetta; graceful degradation.
 - planp/app/static/js/authoring_assistant.js — EDIT (#523). "Check openEHR export" button + realisable/pending/unmapped renderer in the builder panel.
 - planp/tests/test_authoring_api.py — EDIT (#523). +4 proxy tests (disabled/not-configured/forwards/unreachable).
+
+## 2026-08-01 — #521 GA-5 fail-closed enforcement
+- planp/app/services/save_guard.py — NEW. SaveBlocked + guard_concept/guard_plandef; errors block, warnings pass, admin override_validation (audited to log), PLANDEF_VALIDATION_ENFORCED kill-switch.
+- planp/app/config.py — EDIT. PLANDEF_VALIDATION_ENFORCED (default true).
+- planp/app/api/concepts.py — EDIT. guard_concept on create + update (422 on block).
+- planp/app/routes/concepts.py — EDIT. guard_concept on web create + edit (supersedes the single-choice-only check; flashes issues).
+- planp/app/api/plandefinitions.py — EDIT. guard_plandef on create + update (422 on block) + _plandef_validate_payload helper.
+- planp/app/routes/plandefinitions.py — EDIT. guard_plandef on web builder create.
+- planp/tests/test_save_guard.py — NEW. 7 tests (block/valid/admin-override/nonadmin/kill-switch/warning/plandef-dangling).
+- planp/tests/conftest.py — EDIT. PLANDEF_VALIDATION_ENFORCED off by default in tests (enforcement suite opts in).
+- planp/.env.example, planp/docs/plandef_authoring_assistant_design.md — EDIT. Document the flag + status.

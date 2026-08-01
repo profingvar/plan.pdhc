@@ -14,6 +14,7 @@ from app.services.name_uniqueness import make_unique_concept_name
 from app.services.concept_importer import (
     parse_xlsx, parse_csv, validate_and_import, compute_sha256, ImportError_,
 )
+from app.services.save_guard import guard_concept, SaveBlocked  # #521 GA-5
 
 concepts_bp = Blueprint('concepts', __name__)
 # Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
@@ -106,6 +107,19 @@ def create_concept():
 
     name = make_unique_concept_name(name)
 
+    try:  # #521 GA-5 — fail-closed validation (errors block; admin override audited)
+        guard_concept({
+            'response_type': data.get('response_type'),
+            'unit': data.get('unit'),
+            'valueset': data.get('valueset'),
+            'canonical_lib': canon_lib,
+            'canonical_refnumber': data.get('canonical_refnumber'),
+            'range_low': data.get('range_low'),
+            'range_high': data.get('range_high'),
+        })
+    except SaveBlocked as e:
+        return jsonify(e.as_dict()), 422
+
     concept = Concept(
         concept_name=name,
         canonical_lib=canon_lib,
@@ -171,6 +185,16 @@ def update_concept(guid):
         val = data.get(fk_field)
         if val and not _is_valid_uuid(val):
             return jsonify({'error': f'Invalid UUID for {fk_field}'}), 400
+
+    # #521 GA-5 — validate the EFFECTIVE post-update state before mutating.
+    def _eff(field):
+        return data[field] if field in data else getattr(concept, field)
+    try:
+        guard_concept({f: _eff(f) for f in (
+            'response_type', 'unit', 'valueset', 'canonical_lib',
+            'canonical_refnumber', 'range_low', 'range_high')})
+    except SaveBlocked as e:
+        return jsonify(e.as_dict()), 422
 
     string_fields = ('concept_name', 'concept_display_text', 'concept_explain',
                      'canonical_refnumber', 'anchor_low_text', 'anchor_high_text', 'author')

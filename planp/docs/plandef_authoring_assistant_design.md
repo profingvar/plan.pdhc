@@ -201,7 +201,7 @@ cost/quality tier per call, and keeps the key in the server's env.
 | **#518 GA-2** | `plandef_assistant.py` (selectable model) + tests | **built** |
 | **#519 GA-3** | opt-in `/api/v1/authoring` surface + config flag | **built** |
 | **#520 GA-4** | builder UI Check/Assist panel | follow-up |
-| **#521 GA-5** | promote L1 to fail-closed on save | **operator sign-off required** |
+| **#521 GA-5** | promote L1 to fail-closed on save | **built + deployed 2026-08-01** (after a data cleanup that took prod from 33→0 blocked concepts) |
 | **#522 GA-6** | this doc + user/tech docs + bookkeeping | **built** |
 
 The natural first thing to *use* is GA-1 + GA-3's `/validate` endpoint — a

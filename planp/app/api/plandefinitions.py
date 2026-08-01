@@ -14,6 +14,16 @@ from app.models.concept_models import Concept, Unit
 from app.models.forms_models import FormDefinition
 from app.services.fhir_service import FHIRService
 from app.services.name_uniqueness import NameUniquenessService
+from app.services.save_guard import guard_plandef, SaveBlocked  # #521 GA-5
+
+
+def _plandef_validate_payload(goals_data, actions_data):
+    """Shape the goals/actions blobs for validate_plandef (#521)."""
+    activities = []
+    for a in (actions_data or []):
+        if isinstance(a, dict):
+            activities.append({"transactions": a.get("transactions") or []})
+    return {"goals": goals_data or [], "activities": activities}
 
 PLAN_BASE = "https://plan.pdhc.se"
 
@@ -173,6 +183,11 @@ def create_plandefinition():
     goals_data = data.get('goals', [])
     actions_data = data.get('actions', [])
 
+    try:  # #521 GA-5 — fail-closed validation of the plan's structure
+        guard_plandef(_plandef_validate_payload(goals_data, actions_data))
+    except SaveBlocked as e:
+        return jsonify(e.as_dict()), 422
+
     plandef = PlanDefinition(
         title=title,
         name=name,
@@ -288,6 +303,19 @@ def update_plandefinition(guid):
         return jsonify({'error': 'Not found'}), 404
 
     data = request.get_json(silent=True) or {}
+
+    # #521 GA-5 — validate the effective post-update structure before mutating.
+    def _existing(col):
+        try:
+            return json.loads(col) if col else []
+        except (ValueError, TypeError):
+            return []
+    _goals = data['goals'] if 'goals' in data else _existing(pd.goal)
+    _actions = data['actions'] if 'actions' in data else _existing(pd.action)
+    try:
+        guard_plandef(_plandef_validate_payload(_goals, _actions))
+    except SaveBlocked as e:
+        return jsonify(e.as_dict()), 422
 
     string_fields = ('title', 'name', 'description', 'type', 'version', 'subject_type',
                      'publisher', 'purpose', 'usage', 'copyright', 'author', 'editor',

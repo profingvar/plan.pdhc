@@ -89,3 +89,11 @@ class Config:
     # must match rosetta's own ROSETTA_SERVICE_KEY.
     ROSETTA_BASE_URL = os.environ.get('ROSETTA_BASE_URL', '')
     ROSETTA_SERVICE_KEY = os.environ.get('ROSETTA_SERVICE_KEY', '')
+
+    # #521 GA-5 — fail-closed validation on concept/plandef saves. When True
+    # (default), an ERROR-severity validation issue REJECTS the save on both the
+    # web and JSON-API paths (warnings pass). An admin/SU may force a save with
+    # ?override_validation=1 (audited to the log). Kill-switch: set to false.
+    PLANDEF_VALIDATION_ENFORCED = os.environ.get(
+        'PLANDEF_VALIDATION_ENFORCED', 'true'
+    ).lower() in ('true', '1', 'yes')

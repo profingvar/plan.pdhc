@@ -843,3 +843,11 @@ Fix (validator-scoped, forms path untouched): _RESPONSE_TYPE_ALIASES
 numeric (quantity), not slider/integer (dimensionless). +3 tests; suite 283 green.
 Follow-up: forms_service.RESPONSE_TYPE_MAP has the same latent gap for form
 production (out of scope here) — candidate for a small alignment ticket.
+
+### #521 GA-5 fail-closed enforcement — BUILT (2026-08-01)
+After the data cleanup took prod from 33→0 blocked concepts, wired the deterministic
+validators into ALL concept + plandef save paths (web + JSON API, closing the API
+bypass): ERROR-severity issues reject the save (HTTP 422 / flash), warnings pass.
+Admin/SU override via override_validation=1 (audited to app log). Kill-switch
+PLANDEF_VALIDATION_ENFORCED (default true). save_guard.py + 7 tests; full suite 297 green.
+Every existing prod row already passes, so enabling this blocks only NEW invalid saves.

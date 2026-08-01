@@ -13,6 +13,7 @@ from app.models.concept_models import (
     ValueSet, ValueSetValue, ValueCatalog,
 )
 from app.models.forms_models import FormDefinition, Questionnaire
+from app.services.save_guard import guard_plandef, SaveBlocked  # #521 GA-5
 from app.services.fhir_service import FHIRService
 from app.services.name_uniqueness import NameUniquenessService
 
@@ -148,6 +149,16 @@ def create_plandef():
         actions_data = json.loads(action_json)
     except json.JSONDecodeError:
         flash('Invalid JSON in goals or actions.', 'error')
+        return redirect(url_for('plandefinitions_web.builder'))
+
+    # #521 GA-5 — fail-closed validation of the plan structure
+    _acts = [{"transactions": a.get("transactions") or []}
+             for a in (actions_data or []) if isinstance(a, dict)]
+    try:
+        guard_plandef({"goals": goals_data or [], "activities": _acts})
+    except SaveBlocked as e:
+        for m in e.messages():
+            flash(m, 'error')
         return redirect(url_for('plandefinitions_web.builder'))
 
     # Derive name

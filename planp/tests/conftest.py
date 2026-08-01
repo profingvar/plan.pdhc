@@ -24,6 +24,10 @@ def app():
     application = create_app(testing=True)
     application.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     application.config['TESTING'] = True
+    # #521 GA-5: fail-closed save enforcement is OFF by default in tests (most
+    # CRUD tests create minimal fixtures); the enforcement suite (test_save_guard)
+    # turns it on explicitly per-test.
+    application.config['PLANDEF_VALIDATION_ENFORCED'] = False
 
     with application.app_context():
         _db.create_all()

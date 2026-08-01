@@ -11,6 +11,7 @@ from app.services.name_uniqueness import NameUniquenessService
 from app.services.concept_importer import (
     parse_xlsx, parse_csv, validate_and_import, compute_sha256, ImportError_,
 )
+from app.services.save_guard import guard_concept, SaveBlocked  # #521 GA-5
 
 concepts_web_bp = Blueprint('concepts_web', __name__, url_prefix='/concepts')
 
@@ -38,17 +39,23 @@ def create_concept():
             flash(error, 'error')
             return redirect(url_for('concepts_web.create_concept'))
 
-        # Business rule: single-choice response types require a valueset
+        # #521 GA-5 — full fail-closed validation (supersedes the single-choice-only check)
         response_type_guid = request.form.get('response_type')
         valueset_guid = request.form.get('valueset')
-        if response_type_guid:
-            rt = ResponseType.query.filter_by(guid=response_type_guid).first()
-            if rt and rt.response_type_name.lower() in (
-                'single choice', 'single_choice', 'singlechoice', 'categorical'
-            ):
-                if not valueset_guid:
-                    flash('Single-choice response type requires a ValueSet.', 'error')
-                    return redirect(url_for('concepts_web.create_concept'))
+        try:
+            guard_concept({
+                'response_type': response_type_guid or None,
+                'unit': request.form.get('unit') or None,
+                'valueset': valueset_guid or None,
+                'canonical_lib': canon_lib,
+                'canonical_refnumber': request.form.get('canonical_refnumber'),
+                'range_low': request.form.get('range_low', type=float),
+                'range_high': request.form.get('range_high', type=float),
+            })
+        except SaveBlocked as e:
+            for m in e.messages():
+                flash(m, 'error')
+            return redirect(url_for('concepts_web.create_concept'))
 
         concept = Concept(
             concept_name=name,
@@ -101,17 +108,23 @@ def edit_concept(guid):
                 flash(error, 'error')
                 return redirect(url_for('concepts_web.edit_concept', guid=guid))
 
-        # Business rule: single-choice response types require a valueset
+        # #521 GA-5 — full fail-closed validation (supersedes the single-choice-only check)
         response_type_guid = request.form.get('response_type')
         valueset_guid = request.form.get('valueset')
-        if response_type_guid:
-            rt = ResponseType.query.filter_by(guid=response_type_guid).first()
-            if rt and rt.response_type_name.lower() in (
-                'single choice', 'single_choice', 'singlechoice', 'categorical'
-            ):
-                if not valueset_guid:
-                    flash('Single-choice response type requires a ValueSet.', 'error')
-                    return redirect(url_for('concepts_web.edit_concept', guid=guid))
+        try:
+            guard_concept({
+                'response_type': response_type_guid or None,
+                'unit': request.form.get('unit') or None,
+                'valueset': valueset_guid or None,
+                'canonical_lib': request.form.get('canonical_lib'),
+                'canonical_refnumber': request.form.get('canonical_refnumber'),
+                'range_low': request.form.get('range_low', type=float),
+                'range_high': request.form.get('range_high', type=float),
+            })
+        except SaveBlocked as e:
+            for m in e.messages():
+                flash(m, 'error')
+            return redirect(url_for('concepts_web.edit_concept', guid=guid))
 
         concept.concept_name = name
         concept.canonical_lib = request.form.get('canonical_lib')
