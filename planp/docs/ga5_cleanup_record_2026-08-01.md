@@ -57,3 +57,12 @@ re-saved in the builder (the authoritative action blob is already scrubbed).
 ## Result
 73 concepts, **all pass**; plandef references clean. Ready for fail-closed
 enforcement (GA-5 proper) + an audited override hatch.
+
+## Post-removal: Form-operation FHIR cache refresh
+After removing `Information 1`, the Form-operation plandef's authoritative
+`action` blob was already clean but its cached `fhir_data` still mentioned it.
+Regenerated the cache server-side via
+`FHIRService.create_fhir_plandefinition(pd)` (the same call a builder re-save
+makes) and committed — verified the new `fhir_data` references `Information 1`
+neither by guid (`ea75ca90-…`) nor by name. This was a single-row DB update
+(no code change), recorded here for the audit trail.
