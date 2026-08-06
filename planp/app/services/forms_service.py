@@ -26,15 +26,23 @@ RESPONSE_TYPE_MAP = {
     'flervalsfråga': 'multiple_choice',
     'quantity': 'numeric',
     'numeric': 'numeric',
+    'numerical': 'numeric',
     'numerisk': 'numeric',
     'decimal': 'numeric',
     'integer': 'slider',
     'slider': 'slider',
     'text': 'text',
     'string': 'text',
+    'free text': 'text',
     'fritext': 'text',
     'boolean': 'boolean',
 }
+# NOTE: 'numerical' and 'free text' are real production response_type lookup
+# names. _map_response_type() already resolved both correctly via its substring
+# fallback ('numer' -> numeric; unmatched -> text), and plandef_validation.py
+# covers them via _RESPONSE_TYPE_ALIASES. Listing them explicitly here makes this
+# the single source of truth for both consumers and removes reliance on the
+# heuristic for known names (audit #526, 2026-08-06). No output change.
 
 # Internal question type → FHIR item type
 FHIR_TYPE_MAP = {
