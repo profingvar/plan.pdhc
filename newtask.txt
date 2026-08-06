@@ -1,32 +1,26 @@
 Current focus
 =============
 
-epic #516 — Guided PlanDef authoring assistant (opt-in, Claude-assisted).
+#530 — Transfer page (plan.pdhc): promote synthetic cdr_6 content into a
+working CDR. BUILT local 2026-08-06, full suite 320 passed. Thin proxy to
+cdr_6's server-side engine (#529, DEPLOYED). plan.pdhc is authoring-plane and
+does NOT move data itself — it only triggers cdr_6.
 
-DONE (2026-07-31, local build, all tests green — 280 passed):
-  - GA-1 #517  app/services/plandef_validation.py   (deterministic Layer-1 floor)
-  - GA-2 #518  app/services/plandef_assistant.py     (Claude Layer-2, selectable model)
-  - GA-3 #519  app/api/authoring.py + config flag     (opt-in /api/v1/authoring, default OFF)
-  - GA-6 #522  docs/plandef_authoring_assistant_design.md (+ .docx)
-
-The tool is OPT-IN and does NOT change existing concept/plandef save behaviour.
-Enable with AUTHORING_ASSISTANT_ENABLED=true; set ANTHROPIC_API_KEY to turn on
-the Claude assistant (Layer 2). Without a key, Layer-1 /authoring/validate still
-works.
+  - GET /transfer (SSO page) + GET/POST /api/v1/transfer/{targets,preview,execute}
+    (@requires_role read_write). Source fixed to cdr_6 (synthetic) -> safe for
+    any authenticated professional. Calls cdr_6 as X-Source-Service: sim.pdhc
+    (cdr_6 sim-only, Rule 2) with CDR6_SERVICE_KEY = cdr_6's SIM_PDHC_SERVICE_KEY.
 
 Next-up
 -------
-1. GA-4 #520 — DONE (2026-07-31): opt-in Check/Assist panel wired into concept
-   create/edit forms + the plandef builder (app/static/js/authoring_assistant.js).
-   [superseded] original note: wire a non-blocking Check/Assist panel into
-   templates/plandefinitions/builder.html (+ concept form). Model picker from
-   GET /api/v1/authoring/models; hidden when disabled/no key. Purely additive.
-2. GA-5 #521 — OPERATOR SIGN-OFF: promote validate_concept/validate_plandef to
-   fail-closed on the write paths (web + API) so ERROR-severity rejects the save.
-   Requires a data audit of existing rows that would newly fail + an audited
-   per-field override escape hatch. Do NOT deploy without go-ahead.
-3. Server deploy (when authorised): scp the new files + config; no migration.
-   Set AUTHORING_ASSISTANT_ENABLED + ANTHROPIC_API_KEY in server .env; restart
-   own gunicorn. Verify GET /api/v1/authoring/models behind SSO.
-
-Prior focus (still valid): §6 FHIR R5 terminology profile COMPLETE (2026-06-22).
+1. Deploy (operator go-ahead): docker compose up -d --build (pdhc_app). Set in
+   the server .env: CDR6_BASE_URL=http://host.docker.internal:9055 and
+   CDR6_SERVICE_KEY = cdr_6's SIM_PDHC_SERVICE_KEY. Also set the destination
+   URLs on the cdr_6 side (#529): CDRn_BASE_URL=http://host.docker.internal:<port>
+   (cdr1 9046, cdr2 9146, cdr3 9246, cdr4 9346, cdr5 9446) in cdr_6's .env so a
+   real transfer can reach cdr1-5.
+2. Live e2e smoke: sim generate-from-plandef ... --target cdr_6 --run-id
+   move-smoke ; then on the Transfer page pick cdr2 + run move-smoke -> Preview
+   (count == generated) -> Execute -> verify cdr2 rises; re-run with purge and
+   confirm the run left cdr_6 /api/v1/runs. Purge the cdr2 test run afterwards.
+3. No migration either side.

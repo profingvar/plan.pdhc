@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Transfer — PDHC PlanDef Builder{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Transfer synthetic data</h1>
+    <p class="lead">Promote generated content from the synthetic sink (cdr_6) into a working CDR.</p>
+  </div>
+</div>
+
+<div id="tx-unconfigured" class="flash flash-warning" role="alert" style="display:none;">
+  Transfer is not configured on this server (no <code>CDR6_BASE_URL</code>). Nothing to do yet.
+</div>
+
+<div class="card" id="tx-card" style="max-width:680px;">
+  <div class="form-group">
+    <label>Source</label>
+    <input type="text" id="tx-source" value="cdr_6 (synthetic test sink)" readonly
+           style="background:#f5f5f5;cursor:not-allowed;">
+    <p class="text-muted" style="font-size:0.85em;margin-top:0.25rem;">
+      Fixed. Only the synthetic sink can be a source — no real patient data can be moved.
+    </p>
+  </div>
+
+  <div class="form-group">
+    <label for="tx-to">Destination CDR</label>
+    <select id="tx-to"></select>
+  </div>
+
+  <div class="form-group">
+    <label for="tx-run">Run ID <span class="text-muted">(optional — blank = all runs)</span></label>
+    <input type="text" id="tx-run" placeholder="e.g. move-smoke">
+  </div>
+
+  <div class="button-group">
+    <button type="button" class="btn btn-secondary" id="tx-preview-btn">
+      <i data-lucide="search"></i> Preview (dry-run)
+    </button>
+    <button type="button" class="btn btn-primary" id="tx-execute-btn" disabled>
+      <i data-lucide="send"></i> Execute
+    </button>
+  </div>
+
+  <div class="form-group" style="margin-top:1rem;">
+    <label style="font-weight:normal;">
+      <input type="checkbox" id="tx-purge"> Purge source after a verified copy
+      <span class="text-muted">(turns copy into move)</span>
+    </label>
+  </div>
+
+  <div id="tx-result" style="margin-top:1rem;display:none;"></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var previewBtn = document.getElementById("tx-preview-btn");
+  var executeBtn = document.getElementById("tx-execute-btn");
+  var toSel = document.getElementById("tx-to");
+  var runInp = document.getElementById("tx-run");
+  var purgeChk = document.getElementById("tx-purge");
+  var resultBox = document.getElementById("tx-result");
+  var previewedFor = null;  // "to|run" the current preview was run for
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c];
+    });
+  }
+  function key() { return toSel.value + "|" + runInp.value.trim(); }
+  function show(html, cls) {
+    resultBox.style.display = "block";
+    resultBox.className = "flash flash-" + (cls || "info");
+    resultBox.innerHTML = html;
+  }
+  function post(path, payload) {
+    return fetch("/api/v1/transfer/" + path, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      credentials: "same-origin",
+      body: JSON.stringify(payload),
+    }).then(function (r) { return r.json().then(function (b) { return {ok: r.ok, status: r.status, body: b}; }); });
+  }
+  function payload() {
+    return {to: toSel.value, sim_run_id: runInp.value.trim() || null};
+  }
+
+  // Any change invalidates a prior preview → disable Execute again.
+  [toSel, runInp].forEach(function (el) {
+    el.addEventListener("input", function () {
+      if (key() !== previewedFor) { executeBtn.disabled = true; }
+    });
+    el.addEventListener("change", function () {
+      if (key() !== previewedFor) { executeBtn.disabled = true; }
+    });
+  });
+
+  previewBtn.addEventListener("click", function () {
+    if (!toSel.value) { show("Pick a destination CDR first.", "warning"); return; }
+    show("Counting…", "info");
+    post("preview", payload()).then(function (res) {
+      if (!res.ok) {
+        show("Preview failed: " + esc((res.body && res.body.error) || res.status), "error");
+        executeBtn.disabled = true;
+        return;
+      }
+      var b = res.body;
+      var runs = (b.runs || []).length;
+      previewedFor = key();
+      executeBtn.disabled = false;
+      show("<strong>" + esc(b.rows) + "</strong> row(s) across <strong>" + esc(runs) +
+           "</strong> run(s) would move to <strong>" + esc(toSel.value) + "</strong>. " +
+           "Click Execute to proceed.", "info");
+    }).catch(function () { show("Preview failed (network).", "error"); });
+  });
+
+  executeBtn.addEventListener("click", function () {
+    if (key() !== previewedFor) { show("Run Preview first for this selection.", "warning"); return; }
+    var purge = purgeChk.checked;
+    var msg = "Transfer cdr_6" + (runInp.value.trim() ? " run '" + runInp.value.trim() + "'" : " (all runs)") +
+              " → " + toSel.value + ".";
+    if (purge) { msg += "\n\nPURGE the source after a verified copy? This deletes the run(s) from cdr_6."; }
+    if (!window.confirm(msg)) { return; }
+    executeBtn.disabled = true;
+    show("Transferring…", "info");
+    var p = payload(); p.purge_source = purge;
+    post("execute", p).then(function (res) {
+      var b = res.body || {};
+      if (!res.ok) {
+        show("Transfer failed: " + esc(b.error || res.status), "error");
+        return;
+      }
+      var cls = b.verified ? "success" : "warning";
+      var lines = [
+        "rows read: <strong>" + esc(b.rows) + "</strong>",
+        "accepted: <strong>" + esc(b.accepted) + "</strong>",
+        "duplicate: <strong>" + esc(b.duplicate) + "</strong>",
+        "rejected: <strong>" + esc(b.rejected) + "</strong>",
+        "verified: <strong>" + esc(b.verified) + "</strong>",
+        "purged: <strong>" + esc(b.purged ? JSON.stringify(b.purged) : "no") + "</strong>",
+      ];
+      show(lines.join(" &nbsp;·&nbsp; "), cls);
+      previewedFor = null;  // force a fresh preview before the next execute
+    }).catch(function () { show("Transfer failed (network).", "error"); });
+  });
+
+  // Load destinations.
+  fetch("/api/v1/transfer/targets", {credentials: "same-origin"})
+    .then(function (r) { return r.json(); })
+    .then(function (b) {
+      if (!b.configured) {
+        document.getElementById("tx-unconfigured").style.display = "block";
+        document.getElementById("tx-card").style.opacity = "0.5";
+        previewBtn.disabled = true;
+      }
+      (b.targets || []).forEach(function (t) {
+        var o = document.createElement("option");
+        o.value = t; o.textContent = t;
+        toSel.appendChild(o);
+      });
+    })
+    .catch(function () { show("Could not load destinations.", "error"); });
+
+  if (window.lucide) { window.lucide.createIcons(); }
+})();
+</script>
+{% endblock %}

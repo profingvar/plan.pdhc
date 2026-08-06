@@ -146,6 +146,10 @@ def create_app(testing=False):
     from app.api.authoring import authoring_bp
     app.register_blueprint(authoring_bp, url_prefix='/api/v1')
 
+    # #530 — Transfer API (thin proxy to cdr_6's server-side engine #529).
+    from app.api.transfer import transfer_bp
+    app.register_blueprint(transfer_bp, url_prefix='/api/v1')
+
     # Termbank HTTP client — one instance per app, with TTL cache
     from app.services.termbank_client import TermbankClient
     app.termbank_client = TermbankClient()
@@ -168,6 +172,10 @@ def create_app(testing=False):
 
     from app.routes.plandefinitions import plandef_web_bp
     app.register_blueprint(plandef_web_bp)
+
+    # #530 — Transfer page (web).
+    from app.routes.transfer import transfer_web_bp
+    app.register_blueprint(transfer_web_bp)
 
     from app.api.forms import forms_bp
     app.register_blueprint(forms_bp, url_prefix='/api/v1')

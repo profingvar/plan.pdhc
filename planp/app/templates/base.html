@@ -28,6 +28,7 @@
       <li><a href="{{ url_for('lookup_web.list_response_types') }}" {% if 'response_type' in request.endpoint|default('') %}class="active"{% endif %}>Response Types</a></li>
       <li><a href="{{ url_for('lookup_web.list_concept_types') }}" {% if 'concept_type' in request.endpoint|default('') %}class="active"{% endif %}>Concept Types</a></li>
       <li class="nav-separator"></li>
+      <li><a href="{{ url_for('transfer_web.transfer_page') }}" {% if request.blueprint == 'transfer_web' %}class="active"{% endif %}>Transfer</a></li>
       <li><a href="{{ url_for('main.docs_page') }}" {% if request.endpoint and 'docs' in request.endpoint %}class="active"{% endif %}>Docs</a></li>
     </ul>
     <div class="nav-auth">

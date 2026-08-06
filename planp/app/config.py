@@ -90,6 +90,22 @@ class Config:
     ROSETTA_BASE_URL = os.environ.get('ROSETTA_BASE_URL', '')
     ROSETTA_SERVICE_KEY = os.environ.get('ROSETTA_SERVICE_KEY', '')
 
+    # #530 — Transfer page: promote synthetic cdr_6 content into a working CDR.
+    # plan.pdhc only TRIGGERS; the transfer runs server-side in cdr_6 (#529).
+    # cdr_6 is sim-only (its Rule 2), so we call it as X-Source-Service:
+    # sim.pdhc — CDR6_SERVICE_KEY must equal cdr_6's SIM_PDHC_SERVICE_KEY. Both
+    # unset = the Transfer page reports "not configured" and does nothing.
+    CDR6_BASE_URL = os.environ.get('CDR6_BASE_URL', '')
+    CDR6_SERVICE_KEY = os.environ.get('CDR6_SERVICE_KEY', '')
+    # Longer timeout: a real (non-dry) transfer of a large run can take a while.
+    CDR6_TIMEOUT = int(os.environ.get('CDR6_TIMEOUT', '120'))
+    # Destinations the UI offers (cdr_6 re-validates the real set server-side).
+    CDR_TRANSFER_TARGETS = [
+        t.strip() for t in os.environ.get(
+            'CDR_TRANSFER_TARGETS', 'cdr1,cdr2,cdr3,cdr4,cdr5'
+        ).split(',') if t.strip()
+    ]
+
     # #521 GA-5 — fail-closed validation on concept/plandef saves. When True
     # (default), an ERROR-severity validation issue REJECTS the save on both the
     # web and JSON-API paths (warnings pass). An admin/SU may force a save with

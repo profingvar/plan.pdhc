@@ -399,3 +399,17 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - planp/tests/test_save_guard.py — NEW. 7 tests (block/valid/admin-override/nonadmin/kill-switch/warning/plandef-dangling).
 - planp/tests/conftest.py — EDIT. PLANDEF_VALIDATION_ENFORCED off by default in tests (enforcement suite opts in).
 - planp/.env.example, planp/docs/plandef_authoring_assistant_design.md — EDIT. Document the flag + status.
+
+## 2026-08-06 — #526 response_type vocabulary hardening (audit follow-up)
+- planp/app/services/forms_service.py  (RESPONSE_TYPE_MAP: explicit 'numerical'->numeric, 'free text'->text; no output change — heuristic fallback already resolved both)
+- planp/tests/test_response_type_map.py (new — pins response_type->question_type->FHIR item for prod vocab; regression guard "free text is never numeric")
+
+## 2026-08-06 — #530 Transfer page (promote synthetic cdr_6 → working CDR; thin proxy to cdr_6 #529)
+- planp/app/config.py — add CDR6_BASE_URL / CDR6_SERVICE_KEY / CDR6_TIMEOUT / CDR_TRANSFER_TARGETS.
+- planp/app/api/transfer.py (new) — transfer_bp under /api/v1: GET /transfer/targets, POST /transfer/preview (dry_run), POST /transfer/execute. @requires_role('read_write'). _call_cdr6() proxies cdr_6 POST /api/v1/transfer as X-Source-Service: sim.pdhc (cdr_6 sim-only, Rule 2); degrades gracefully (503 not-configured / 502 unreachable). execute audit-logged (user/to/run/purge/outcome).
+- planp/app/routes/transfer.py (new) — transfer_web_bp: GET /transfer @sso_login_required → render transfer.html.
+- planp/app/templates/transfer.html (new) — read-only cdr_6 source, to-CDR select (loaded from /targets), run-id, Preview(dry-run)→count, Execute (disabled until preview for the current selection), purge checkbox + confirm(), results panel. Vanilla JS, same-origin fetch.
+- planp/app/templates/base.html — nav: add Transfer link (before Docs).
+- planp/app/__init__.py — register transfer_bp (/api/v1) + transfer_web_bp.
+- planp/.env.example — document CDR6_* + CDR_TRANSFER_TARGETS.
+- planp/tests/test_transfer.py (new) — 12 tests: auth gate (unauth 401/403, analysis-only 403, SU allowed), targets configured/unconfigured, preview proxies dry_run + sim.pdhc headers, unknown-dest/missing-to 400, execute proxies real + purge/batch passthrough, unconfigured 503, unreachable 502, page renders. Full suite 320 passed.
