@@ -826,12 +826,16 @@ only. MDR-aware (thresholds feed request.pdhc alerts).
 Full suite: **280 passed** (was 260 + 20 new; import-test collision avoided by a
 non-colliding test canonical-lib name). Nothing touches existing save paths.
 
-Deferred / open: **GA-4 (#520)** builder UI Check/Assist panel; **GA-5 (#521)**
-promote L1 to fail-closed on save — OPERATOR SIGN-OFF required (changes
-accept/reject of a live device-scope service; needs a data audit of rows that
-would newly fail). Epic **#516** stays open as umbrella.
-Not deployed — local build only; server deploy needs operator go-ahead (no
-migration; config-only + new files).
+Deferred / open at the time: **GA-4 (#520)** builder UI Check/Assist panel;
+**GA-5 (#521)** promote L1 to fail-closed on save. Epic **#516** stays open as
+umbrella.
+
+**UPDATE 2026-08-06 (#525):** GA-4 and GA-5 are now **DEPLOYED**. Prod `pdhc_app`
+runs the GA-5 fail-closed enforcement (`PLANDEF_VALIDATION_ENFORCED` defaults
+true) with `AUTHORING_ASSISTANT_ENABLED=true` (`ANTHROPIC_API_KEY` unset →
+Layer-2 Claude assist dormant, Layer-1 Check live; decision tracked in #527).
+The "Not deployed — local build only" framing above is **superseded** — the
+whole #516 reform is live. Health path corrected in README.md (`/api/health`).
 
 ### #516 post-deploy fix (2026-07-31) — validator prod-vocabulary alignment
 Live functional test in pdhc_app revealed prod response_type lookup names

@@ -413,3 +413,7 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - planp/app/__init__.py — register transfer_bp (/api/v1) + transfer_web_bp.
 - planp/.env.example — document CDR6_* + CDR_TRANSFER_TARGETS.
 - planp/tests/test_transfer.py (new) — 12 tests: auth gate (unauth 401/403, analysis-only 403, SU allowed), targets configured/unconfigured, preview proxies dry_run + sim.pdhc headers, unknown-dest/missing-to 400, execute proxies real + purge/batch passthrough, unconfigured 503, unreachable 502, page renders. Full suite 320 passed.
+
+## 2026-08-06 — #525 doc currency
+- README.md — health path /api/v1/health -> /api/health (v1 404s; matches CLAUDE.md port table).
+- progress.md — #516 block: mark GA-4/GA-5 DEPLOYED (supersede the stale "Not deployed — local build only"); note ANTHROPIC_API_KEY unset (Layer-2 dormant, #527). newtask.txt already current (rewritten for #530).

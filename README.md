@@ -50,7 +50,7 @@ should happen" side of the boundary.
 ```bash
 cp planp/.env.example planp/.env   # then fill in the values
 ./start.sh                         # docker compose up -d --build (db + app)
-curl http://127.0.0.1:9030/api/v1/health
+curl http://127.0.0.1:9030/api/health
 ```
 
 Both the Postgres `db` and the Flask `app` containers come up via
