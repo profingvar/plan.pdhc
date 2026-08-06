@@ -851,3 +851,27 @@ bypass): ERROR-severity issues reject the save (HTTP 422 / flash), warnings pass
 Admin/SU override via override_validation=1 (audited to app log). Kill-switch
 PLANDEF_VALIDATION_ENFORCED (default true). save_guard.py + 7 tests; full suite 297 green.
 Every existing prod row already passes, so enabling this blocks only NEW invalid saves.
+
+### #530 — Transfer page (promote synthetic cdr_6 → working CDR) — BUILT + CODE-DEPLOYED (2026-08-06)
+
+plan.pdhc's operator-facing trigger for the CDR-transfer capability. plan is the
+authoring plane and does NOT move data itself — a thin proxy over cdr_6's
+server-side engine (#529). Source fixed to cdr_6 (synthetic) → safe for any
+authenticated read_write professional. Local commit da9a984 (main); code
+deployed to pdhc_app (docker compose up -d --build).
+
+- Routes: GET /transfer (SSO page) + /api/v1/transfer/{targets,preview,execute}
+  (@requires_role read_write; also callable via X-Source-Service service key).
+  _call_cdr6() proxies cdr_6 POST /api/v1/transfer as X-Source-Service: sim.pdhc
+  (cdr_6 sim-only, Rule 2). Graceful degrade 503/502. execute audit-logged.
+- Verified live: /transfer 302 (SSO), /api/v1/transfer/targets no-auth 401,
+  /api/health 200, migration head d4f5a6b71208 unchanged (no migration).
+- Tests: tests/test_transfer.py (+12). Full suite 320 passed.
+
+**Env wiring PENDING (operator step — enables live cross-CDR movement):**
+plan .env: CDR6_BASE_URL=http://host.docker.internal:9055, CDR6_SERVICE_KEY =
+cdr_6's SIM_PDHC_SERVICE_KEY. cdr_6 .env (finishes #529): CDR1..5_BASE_URL=
+http://host.docker.internal:{9046,9146,9246,9346,9446}. Then `docker compose up
+-d` on BOTH (picks up .env). Until wired, the Transfer page reports "not
+configured" (handled gracefully). Live e2e smoke: generate a throwaway run into
+cdr_6 via sim, Preview (count), Execute, verify destination rises; purge test run.
