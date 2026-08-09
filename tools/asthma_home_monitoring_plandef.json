@@ -1,0 +1,52 @@
+{
+  "_note": "Reproducible, name-based spec of the asthma home-monitoring PlanDefinition. Concept references are by concept_name (resolve to GUIDs at build time). POST the GUID-resolved form to /api/v1/plandefinitions (see build script in session scratchpad). This file documents intent; it is not consumed by an existing loader.",
+  "_applied": {
+    "base": "https://plan.pdhc.se",
+    "plandefinition_guid": "febf8ec1-1c2a-454e-ad42-0b294dc59493",
+    "fhir_id": "b6f30058-8dfe-42ec-82d1-eda893ba5f1e",
+    "applied_utc": "2026-08-09",
+    "status": "active",
+    "effective_period": "2026-08-09 .. 2027-08-04"
+  },
+  "title": "Asthma home monitoring",
+  "name": "asthma-home-monitoring",
+  "status": "active",
+  "version": "1.0.0",
+  "type": "clinical-protocol",
+  "subject_type": "Patient",
+  "validity_duration": "12 mo",
+  "description": "Home monitoring plan for asthma: a daily symptom and peak-flow diary, plus optional weekly home spirometry.",
+  "purpose": "Remote monitoring of asthma control and early detection of deterioration between clinic visits.",
+  "usage": "Daily self-report by the patient at home; weekly FEV1 if a home spirometer is available. Per-patient alerting thresholds (e.g. % personal-best PEF) are configured downstream in request.pdhc, not in this template.",
+  "goals": [],
+  "activities": [
+    {
+      "title": "Daily asthma diary",
+      "description": "Daily self-reported symptoms and peak expiratory flow.",
+      "performer_type": "Patient",
+      "subject_type": "Patient",
+      "timing": { "type": "repeat", "frequency": 1, "period": 1, "period_unit": "d" },
+      "transactions": [
+        { "concept": "asthma-peak-flow",          "requirement": "required" },
+        { "concept": "asthma-daytime-symptoms",   "requirement": "required" },
+        { "concept": "asthma-night-waking",       "requirement": "required" },
+        { "concept": "asthma-reliever-use",       "requirement": "required" },
+        { "concept": "asthma-controller-taken",   "requirement": "required" },
+        { "concept": "asthma-breathlessness",     "requirement": "optional" },
+        { "concept": "asthma-activity-limitation","requirement": "optional" },
+        { "concept": "asthma-wheeze",             "requirement": "optional" },
+        { "concept": "spo2",                      "requirement": "optional" }
+      ]
+    },
+    {
+      "title": "Weekly home spirometry",
+      "description": "Weekly home FEV1 where a home spirometer is available.",
+      "performer_type": "Patient",
+      "subject_type": "Patient",
+      "timing": { "type": "repeat", "frequency": 1, "period": 1, "period_unit": "wk" },
+      "transactions": [
+        { "concept": "FEV1", "requirement": "optional" }
+      ]
+    }
+  ]
+}
