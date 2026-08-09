@@ -417,3 +417,4 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 ## 2026-08-06 — #525 doc currency
 - README.md — health path /api/v1/health -> /api/health (v1 404s; matches CLAUDE.md port table).
 - progress.md — #516 block: mark GA-4/GA-5 DEPLOYED (supersede the stale "Not deployed — local build only"); note ANTHROPIC_API_KEY unset (Layer-2 dormant, #527). newtask.txt already current (rewritten for #530).
+- plan.pdhc/planp/docs/technical.md (Port Allocation section)

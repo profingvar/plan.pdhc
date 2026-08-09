@@ -282,3 +282,13 @@ Key env vars (see `.env.example`):
   to write/resolve without an SSO session; other callers must use SSO.
 - Do not rely on `Transaction.unit` / `Goal.target_unit` as the unit of record —
   resolve the unit from the concept (§2).
+
+## Port Allocation
+
+All ports bind to `127.0.0.1` (loopback only); external traffic arrives
+via the reverse proxy.
+
+| Port | Service |
+|------|---------|
+| 9030 | Flask application (Gunicorn) |
+| 9031 | PostgreSQL database |
