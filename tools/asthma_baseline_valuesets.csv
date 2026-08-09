@@ -1,0 +1,12 @@
+valueset_name,valueset_display,value_name,canonical_lib,canonical_ref,display_text,sort_order
+asthma-gina-step-vs,GINA treatment step,gina-step-1,local,GINA-1,GINA Step 1,1
+asthma-gina-step-vs,GINA treatment step,gina-step-2,local,GINA-2,GINA Step 2,2
+asthma-gina-step-vs,GINA treatment step,gina-step-3,local,GINA-3,GINA Step 3,3
+asthma-gina-step-vs,GINA treatment step,gina-step-4,local,GINA-4,GINA Step 4,4
+asthma-gina-step-vs,GINA treatment step,gina-step-5,local,GINA-5,GINA Step 5,5
+asthma-inhaler-device-vs,Inhaler device type,device-pmdi,local,DEV-PMDI,pMDI - pressurised metered-dose inhaler,1
+asthma-inhaler-device-vs,Inhaler device type,device-pmdi-spacer,local,DEV-PMDI-SPACER,pMDI with spacer,2
+asthma-inhaler-device-vs,Inhaler device type,device-dpi,local,DEV-DPI,Dry powder inhaler (DPI),3
+asthma-inhaler-device-vs,Inhaler device type,device-smi,local,DEV-SMI,Soft mist inhaler (SMI),4
+asthma-inhaler-device-vs,Inhaler device type,device-bami,local,DEV-BAMI,Breath-actuated MDI,5
+asthma-inhaler-device-vs,Inhaler device type,device-nebuliser,local,DEV-NEB,Nebuliser,6

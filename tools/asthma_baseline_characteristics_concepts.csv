@@ -1,12 +1,12 @@
 concept_name,display_text,canonical_lib,canonical_ref,concept_type,response_type,unit,range_low,range_high,valueset
 asthma-personal-best-pef,Personal best PEF (reference for zones),local,ASTHMA-PBPEF,Observation,numerical,L/min,0,900,
 asthma-predicted-pef,Predicted PEF (age/height/sex),local,ASTHMA-PREDPEF,Observation,numerical,L/min,0,900,
-asthma-gina-step,GINA treatment step (1-5),local,ASTHMA-GINA,Observation,Integer,,1,5,
+asthma-gina-step,GINA treatment step,local,ASTHMA-GINA,Observation,Single choice,,,,asthma-gina-step-vs
 asthma-exacerbations-12m,Asthma exacerbations in last 12 months,local,ASTHMA-EXAC12,Observation,Integer,,0,50,
 asthma-ocs-courses-12m,Oral corticosteroid courses in last 12 months,local,ASTHMA-OCS12,Observation,Integer,,0,50,
 asthma-hospitalisations-12m,Asthma hospitalisations in last 12 months,local,ASTHMA-HOSP12,Observation,Integer,,0,50,
 asthma-icu-history,Ever ICU admission or intubation for asthma,local,ASTHMA-ICU,Observation,Boolean,,,,
 asthma-atopy,Atopic or allergic asthma,local,ASTHMA-ATOPY,Observation,Boolean,,,,
-asthma-feno,FeNO - fractional exhaled nitric oxide (ppb),local,ASTHMA-FENO,Observation,numerical,,0,300,
+asthma-feno,FeNO - fractional exhaled nitric oxide,local,ASTHMA-FENO,Observation,numerical,ppb,0,300,
 asthma-blood-eosinophils,Blood eosinophil count,local,ASTHMA-EOS,Observation,numerical,10^9/L,0,5,
-asthma-inhaler-device,Inhaler device type,local,ASTHMA-DEVICE,Observation,Free text,,,,
+asthma-inhaler-device,Inhaler device type,local,ASTHMA-DEVICE,Observation,Single choice,,,,asthma-inhaler-device-vs

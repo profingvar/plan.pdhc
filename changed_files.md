@@ -428,3 +428,5 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - plan.pdhc/tools/eq5d5l_valuesets.csv (NEW — 25 response levels, 5 valuesets)
 - plan.pdhc/tools/asthma_home_monitoring_concepts.csv (NEW — 9 asthma monitoring concepts; FEV1 reused; applied prod)
 - plan.pdhc/tools/asthma_baseline_characteristics_concepts.csv (NEW — 11 baseline concepts; reuse height/weight/bmi/smoking_status; built, not yet applied)
+- plan.pdhc/tools/asthma_baseline_characteristics_concepts.csv (gina-step + inhaler-device -> coded Single choice; feno unit=ppb; APPLIED prod)
+- plan.pdhc/tools/asthma_baseline_valuesets.csv (NEW — GINA 1-5 + 6 inhaler device types)
