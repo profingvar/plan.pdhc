@@ -426,3 +426,5 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - plan.pdhc/tools/load_catalogue.py (--from-csv mode added)
 - plan.pdhc/tools/eq5d5l_concepts.csv (NEW — EQ-5D-5L 5 dimensions + VAS slider)
 - plan.pdhc/tools/eq5d5l_valuesets.csv (NEW — 25 response levels, 5 valuesets)
+- plan.pdhc/tools/asthma_home_monitoring_concepts.csv (NEW — 9 asthma monitoring concepts; FEV1 reused; applied prod)
+- plan.pdhc/tools/asthma_baseline_characteristics_concepts.csv (NEW — 11 baseline concepts; reuse height/weight/bmi/smoking_status; built, not yet applied)

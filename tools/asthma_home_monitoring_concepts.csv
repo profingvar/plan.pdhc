@@ -1,0 +1,10 @@
+concept_name,display_text,canonical_lib,canonical_ref,concept_type,response_type,unit,range_low,range_high,valueset
+asthma-peak-flow,Peak expiratory flow (PEF),local,ASTHMA-PEF,Observation,numerical,L/min,0,900,
+asthma-reliever-use,Reliever (SABA) puffs in last 24h,local,ASTHMA-SABA,Observation,Integer,,0,50,
+asthma-night-waking,Night wakings due to asthma,local,ASTHMA-NIGHT,Observation,Integer,,0,20,
+asthma-daytime-symptoms,Daytime asthma symptom severity 0-10,local,ASTHMA-DAY,Observation,Slider,,0,10,
+asthma-breathlessness,Breathlessness severity 0-10,local,ASTHMA-BREATH,Observation,Slider,,0,10,
+asthma-activity-limitation,Activity limitation due to asthma 0-10,local,ASTHMA-ACTLIM,Observation,Slider,,0,10,
+asthma-wheeze,Wheeze present today,local,ASTHMA-WHEEZE,Observation,Boolean,,,,
+asthma-controller-taken,Controller/preventer taken as prescribed today,local,ASTHMA-ADHERE,Observation,Boolean,,,,
+spo2,Oxygen saturation (SpO2),local,SPO2,Observation,numerical,%,0,100,
