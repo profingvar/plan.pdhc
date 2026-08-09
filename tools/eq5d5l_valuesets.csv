@@ -1,0 +1,26 @@
+valueset_name,valueset_display,value_name,canonical_lib,canonical_ref,display_text,sort_order
+eq5d5l-mobility-vs,EQ-5D-5L Mobility levels,eq5d5l-mo-1,local,EQ5D5L-MO-1,I have no problems in walking about,1
+eq5d5l-mobility-vs,EQ-5D-5L Mobility levels,eq5d5l-mo-2,local,EQ5D5L-MO-2,I have slight problems in walking about,2
+eq5d5l-mobility-vs,EQ-5D-5L Mobility levels,eq5d5l-mo-3,local,EQ5D5L-MO-3,I have moderate problems in walking about,3
+eq5d5l-mobility-vs,EQ-5D-5L Mobility levels,eq5d5l-mo-4,local,EQ5D5L-MO-4,I have severe problems in walking about,4
+eq5d5l-mobility-vs,EQ-5D-5L Mobility levels,eq5d5l-mo-5,local,EQ5D5L-MO-5,I am unable to walk about,5
+eq5d5l-self-care-vs,EQ-5D-5L Self-care levels,eq5d5l-sc-1,local,EQ5D5L-SC-1,I have no problems washing or dressing myself,1
+eq5d5l-self-care-vs,EQ-5D-5L Self-care levels,eq5d5l-sc-2,local,EQ5D5L-SC-2,I have slight problems washing or dressing myself,2
+eq5d5l-self-care-vs,EQ-5D-5L Self-care levels,eq5d5l-sc-3,local,EQ5D5L-SC-3,I have moderate problems washing or dressing myself,3
+eq5d5l-self-care-vs,EQ-5D-5L Self-care levels,eq5d5l-sc-4,local,EQ5D5L-SC-4,I have severe problems washing or dressing myself,4
+eq5d5l-self-care-vs,EQ-5D-5L Self-care levels,eq5d5l-sc-5,local,EQ5D5L-SC-5,I am unable to wash or dress myself,5
+eq5d5l-usual-activities-vs,EQ-5D-5L Usual activities levels,eq5d5l-ua-1,local,EQ5D5L-UA-1,I have no problems doing my usual activities,1
+eq5d5l-usual-activities-vs,EQ-5D-5L Usual activities levels,eq5d5l-ua-2,local,EQ5D5L-UA-2,I have slight problems doing my usual activities,2
+eq5d5l-usual-activities-vs,EQ-5D-5L Usual activities levels,eq5d5l-ua-3,local,EQ5D5L-UA-3,I have moderate problems doing my usual activities,3
+eq5d5l-usual-activities-vs,EQ-5D-5L Usual activities levels,eq5d5l-ua-4,local,EQ5D5L-UA-4,I have severe problems doing my usual activities,4
+eq5d5l-usual-activities-vs,EQ-5D-5L Usual activities levels,eq5d5l-ua-5,local,EQ5D5L-UA-5,I am unable to do my usual activities,5
+eq5d5l-pain-discomfort-vs,EQ-5D-5L Pain / discomfort levels,eq5d5l-pd-1,local,EQ5D5L-PD-1,I have no pain or discomfort,1
+eq5d5l-pain-discomfort-vs,EQ-5D-5L Pain / discomfort levels,eq5d5l-pd-2,local,EQ5D5L-PD-2,I have slight pain or discomfort,2
+eq5d5l-pain-discomfort-vs,EQ-5D-5L Pain / discomfort levels,eq5d5l-pd-3,local,EQ5D5L-PD-3,I have moderate pain or discomfort,3
+eq5d5l-pain-discomfort-vs,EQ-5D-5L Pain / discomfort levels,eq5d5l-pd-4,local,EQ5D5L-PD-4,I have severe pain or discomfort,4
+eq5d5l-pain-discomfort-vs,EQ-5D-5L Pain / discomfort levels,eq5d5l-pd-5,local,EQ5D5L-PD-5,I have extreme pain or discomfort,5
+eq5d5l-anxiety-depression-vs,EQ-5D-5L Anxiety / depression levels,eq5d5l-ad-1,local,EQ5D5L-AD-1,I am not anxious or depressed,1
+eq5d5l-anxiety-depression-vs,EQ-5D-5L Anxiety / depression levels,eq5d5l-ad-2,local,EQ5D5L-AD-2,I am slightly anxious or depressed,2
+eq5d5l-anxiety-depression-vs,EQ-5D-5L Anxiety / depression levels,eq5d5l-ad-3,local,EQ5D5L-AD-3,I am moderately anxious or depressed,3
+eq5d5l-anxiety-depression-vs,EQ-5D-5L Anxiety / depression levels,eq5d5l-ad-4,local,EQ5D5L-AD-4,I am severely anxious or depressed,4
+eq5d5l-anxiety-depression-vs,EQ-5D-5L Anxiety / depression levels,eq5d5l-ad-5,local,EQ5D5L-AD-5,I am extremely anxious or depressed,5

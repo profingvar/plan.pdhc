@@ -1,0 +1,7 @@
+concept_name,display_text,canonical_lib,canonical_ref,concept_type,response_type,unit,range_low,range_high,valueset
+eq5d5l-mobility,EQ-5D-5L Mobility,local,EQ5D5L-MO,Observation,Single choice,,,,eq5d5l-mobility-vs
+eq5d5l-self-care,EQ-5D-5L Self-care,local,EQ5D5L-SC,Observation,Single choice,,,,eq5d5l-self-care-vs
+eq5d5l-usual-activities,EQ-5D-5L Usual activities,local,EQ5D5L-UA,Observation,Single choice,,,,eq5d5l-usual-activities-vs
+eq5d5l-pain-discomfort,EQ-5D-5L Pain / discomfort,local,EQ5D5L-PD,Observation,Single choice,,,,eq5d5l-pain-discomfort-vs
+eq5d5l-anxiety-depression,EQ-5D-5L Anxiety / depression,local,EQ5D5L-AD,Observation,Single choice,,,,eq5d5l-anxiety-depression-vs
+eq5d5l-vas,EQ VAS - overall health today,local,EQ5D5L-VAS,Observation,Slider,,0,100,

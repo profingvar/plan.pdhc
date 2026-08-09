@@ -424,3 +424,5 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - plan.pdhc/tools/concept_import_template.csv (NEW — flat concept CSV + optional valueset column)
 - plan.pdhc/tools/valueset_import_template.csv (NEW — one row per choice option)
 - plan.pdhc/tools/load_catalogue.py (--from-csv mode added)
+- plan.pdhc/tools/eq5d5l_concepts.csv (NEW — EQ-5D-5L 5 dimensions + VAS slider)
+- plan.pdhc/tools/eq5d5l_valuesets.csv (NEW — 25 response levels, 5 valuesets)
