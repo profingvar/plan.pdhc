@@ -418,3 +418,9 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - README.md — health path /api/v1/health -> /api/health (v1 404s; matches CLAUDE.md port table).
 - progress.md — #516 block: mark GA-4/GA-5 DEPLOYED (supersede the stale "Not deployed — local build only"); note ANTHROPIC_API_KEY unset (Layer-2 dormant, #527). newtask.txt already current (rewritten for #530).
 - plan.pdhc/planp/docs/technical.md (Port Allocation section)
+- plan.pdhc/tools/load_catalogue.py (NEW — one-file bulk loader: concepts + valuesets + values)
+- plan.pdhc/tools/example_catalogue.yaml (NEW — example manifest)
+- plan.pdhc/tools/README.md (NEW — loader usage)
+- plan.pdhc/tools/concept_import_template.csv (NEW — flat concept CSV + optional valueset column)
+- plan.pdhc/tools/valueset_import_template.csv (NEW — one row per choice option)
+- plan.pdhc/tools/load_catalogue.py (--from-csv mode added)

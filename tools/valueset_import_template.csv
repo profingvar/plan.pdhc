@@ -1,0 +1,4 @@
+valueset_name,valueset_display,value_name,canonical_lib,canonical_ref,display_text,sort_order
+smoking-status-vs,Smoking status,never-smoker,snomed,266919005,Never smoked,1
+smoking-status-vs,Smoking status,former-smoker,snomed,8517006,Ex-smoker,2
+smoking-status-vs,Smoking status,current-smoker,snomed,77176002,Current smoker,3

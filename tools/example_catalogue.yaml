@@ -1,0 +1,67 @@
+# Example catalogue for load_catalogue.py — concepts + value sets + values
+# in ONE file. Everything is referenced BY NAME; the loader resolves names to
+# GUIDs and is idempotent (re-running is a no-op).
+#
+#   export PLAN_LOADER_SERVICE_KEY=...
+#   python3 load_catalogue.py example_catalogue.yaml --dry-run   # preview
+#   python3 load_catalogue.py example_catalogue.yaml             # apply
+#
+# The lookup names below (loinc/snomed, Observation, numerical, Single choice,
+# L) are the REAL ones already in plan.pdhc — check the current sets with:
+#   curl -s https://plan.pdhc.se/api/v1/lookup/{canonical-libs,concept-types,response-types,units}
+
+version: example_v1
+
+# Applied to any values/valuesets/concepts that omit their own canonical_lib.
+default_canonical_lib: loinc
+
+# OPTIONAL — auto-create these lookups if missing (skipped if already present).
+# Everything referenced below already exists EXCEPT possibly the L/min unit,
+# which this block creates on demand. Drop the block if you don't need it.
+ensure:
+  units:
+    - {name: "L/min", display: "litres per minute"}
+
+# Shared coded values (values_catalog rows). Referenced by name from valuesets.
+values:
+  - {name: never-smoker,   ref: "266919005", display: "Never smoked",   canonical_lib: snomed}
+  - {name: former-smoker,  ref: "8517006",   display: "Ex-smoker",      canonical_lib: snomed}
+  - {name: current-smoker, ref: "77176002",  display: "Current smoker", canonical_lib: snomed}
+
+# Value sets. `values:` is an ordered list of value names -> sort_order 1..n.
+valuesets:
+  - name: smoking-status-vs
+    display: "Smoking status"
+    canonical_lib: snomed
+    values: [never-smoker, former-smoker, current-smoker]
+
+# Concepts. Numeric concepts use range_low/high + a unit; coded concepts point
+# at a valueset by name (resolved to its GUID and bound via concepts.valueset).
+concepts:
+  - name: fev1
+    display: "FEV1"
+    canonical_lib: loinc
+    canonical_refnumber: "20150-9"
+    concept_type: Observation
+    response_type: numerical
+    unit: "L"
+    range_low: 0
+    range_high: 8
+
+  - name: peak-flow
+    display: "Peak expiratory flow"
+    canonical_lib: loinc
+    canonical_refnumber: "33452-4"
+    concept_type: Observation
+    response_type: numerical
+    unit: "L/min"
+    range_low: 0
+    range_high: 900
+
+  - name: smoking-status
+    display: "Smoking status"
+    canonical_lib: snomed
+    canonical_refnumber: "72166-2"
+    concept_type: Observation
+    response_type: "Single choice"
+    valueset: smoking-status-vs

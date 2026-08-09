@@ -1,0 +1,2 @@
+concept_name,display_text,canonical_lib,canonical_ref,concept_type,response_type,unit,range_low,range_high,valueset
+smoking-status,Smoking status,snomed,72166-2,Observation,Single choice,,,,smoking-status-vs
