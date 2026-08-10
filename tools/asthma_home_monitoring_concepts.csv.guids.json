@@ -1,0 +1,124 @@
+{
+  "manifest": "asthma_home_monitoring_concepts.csv",
+  "version": "csv",
+  "base": "https://plan.pdhc.se",
+  "dry_run": false,
+  "canonical_lib_guids": {
+    "atc": "19c8c6fa-6a4e-4d9b-a868-f1b1d7ee0e4b",
+    "icd10": "0b664c53-e772-456f-b8dc-faa89344639f",
+    "icf": "b8179638-071c-491d-b1fe-7cb9b6016421",
+    "kva": "26e5faaa-54c2-4d3b-8d73-22e7ad3f70ff",
+    "local": "c44ac613-421b-4192-81ad-97976b2608ec",
+    "loinc": "086bce1e-e7cf-4577-bd50-f6d4342dcf78",
+    "snomed": "fa4c60b4-ef5f-4459-8995-44c43129eb28",
+    "socialstyrelsen": "134de367-9663-47f0-a083-5c2268af1645"
+  },
+  "value_guids": {
+    "Current smoker": "6dd4f0aa-bc9e-4b4b-a076-09338515e7c1",
+    "eq5d5l-ad-1": "d2d041a3-e876-4788-9488-15094384fb0e",
+    "eq5d5l-ad-2": "0e1b892c-8634-4c05-9867-352b941a679d",
+    "eq5d5l-ad-3": "57ca1831-40e9-4a1a-92cd-06e930903f7b",
+    "eq5d5l-ad-4": "26ed82a6-2b8d-49b0-91c6-2a5edc942566",
+    "eq5d5l-ad-5": "8d28716d-ea51-4503-868b-1f0f129ddb19",
+    "eq5d5l-mo-1": "117cf2bd-2c2a-4ec0-9066-6137612c60cc",
+    "eq5d5l-mo-2": "21bc75ac-b859-4073-8ef8-69563df6a401",
+    "eq5d5l-mo-3": "39395ecc-c507-400d-bd2d-0b32d9b9e9ee",
+    "eq5d5l-mo-4": "ec39bbd4-cacf-4012-8d84-357612b4988f",
+    "eq5d5l-mo-5": "7f44c42d-1c8b-4bf7-8f60-9037bad0c4a3",
+    "eq5d5l-pd-1": "68232908-31ae-46cb-a08f-537cb66ca93f",
+    "eq5d5l-pd-2": "4c11d96b-939b-4889-88e2-c3ff28faca8d",
+    "eq5d5l-pd-3": "ba32e2af-5807-414f-abba-2a7a3c0ebe2b",
+    "eq5d5l-pd-4": "38e24f9e-3e65-4c3f-a864-10a072615f03",
+    "eq5d5l-pd-5": "581ed4c1-82ad-4096-861a-a0d00e92fb4e",
+    "eq5d5l-sc-1": "db85f325-c8e1-4759-a2ac-178549c63618",
+    "eq5d5l-sc-2": "ec199569-5998-4a55-9a4a-e99b4c79f8e4",
+    "eq5d5l-sc-3": "35dc282d-2e66-4660-ad49-8fc9bed87d0d",
+    "eq5d5l-sc-4": "34431ae0-a4d3-4150-8755-9a8d61514995",
+    "eq5d5l-sc-5": "412d6fe7-e8ad-4120-bbf8-2c344a9683b1",
+    "eq5d5l-ua-1": "3e6984a6-13ce-40c3-9ad0-d906ba192ea2",
+    "eq5d5l-ua-2": "4c2f71b4-66eb-42d3-aeaa-62c50369bbb6",
+    "eq5d5l-ua-3": "b7a120ad-f9a0-4b7f-a290-14f3ca4bad26",
+    "eq5d5l-ua-4": "8e5df9b8-e136-4402-8e1c-62e5e1bb0124",
+    "eq5d5l-ua-5": "9f9f4c75-adb9-480c-9ad2-6f397f3de9fa",
+    "Förhöjd nivå": "5b2b0bc9-a923-4a8a-8421-a2aa789860fe",
+    "Former smoker": "3ee70523-f2fc-49be-a73a-bbe815ab5fb5",
+    "Hjärta kärl": "ddb8a2af-d2c9-44ea-96d9-a86ddd0d37a9",
+    "hög": "d2e2e021-3c86-4d98-9654-267e8bfcfa61",
+    "Huden": "a91a9926-d44f-4fa0-8faf-c30f165280b1",
+    "Immunsystemet": "b55527be-be71-4c4e-8aff-4b0868619e59",
+    "låg": "efa17b6c-ca05-4c0b-8645-9d057ff1d41b",
+    "Leder och muskler": "17c4b531-80f1-451c-ba63-cd8f6e1d2c0a",
+    "medel": "eb74ebbe-d289-4776-b390-ab1f801616b3",
+    "Nervsystemet": "5db6ed3d-195c-4c77-b79d-ce379247ccc5",
+    "Never smoker": "faec0d69-feaa-45d0-bbc3-b13a73a97c70",
+    "Njurar och Urinvägar": "22a7d12b-2230-4f85-8410-2a92693c2243",
+    "Normal": "d0c0d3c0-dc7d-49ad-bff2-5eac870775f4",
+    "Received information": "ef91d7f5-9148-4931-b061-ab8b3c7b830e"
+  },
+  "valueset_guids": {
+    "Bidiagnoser": "882867af-9493-4574-a847-d8d24e89c064",
+    "eq5d5l-anxiety-depression-vs": "b30ef096-8ab3-47b2-8c6f-f2ea9c0e906f",
+    "eq5d5l-mobility-vs": "21131b30-a45c-40ab-8127-85bf2c8528bb",
+    "eq5d5l-pain-discomfort-vs": "be73f1e0-ede7-44d9-ab39-4aeb2eead1d2",
+    "eq5d5l-self-care-vs": "6c361f48-32ad-48f6-a20f-50538af34b33",
+    "eq5d5l-usual-activities-vs": "b4925236-5a4a-40ff-86d5-65a3ebfdf4af",
+    "got it": "5fc9e019-ab7c-4476-bcca-9d0e134de20f",
+    "Intensitet": "a26ad48d-e89b-4bdf-99b0-c3eefd002638",
+    "Norm": "0045ec54-febe-42f9-b390-cd394e11cf15",
+    "Smoking status": "129fec0b-f56f-470c-81dd-31f944960882"
+  },
+  "concepts": {
+    "asthma-peak-flow": {
+      "guid": "8baad6ac-486d-4428-ab37-9f971f43fd71",
+      "status": "created",
+      "valueset": null
+    },
+    "asthma-reliever-use": {
+      "guid": "89864ae4-012f-4d62-9cb8-ac15ab66e6c4",
+      "status": "created",
+      "valueset": null
+    },
+    "asthma-night-waking": {
+      "guid": "6f6fbe8d-4e7e-4989-984a-b6d2b0ebcac4",
+      "status": "created",
+      "valueset": null
+    },
+    "asthma-daytime-symptoms": {
+      "guid": "15cedab1-f694-467d-96dc-ad9bbd5794db",
+      "status": "created",
+      "valueset": null
+    },
+    "asthma-breathlessness": {
+      "guid": "0139525f-fbc7-427e-a508-cf33c4c681eb",
+      "status": "created",
+      "valueset": null
+    },
+    "asthma-activity-limitation": {
+      "guid": "e3d8cf4f-81e1-4046-8e9a-3a371725df05",
+      "status": "created",
+      "valueset": null
+    },
+    "asthma-wheeze": {
+      "guid": "45870f77-ce44-4ebb-85d0-b9af5917504f",
+      "status": "created",
+      "valueset": null
+    },
+    "asthma-controller-taken": {
+      "guid": "0c15ab68-5c79-4a35-a123-60fb69e64cf3",
+      "status": "created",
+      "valueset": null
+    },
+    "spo2": {
+      "guid": "2f15ae94-209e-4b0c-81bd-c91d76e74475",
+      "status": "created",
+      "valueset": null
+    }
+  },
+  "stats": {
+    "values_created": 0,
+    "valuesets_created": 0,
+    "concepts_created": 9,
+    "concepts_updated": 0,
+    "concepts_skipped": 0
+  }
+}
