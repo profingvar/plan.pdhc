@@ -431,3 +431,6 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - plan.pdhc/tools/asthma_baseline_characteristics_concepts.csv (gina-step + inhaler-device -> coded Single choice; feno unit=ppb; APPLIED prod)
 - plan.pdhc/tools/asthma_baseline_valuesets.csv (NEW — GINA 1-5 + 6 inhaler device types)
 - plan.pdhc/tools/asthma_home_monitoring_plandef.json (NEW — reproducible spec; PlanDefinition applied active to prod guid febf8ec1)
+
+- planp/app/api/concepts.py — accept `limit` as alias for `per_page` (silent-50 default fix). Deployed 2026-08-15 (pdhc_app rebuild).
+- .env APP_VERSION=98bf711 — populate health `version` (was "dev"). 2026-08-15.

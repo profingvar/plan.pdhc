@@ -73,9 +73,14 @@ def list_concepts():
     # Deterministic sort
     query = query.order_by(Concept.concept_name, Concept.guid)
 
-    # Pagination
+    # Pagination. `per_page` is the canonical param (server-capped at 200);
+    # accept `limit` as an alias so consumers using the common `limit`
+    # convention aren't silently defaulted to the first 50 rows.
     page = max(1, request.args.get('page', 1, type=int))
-    per_page = max(1, min(200, request.args.get('per_page', 50, type=int)))
+    _pp = request.args.get('per_page', type=int)
+    if _pp is None:
+        _pp = request.args.get('limit', 50, type=int)
+    per_page = max(1, min(200, _pp))
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
     return jsonify({
