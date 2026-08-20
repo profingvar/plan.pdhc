@@ -71,7 +71,12 @@ def authoring_assist():
     model = body.get("model")
     if not intent:
         return jsonify({"error": "intent is required"}), 400
-    result = assistant.suggest_concept(intent, model, termbank=_termbank())
+    # #571: the Anthropic key is supplied per request from the operator's
+    # browser session (header X-Anthropic-Key), never from server config/.env.
+    # It is used only for this call and never stored server-side.
+    api_key = (request.headers.get("X-Anthropic-Key") or "").strip()
+    result = assistant.suggest_concept(
+        intent, model, termbank=_termbank(), api_key=api_key)
     return jsonify(result), 200
 
 

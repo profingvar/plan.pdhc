@@ -94,7 +94,7 @@ def test_happy_path_parses_and_self_validates(app, monkeypatch, seed):
         monkeypatch.setattr(a.requests, 'post',
                             lambda *args, **kw: _FakeResp(200, reply))
         res = a.suggest_concept('track systolic blood pressure',
-                                model='claude-sonnet-5')
+                                model='claude-sonnet-5', api_key='sk-test')
     assert res['assistant_available'] is True
     assert res['model_used'] == 'claude-sonnet-5'
     assert res['proposal']['canonical_refnumber'] == '8480-6'
@@ -109,7 +109,7 @@ def test_malformed_reply_degrades(app, monkeypatch, seed):
         monkeypatch.setattr(
             a.requests, 'post',
             lambda *args, **kw: _FakeResp(200, _anthropic_reply("no json here at all")))
-        res = a.suggest_concept('track bp', model='claude-sonnet-5')
+        res = a.suggest_concept('track bp', model='claude-sonnet-5', api_key='sk-test')
     assert res['assistant_available'] is False
     assert res['reason'] == a.R_MALFORMED
 
@@ -119,7 +119,7 @@ def test_http_error_degrades(app, monkeypatch, seed):
         _enable(app, monkeypatch)
         monkeypatch.setattr(a.requests, 'post',
                             lambda *args, **kw: _FakeResp(500, {"error": "boom"}))
-        res = a.suggest_concept('track bp', model='claude-sonnet-5')
+        res = a.suggest_concept('track bp', model='claude-sonnet-5', api_key='sk-test')
     assert res['assistant_available'] is False
     assert res['reason'] == a.R_NETWORK
 
@@ -139,7 +139,7 @@ def test_proposal_with_unknown_unit_is_flagged(app, monkeypatch, seed):
         _enable(app, monkeypatch)
         monkeypatch.setattr(a.requests, 'post',
                             lambda *args, **kw: _FakeResp(200, reply))
-        res = a.suggest_concept('track something', model='claude-sonnet-5')
+        res = a.suggest_concept('track something', model='claude-sonnet-5', api_key='sk-test')
     assert res['assistant_available'] is True
     assert any('furlong' in n for n in res['resolution_notes'])
     codes = {i['code'] for i in res['validation']['issues']}

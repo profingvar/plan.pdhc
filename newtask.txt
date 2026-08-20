@@ -24,3 +24,16 @@ Next-up
    (count == generated) -> Execute -> verify cdr2 rises; re-run with purge and
    confirm the run left cdr_6 /api/v1/runs. Purge the cdr2 test run afterwards.
 3. No migration either side.
+
+Authoring assistant Layer-2 posture (DECIDED — #527 / #571, 2026-08-20)
+----------------------------------------------------------------------
+Decision: the Anthropic key for the Layer-2 "Suggest" affordance is NOT
+registered in code or the server .env. It is entered PER SESSION in the
+authoring UI, held only in the browser tab's memory, sent as X-Anthropic-Key
+on the single /assist call the operator triggers, and gone on logout/reload.
+So AUTHORING_ASSISTANT_ENABLED stays true (Layer-1 "Check" always on), and
+ANTHROPIC_API_KEY stays EMPTY on prod by design — the enablement state is
+intentional, not accidental. Implemented: plandef_assistant._call_claude takes
+the key per-request; models_info reports key_mode:"session" (key_configured
+false); /authoring/assist reads X-Anthropic-Key; authoring_assistant.js collects
+the session key and gates Suggest on it. Never store the key server-side.

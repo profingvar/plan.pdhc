@@ -17,6 +17,12 @@
 
   var API = "/api/v1/authoring";
 
+  // #571: the Layer-2 Anthropic key is entered per session and held ONLY in
+  // this tab's memory (never localStorage, never the server, never .env). It
+  // is sent as X-Anthropic-Key on the single /assist call the operator
+  // triggers, and is gone on logout / reload.
+  var SESSION_KEY = "";
+
   function fetchJSON(url, opts) {
     opts = opts || {};
     opts.credentials = "same-origin";
@@ -203,42 +209,76 @@
     card.appendChild(checkBtn);
     card.appendChild(out);
 
-    if (models.key_configured) {
-      card.appendChild(h("hr", { style: "border:none;border-top:1px solid #e2e2e2;margin:0.75rem 0;" }));
-      card.appendChild(h("label", { style: "font-size:0.85rem;font-weight:600;" },
+    // #571: Layer-2 "Suggest" uses a PER-SESSION key entered here — never
+    // stored server-side or in .env, gone on logout/reload.
+    card.appendChild(h("hr", { style: "border:none;border-top:1px solid #e2e2e2;margin:0.75rem 0;" }));
+
+    var keyInput = h("input", {
+      type: "password", class: "form-control", autocomplete: "off",
+      placeholder: "Anthropic API key — this session only",
+      style: "max-width:320px;"
+    });
+    var keyStatus = h("span", { style: "font-size:0.8rem;margin-left:0.5rem;color:#666;" }, [""]);
+    var useBtn = h("button", { type: "button", style: BTN }, ["Use key this session"]);
+    var forgetBtn = h("button", { type: "button", style: BTN + "margin-left:0.4rem;" }, ["Forget key"]);
+    var layer2 = h("div", { style: "margin-top:0.6rem;" });
+
+    function renderLayer2() {
+      layer2.innerHTML = "";
+      keyStatus.textContent = SESSION_KEY ? "key set for this session" : "no key this session";
+      if (!SESSION_KEY) {
+        layer2.appendChild(h("div", { style: "font-size:0.8rem;color:#888;" },
+          ["Enter your Anthropic key above to enable Claude suggestions for this session. The Check button works without a key."]));
+        return;
+      }
+      layer2.appendChild(h("label", { style: "font-size:0.85rem;font-weight:600;" },
         ["Describe what you want to collect, and let the assistant propose the binding:"]));
       var intent = h("textarea", {
         class: "form-control", rows: "2",
         placeholder: "e.g. track morning peak expiratory flow"
       });
-      card.appendChild(intent);
+      layer2.appendChild(intent);
       var modelSel = h("select", { class: "form-control", style: "max-width:260px;margin-top:0.4rem;" });
       (models.models || []).forEach(function (m) {
         var o = h("option", { value: m }, [m]);
         if (m === models.default_model) o.setAttribute("selected", "selected");
         modelSel.appendChild(o);
       });
-      card.appendChild(h("div", { style: "display:flex;align-items:center;gap:0.5rem;margin-top:0.4rem;" },
+      layer2.appendChild(h("div", { style: "display:flex;align-items:center;gap:0.5rem;margin-top:0.4rem;" },
         [h("span", { style: "font-size:0.8rem;color:#666;" }, ["Model:"]), modelSel]));
       var assistBtn = h("button", { type: "button", style: BTN + "margin-top:0.5rem;" }, ["Suggest"]);
       var pout = h("div", { style: "margin-top:0.5rem;" });
       assistBtn.addEventListener("click", function () {
         var q = intent.value.trim();
         if (!q) { pout.textContent = "Type what you want to collect first."; return; }
+        if (!SESSION_KEY) { pout.textContent = "Enter your Anthropic key first."; return; }
         pout.innerHTML = "Thinking…";
         fetchJSON(API + "/assist", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "X-Anthropic-Key": SESSION_KEY },
           body: JSON.stringify({ intent: q, model: modelSel.value })
         }).then(function (res) { renderProposal(pout, res); })
           .catch(function () { pout.textContent = "Assistant unavailable right now."; });
       });
-      card.appendChild(assistBtn);
-      card.appendChild(pout);
-    } else {
-      card.appendChild(h("div", { style: "font-size:0.8rem;color:#888;margin-top:0.4rem;" },
-        ["Claude suggestions activate once an API key is configured. The Check button works now."]));
+      layer2.appendChild(assistBtn);
+      layer2.appendChild(pout);
     }
+
+    useBtn.addEventListener("click", function () {
+      var v = (keyInput.value || "").trim();
+      if (!v) { keyStatus.textContent = "paste your Anthropic key first"; return; }
+      SESSION_KEY = v; keyInput.value = "";
+      renderLayer2();
+    });
+    forgetBtn.addEventListener("click", function () { SESSION_KEY = ""; renderLayer2(); });
+
+    card.appendChild(h("div", { style: "display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;" },
+      [keyInput, useBtn, forgetBtn, keyStatus]));
+    card.appendChild(h("div", { style: "font-size:0.75rem;color:#999;margin-top:0.2rem;" },
+      ["Held only in this browser tab for this session — sent to the server only to make the one Claude call you trigger, never stored, and gone on logout or reload."]));
+    card.appendChild(layer2);
+    renderLayer2();
+
     mount.appendChild(card);
   }
 

@@ -59,7 +59,12 @@ def models_info() -> dict:
     """What the UI needs to render (or grey out) the model picker."""
     return {
         "enabled": bool(_cfg("AUTHORING_ASSISTANT_ENABLED", False)),
-        "key_configured": bool(_cfg("ANTHROPIC_API_KEY", "")),
+        # #571: the Layer-2 key is entered PER SESSION in the browser and sent
+        # per request — it is never configured server-side. key_configured is
+        # therefore always False here; the UI collects the key for the session
+        # and gates the Suggest action on it. See key_mode.
+        "key_configured": False,
+        "key_mode": "session",
         "models": list(_cfg("AUTHORING_ASSISTANT_MODELS", []) or []),
         "default_model": _cfg("AUTHORING_ASSISTANT_DEFAULT_MODEL", ""),
     }
@@ -144,12 +149,15 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _call_claude(model: str, intent_text: str, context: list[dict]) -> dict:
+def _call_claude(model: str, intent_text: str, context: list[dict], api_key: str) -> dict:
     """POST to the Anthropic Messages API; return the parsed proposal dict.
 
-    Raises ``_Unavailable(reason)`` on any failure so the caller degrades.
+    ``api_key`` is supplied PER REQUEST from the operator's browser session
+    (#571) — it is never read from config/.env and never stored server-side,
+    so the rarely-used Layer-2 key lives only in the session and is gone on
+    logout. Raises ``_Unavailable(reason)`` on any failure so the caller degrades.
     """
-    key = _cfg("ANTHROPIC_API_KEY", "")
+    key = (api_key or "").strip()
     if not key:
         raise _Unavailable(R_NO_KEY)
     base = (_cfg("ANTHROPIC_API_BASE", "https://api.anthropic.com") or "").rstrip("/")
@@ -271,6 +279,7 @@ def suggest_concept(
     *,
     termbank=None,
     verify_terminology: bool = True,
+    api_key: str = "",
 ) -> dict:
     """Suggest a concept draft for a plain-language intent.
 
@@ -305,7 +314,7 @@ def suggest_concept(
     result["reuse_candidates"] = candidates
 
     try:
-        proposal = _call_claude(chosen, intent_text, candidates)
+        proposal = _call_claude(chosen, intent_text, candidates, api_key)
     except _Unavailable as u:
         result["reason"] = u.reason
         return result
