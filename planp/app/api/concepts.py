@@ -18,7 +18,7 @@ from app.services.save_guard import guard_concept, SaveBlocked  # #521 GA-5
 
 concepts_bp = Blueprint('concepts', __name__)
 # Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
-# Service-key callers (sim.pdhc / loader.pdhc / cdr.pdhc canonicaliser)
+# Service-key callers (sim.pdhc / cdr.pdhc canonicaliser) — loader.pdhc retired 2026-10-05
 # are exempted via the global request_filter registered there — the
 # burst-warmup of the canonicaliser cache used to push parallel writers
 # past the limit and trigger 6/400 4xx during the first seed

@@ -30,9 +30,9 @@ class Config:
     API_KEY = os.environ.get('API_KEY', '')
 
     # Service-key credentials accepted by api/auth.py service-key bypass
-    # (loader.pdhc runs the bulk-concept loader from operator's machine;
-    # sim.pdhc may consult plan.pdhc to resolve concept GUIDs at run time).
-    PLAN_LOADER_SERVICE_KEY = os.environ.get('PLAN_LOADER_SERVICE_KEY', '')
+    # (sim.pdhc may consult plan.pdhc to resolve concept GUIDs at run time).
+    # PLAN_LOADER_SERVICE_KEY was read here until 2026-10-05; nothing reads it
+    # now, so the variable is inert wherever it is still set.
     SIM_PDHC_SERVICE_KEY = os.environ.get('SIM_PDHC_SERVICE_KEY', '')
 
     # Upstream services

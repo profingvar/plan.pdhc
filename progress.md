@@ -879,3 +879,44 @@ http://host.docker.internal:{9046,9146,9246,9346,9446}. Then `docker compose up
 -d` on BOTH (picks up .env). Until wired, the Transfer page reports "not
 configured" (handled gracefully). Live e2e smoke: generate a throwaway run into
 cdr_6 via sim, Preview (count), Execute, verify destination rises; purge test run.
+
+## 2026-10-05 — loader.pdhc retired; PLAN_LOADER_SERVICE_KEY destroyed
+
+Operator decision: "loader.pdhc is a lame project" (#736, closed), then "kill
+PLAN_LOADER_SERVICE_KEY".
+
+### What it was
+A service-key identity in `planp/app/api/auth.py` naming **no repo** — a
+bulk-concept loader run from the operator's machine. Its key was **live and
+non-empty (43 chars)** in the running `pdhc_app`, created 2026-04-28, **never
+rotated** — the same batch as the `monitor.pdhc` key destroyed under #727. And
+plan checks the service-key path **first** in `requires_role`, so a valid key
+bypassed SSO entirely.
+
+It was found only by `tools/build_platform_graph.py`. Two hand audits of exactly
+this question (#727's and #729's) had already reported the wrong answer — two
+allowlists, then three. There are four.
+
+### Removed from
+- `planp/app/api/auth.py` — the `KNOWN_SERVICES` entry
+- `planp/app/config.py` — the config read; the env var is now inert wherever set
+- `planp/app/api/capability.py` — `known_sources`, which advertised it.
+  Advertising an identity that cannot authenticate is worse than not advertising
+  it: a caller follows the documentation and gets a 403 the documentation says
+  is impossible.
+- `planp/docs/technical.md` — three places
+
+### What this breaks, deliberately
+Both bulk loaders are now dead:
+- `plan.pdhc/tools/load_catalogue.py` — marked RETIRED at the top rather than
+  deleted, because it documents the bulk-load wire format
+- `sim.pdhc/concepts/load_to_plan.py` — **in another repo, left untouched**; it
+  will 403. Flagged to the operator rather than edited.
+
+If bulk loading is wanted again: mint a **new** identity under its own name with
+its own key. Do not reinstate this one — reusing a retired credential is how the
+platform accumulated three orphan identities.
+
+323 tests pass (was 320). `tests/test_loader_identity_retired.py` pins the
+removal, the config absence and the capability statement; the first was verified
+to fail with the entry restored.

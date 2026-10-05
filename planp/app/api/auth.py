@@ -21,9 +21,18 @@ def _phases(blob):
 # without an SSO session by sending X-Source-Service + X-Service-Key.
 # Each entry maps a recognised source-service name to the env var holding
 # its expected key. Empty/unset key in config => that source is rejected.
+# loader.pdhc was removed 2026-10-05. It named no repo — a bulk-concept loader
+# identity run from the operator's machine — and held a live, never-rotated
+# service key (created 2026-04-28, same batch as monitor.pdhc, #727) that
+# bypassed SSO here. The operator judged the loader project not worth keeping.
+#
+# The two scripts that used it are now dead: plan.pdhc/tools/load_catalogue.py
+# and sim.pdhc/concepts/load_to_plan.py. If bulk loading is ever needed again,
+# mint a NEW identity under its own name with its own key, rather than reviving
+# this one — reusing a retired credential is how the platform accumulated three
+# orphan identities in the first place.
 KNOWN_SERVICES = {
-    'loader.pdhc': 'PLAN_LOADER_SERVICE_KEY',
-    'sim.pdhc':    'SIM_PDHC_SERVICE_KEY',
+    'sim.pdhc': 'SIM_PDHC_SERVICE_KEY',
 }
 
 

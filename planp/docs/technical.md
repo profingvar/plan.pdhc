@@ -220,7 +220,10 @@ Two paths, both in `app/api/auth.py`.
 `X-Source-Service` + `X-Service-Key` headers let a recognised sibling call
 POST/PUT/DELETE without an SSO session (`_service_key_outcome()`). Recognised
 sources (`KNOWN_SERVICES`):
-- `loader.pdhc` → env `PLAN_LOADER_SERVICE_KEY` (bulk concept loader)
+- ~~`loader.pdhc` → env `PLAN_LOADER_SERVICE_KEY`~~ — **retired 2026-10-05.** It named
+  no repo and held a live, never-rotated key that bypassed SSO. The two bulk
+  loaders that used it are dead; mint a new identity under its own name if
+  bulk loading is needed again.
 - `sim.pdhc` → env `SIM_PDHC_SERVICE_KEY` (concept-GUID resolution at run time)
 
 An unknown source, missing key, or wrong key returns **403**. Valid-shape
@@ -239,7 +242,7 @@ Key env vars (see `.env.example`):
 | `DATABASE_URL` | Postgres DSN (default DB `pdhc_gateway` on `:9031`) |
 | `AUTH_DISABLED` | `true` = bypass auth (local dev only); prod sets `false` |
 | `SSO_BASE_URL` / `SSO_CLIENT_ID` / `SSO_CLIENT_SECRET` / `SSO_CALLBACK_URL` | SSO integration |
-| `PLAN_LOADER_SERVICE_KEY` / `SIM_PDHC_SERVICE_KEY` | trusted-sibling service keys |
+| `SIM_PDHC_SERVICE_KEY` | trusted-sibling service key (`PLAN_LOADER_SERVICE_KEY` retired 2026-10-05) |
 | `AUTHORING_ASSISTANT_ENABLED` | master flag for `/api/v1/authoring/*` (default false) |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_API_BASE` | Layer-2 assistant (no key ⇒ validation-only) |
 | `AUTHORING_ASSISTANT_MODELS` / `_DEFAULT_MODEL` / `_MAX_TOKENS` / `_TIMEOUT_SECONDS` | model allowlist + bounds |
@@ -278,7 +281,7 @@ Key env vars (see `.env.example`):
 - To read the authored terminology programmatically, prefer the FHIR operations
   in §4 (`$expand`, `$validate-code`, `$lookup`, `$translate`) — they reflect
   live authoring with no cache to invalidate.
-- The service-key path (§6) is the supported way for `loader.pdhc` / `sim.pdhc`
+- The service-key path (§6) is the supported way for `sim.pdhc`
   to write/resolve without an SSO session; other callers must use SSO.
 - Do not rely on `Transaction.unit` / `Goal.target_unit` as the unit of record —
   resolve the unit from the concept (§2).

@@ -223,7 +223,7 @@ def capability_statement():
                                'sending the headers below. Each service\'s '
                                'expected key is held in the service\'s env var.',
                 'headers': ['X-Source-Service', 'X-Service-Key'],
-                'known_sources': ['loader.pdhc', 'sim.pdhc'],
+                'known_sources': ['sim.pdhc'],
             },
         },
         'rate_limiting': {

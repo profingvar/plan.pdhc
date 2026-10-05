@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""One-file bulk loader for plan.pdhc: concepts + value sets + values.
+"""RETIRED 2026-10-05 — THIS SCRIPT NO LONGER WORKS.
+
+The `loader.pdhc` identity it authenticates as was removed from plan.pdhc's
+KNOWN_SERVICES, and PLAN_LOADER_SERVICE_KEY was destroyed. Every request this
+makes now gets 403 "unknown source service".
+
+Kept rather than deleted because it documents the bulk-load wire format. To
+revive bulk loading, mint a NEW identity under its own name with its own key;
+do not reinstate this one.
+
+One-file bulk loader for plan.pdhc: concepts + value sets + values.
 
 Give it ONE YAML manifest describing a catalogue and it makes the right
 plan.pdhc API calls, in dependency order, idempotently:

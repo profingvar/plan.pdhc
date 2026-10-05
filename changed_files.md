@@ -434,3 +434,12 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 
 - planp/app/api/concepts.py — accept `limit` as alias for `per_page` (silent-50 default fix). Deployed 2026-08-15 (pdhc_app rebuild).
 - .env APP_VERSION=98bf711 — populate health `version` (was "dev"). 2026-08-15.
+
+## 2026-10-05 — retire loader.pdhc
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/auth.py — loader.pdhc removed from KNOWN_SERVICES.
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/config.py — PLAN_LOADER_SERVICE_KEY no longer read into config.
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/capability.py — known_sources no longer advertises it.
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/concepts.py — comment updated.
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/technical.md — three references marked retired.
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/tools/load_catalogue.py — marked RETIRED; kept for the wire format.
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_loader_identity_retired.py — NEW, 3 tests.
