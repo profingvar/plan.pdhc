@@ -920,3 +920,42 @@ platform accumulated three orphan identities.
 323 tests pass (was 320). `tests/test_loader_identity_retired.py` pins the
 removal, the config absence and the capability statement; the first was verified
 to fail with the entry restored.
+
+### 2026-10-05 — after retiring loader.pdhc: the service-key bypass is vestigial
+
+With `loader.pdhc` gone, `KNOWN_SERVICES` holds one entry — `sim.pdhc` — and
+**`SIM_PDHC_SERVICE_KEY` is unset in plan's production `.env`** (verified in the
+running `pdhc_app`: `_service_key_outcome()` returns `False` for `sim.pdhc`).
+
+So the service-key bypass currently **admits nobody**. That is the third time
+this shape has appeared — an allowlist entry that cannot authenticate, and is
+indistinguishable from one nobody has tried (`2gate.pdhc` #732, `monitor.pdhc`
+#727). It is exactly what the live-config layer (#746) exists to surface
+automatically instead of by hand.
+
+### Correction to a claim made the same day
+It was first reported that "if sim is meant to resolve concept GUIDs against plan
+at runtime, it currently can't". **That was wrong.** It can, and does. The real
+shape, checked:
+
+- `sim/plandef_client.py` calls `GET /api/v1/plandefinitions` and
+  `/plandefinitions/<guid>` at runtime.
+- Those routes carry **no `@requires_role`** — an unauthenticated GET returns
+  **200** (probed on 127.0.0.1:9030).
+- sim sends `X-API-Key`, which **those routes never read** — only
+  `planp/app/api/forms.py` reads that header.
+
+So sim's authentication header is decorative on this path, and the call succeeds
+because the route is open. sim never touches `KNOWN_SERVICES` at all.
+
+### What follows
+1. **plan's service-key bypass looks entirely dead.** It existed for `loader.pdhc`
+   (retired today) and for a sim path that sim does not use. Removing it
+   altogether would close the surface rather than leaving a dict that admits
+   nobody — the same reasoning as dashboard's empty dict in #729. Needs a
+   decision, not an assumption: unset today is not the same as never needed.
+2. **Separately, and bigger: `GET /api/v1/plandefinitions` is open.** So is
+   `GET /api/v1/concepts`. For a terminology and plan catalogue that may well be
+   deliberate — these are definitions, not patient data — but it is worth being
+   a recorded decision rather than an accident, because the service-key
+   machinery sitting beside it implies someone once thought otherwise.
