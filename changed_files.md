@@ -460,3 +460,14 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/scripts/gen_db_schema_snapshot.py   (NEW)
 /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_assume_local_786.py   (NEW)
 /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_docs_serving.py
+
+## 2026-10-07 — #786 item 4: /transfer retired
+| 2026-10-07 | planp/app/api/transfer.py | DELETED — the cdr_6 proxy |
+| 2026-10-07 | planp/app/routes/transfer.py | DELETED — the page route |
+| 2026-10-07 | planp/app/templates/transfer.html | DELETED |
+| 2026-10-07 | planp/app/__init__.py | both transfer blueprints unregistered |
+| 2026-10-07 | planp/app/config.py | CDR6_* + CDR_TRANSFER_TARGETS removed, tombstoned |
+| 2026-10-07 | planp/app/templates/base.html | Transfer nav link removed |
+| 2026-10-07 | planp/.env.example | CDR6 block tombstoned (ROSETTA_SERVICE_KEY over-deleted and restored) |
+| 2026-10-07 | planp/tests/test_transfer.py | DELETED (12 tests asserting the feature worked) |
+| 2026-10-07 | planp/tests/test_transfer_retired.py | NEW — 8 guards, incl. a stale-env reload check |

@@ -90,21 +90,21 @@ class Config:
     ROSETTA_BASE_URL = os.environ.get('ROSETTA_BASE_URL', '')
     ROSETTA_SERVICE_KEY = os.environ.get('ROSETTA_SERVICE_KEY', '')
 
-    # #530 — Transfer page: promote synthetic cdr_6 content into a working CDR.
-    # plan.pdhc only TRIGGERS; the transfer runs server-side in cdr_6 (#529).
-    # cdr_6 is sim-only (its Rule 2), so we call it as X-Source-Service:
-    # sim.pdhc — CDR6_SERVICE_KEY must equal cdr_6's SIM_PDHC_SERVICE_KEY. Both
-    # unset = the Transfer page reports "not configured" and does nothing.
-    CDR6_BASE_URL = os.environ.get('CDR6_BASE_URL', '')
-    CDR6_SERVICE_KEY = os.environ.get('CDR6_SERVICE_KEY', '')
-    # Longer timeout: a real (non-dry) transfer of a large run can take a while.
-    CDR6_TIMEOUT = int(os.environ.get('CDR6_TIMEOUT', '120'))
-    # Destinations the UI offers (cdr_6 re-validates the real set server-side).
-    CDR_TRANSFER_TARGETS = [
-        t.strip() for t in os.environ.get(
-            'CDR_TRANSFER_TARGETS', 'cdr1,cdr2,cdr3,cdr4,cdr5'
-        ).split(',') if t.strip()
-    ]
+    # #786 — the #530 CDR6_* settings are GONE, deliberately and by name.
+    #
+    # plan.pdhc is the authoring plane. The Transfer page it fed was a thin
+    # proxy over cdr_6's engine, and it reached cdr_6 by presenting
+    # `X-Source-Service: sim.pdhc` with cdr_6's sim service key — so the
+    # authoring plane held a data-plane credential it had no other use for, and
+    # cdr_6's audit attributed those transfers to sim.pdhc rather than to plan
+    # or to the operator who clicked. `sim cdr-transfer` already does the same
+    # job from the service that legitimately owns that key.
+    #
+    # They are NOT read back under any name. An operator with a stale
+    # CDR6_SERVICE_KEY in their .env must be IGNORED, not quietly honoured:
+    # silently re-admitting a borrowed credential is how retired identities
+    # come back (#727 monitor.pdhc, #736 loader.pdhc). Pinned by
+    # tests/test_transfer_retired.py.
 
     # #521 GA-5 — fail-closed validation on concept/plandef saves. When True
     # (default), an ERROR-severity validation issue REJECTS the save on both the

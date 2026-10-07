@@ -1335,3 +1335,62 @@ guard; one that requires writing down what you checked is.
 
 Script and its findings kept at `planp/scripts/deploy_786.sh` and
 `planp/scripts/deploy_786.ACCEPT_STALE`.
+
+## 2026-10-07 — #786 item 4 EXECUTED: /transfer retired from plan.pdhc
+
+Operator decision ("Retire transfer, deploy"). 341 tests pass (345 − 12
+transfer tests + 8 retirement guards).
+
+### Removed
+
+| file | action |
+|---|---|
+| `planp/app/api/transfer.py` | deleted (the cdr_6 proxy: targets / preview / execute) |
+| `planp/app/routes/transfer.py` | deleted (the SSO-gated page route) |
+| `planp/app/templates/transfer.html` | deleted |
+| `planp/app/__init__.py` | both blueprints unregistered |
+| `planp/app/config.py` | `CDR6_BASE_URL`, `CDR6_SERVICE_KEY`, `CDR6_TIMEOUT`, `CDR_TRANSFER_TARGETS` removed |
+| `planp/app/templates/base.html` | Transfer nav link removed |
+| `planp/.env.example` | the CDR6 block replaced by a tombstone |
+| `planp/tests/test_transfer.py` | replaced by `test_transfer_retired.py` |
+
+### Why, in the order that actually mattered
+
+1. **It was already non-functional in production.** `CDR_TRANSFER_TARGETS` was
+   unset on `pdhc_app` and `_validate_to` rejected anything not in that list,
+   so preview and execute both 400'd. The page reported `configured: true` —
+   that flag only checked `CDR6_BASE_URL` — with `targets: []`. It looked wired
+   and could do nothing.
+2. **plan held sim's credential and impersonated it.** cdr_6 is sim-only (its
+   Rule 2), so plan called it as `X-Source-Service: sim.pdhc` with cdr_6's SIM
+   service key. The authoring plane held a data-plane credential it had no
+   other use for, and cdr_6's audit attributed those transfers to sim.pdhc —
+   not to plan, and not to the operator who clicked.
+3. `sim cdr-transfer` already does the job, from the service that owns the key.
+
+### What the guard tests are actually for
+
+Deleting code is the easy half. `test_transfer_retired.py` pins that the
+settings are **not read back under any name**, including a test that sets all
+four in the environment, reloads `config`, and asserts they still do not
+appear. An operator with a stale `CDR6_SERVICE_KEY` must be ignored, not
+quietly honoured — three identities on this platform lingered or returned
+exactly that way: monitor.pdhc (#727), 2gate.pdhc (#732), loader.pdhc (#736).
+It also checks the URL map rather than only the blueprint names, since a route
+re-registered under another name would still be a live transfer endpoint.
+
+### A mistake I made and caught
+
+Removing the CDR6 block from `.env.example` by walking backwards to the
+preceding comment header swallowed **`ROSETTA_SERVICE_KEY=` and the last line
+of its comment** — the file then read "NEVER commit a" and stopped mid-sentence.
+Restored verbatim from git and re-diffed: the only removals are the ten CDR6
+lines, every other change is an added comment. The lesson is the ordinary one
+about anchoring a deletion on the block you mean rather than on the nearest
+delimiter.
+
+### Not touched
+
+cdr_6's own `SIM_PDHC_SERVICE_KEY` is unchanged — this removes plan's *copy* of
+a borrowed credential, it does not rotate sim's key or alter cdr_6. Rotating it
+would break sim, which legitimately uses it.
