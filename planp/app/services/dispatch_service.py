@@ -71,19 +71,32 @@ def _find_matching_contract(entries, plan_definition_refs, provider_org_guid):
     `plan_definition_refs` is every identifier this PlanDefinition answers to.
     #771: a PlanDefinition carries TWO independent GUIDs — `guid` and `fhir_id`,
     each from its own uuid4(), strictly 1:1 and never equal — and contracts in
-    production reference BOTH. Measured 2026-10-07 across the 10 live contracts:
+    production reference BOTH. Measured 2026-10-07 across the 10 live contracts,
+    and re-counted in the database the same day:
 
-        7 topics reference the `guid`     (incl. 3 inert test artifacts)
-        3 topics reference the `fhir_id`  (Medituner, CambioCaregiver, ff10d695)
+        7 references on the `guid`     (incl. 3 inert test artifacts)
+        4 references on a `fhir_id`, spread over 3 contracts --
+            b23c8bec (Medituner) and ff10d695 carry one each, and
+            58d10bff (CambioCaregiver) carries TWO, to two different plans.
+
+    Note the asymmetry: 3 contracts, 4 references. An earlier version of this
+    docstring said "3 topics", conflating the two, which would have made a
+    rewrite look complete one reference early.
 
     This function was passed only `fhir_id`, so the seven guid-referencing
     contracts could never match and dispatch answered "No active contract
     found" for every one of them.
 
-    Accepting both is a bridge, not the destination: #771 collapses the two
-    identifiers, and once every topic references one value this takes a single
-    reference again. Accepting both FIRST means that convergence can rewrite
-    contract topics without a window in which dispatch is broken.
+    Accepting both is a bridge. #771 collapses the two identifiers, and
+    accepting both FIRST means that convergence can rewrite contract topics
+    with no window in which dispatch is broken.
+
+    The tolerance should SURVIVE the convergence rather than be removed with
+    it. #771 asks for the translation step to go, but a contract restored from
+    a backup predating the rewrite still carries a retiring reference, and the
+    cost of keeping this is one set comprehension against a dispatch path that
+    silently 404s when it guesses wrong. Keep it; delete the DUPLICATION, not
+    the leniency that makes the duplication survivable.
     """
     wanted = {f'PlanDefinition/{r}' for r in plan_definition_refs if r}
     for entry in entries:
