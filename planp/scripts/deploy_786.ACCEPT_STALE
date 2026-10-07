@@ -1,0 +1,12 @@
+# Paths whose server copy I have INSPECTED and determined to be an older
+# version of the git file, not uncommitted server-side work.
+#
+# The drift check cannot tell "server is behind" from "server is ahead" -- both
+# look like "differs from baseline". On the first run it reported these two as
+# "edited on the server and never committed", which was the wrong diagnosis.
+# Rather than force past the guard with --apply, each entry here records what
+# was actually checked.
+#
+# format: <path><TAB><what was verified>
+progress.md	server is Aug 1 and 853 lines vs git 1277; exactly 6 server-only lines, all of them the superseded "Not deployed - local build only" paragraph that git replaces with "UPDATE 2026-08-06 (#525): GA-4 and GA-5 are now DEPLOYED ... the framing above is superseded". Nothing unique is lost.
+changed_files.md	server is Aug 1 and 401 lines vs git 462; ZERO server-only lines. Git is a strict superset.

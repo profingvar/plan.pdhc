@@ -1275,3 +1275,63 @@ Two mistakes in my own harness, both mine and both caught: I asserted the
 importer's report keys as `inserted`/`updated` when the real shape is
 `summary.n_accepted` / `rejected`, and a standalone Jinja render kept failing
 on missing Flask globals until I used the real test client instead.
+
+### 2026-10-07 — #786 DEPLOYED, and what the compare step caught
+
+Live: `{"database":"connected","service":"plan.pdhc","status":"ok","version":"98bf711"}`.
+Backup `miserver:~/backups/predeploy/plan.pdhc/20261007T124946Z/` (12 files).
+16 files shipped, including #771's dispatch_service docstring, which had been
+committed this morning and never deployed.
+
+**Verified in production, not inferred:**
+
+* `17 entries, 0 unresolvable` — every DOCS_CATALOG entry resolves INSIDE the
+  container. This is the defect class the change fixes, so it is asserted in
+  prod rather than trusted from the local test.
+* `/api/v1/docs` serves 17 documents; `technical.md`, `user_manual.md` and
+  `concept_import.md` are present; the two sso documents are correctly absent.
+* `db_schema_snapshot.md` live header reads **Generated: 2026-10-07 / Tables: 22**
+  (was Date: 2026-03-20 / Tables: 17).
+* `progress.md` serves **1277 lines** (the server copy was 853 and from Aug 1).
+* The landing page returns 200 with the explainer and all five chain steps.
+* `resolve_or_local("")` resolves to prod's existing `local` library
+  (`c44ac613`), `resolve_or_local("snomd")` hands `snomd` back unlocalised, and
+  `canonical_libs` still has **8 rows with exactly 1 local** — so the on-demand
+  create found the existing row instead of adding a duplicate.
+* No errors in `pdhc_app` logs since the deploy.
+
+**Two corrections to what I wrote earlier today.**
+
+1. **The `db_schema_snapshot.md` 404 was LOCAL-DEV ONLY.** In production the
+   Dockerfile consolidates everything into `/app/docs/` (`COPY planp/docs/`
+   plus `COPY planp/db_schema_snapshot.md ./docs/`), so it always resolved
+   there — it was simply the stale 2026-03-20 version. The resolver bug was
+   real, but it only ever broke the local dev server. I had stated it as if
+   /docs were broken in production.
+2. **`technical.md` and `user_manual.md` would have 404'd in production** had I
+   shipped only the catalog. They are in `planp/docs/` in git but were absent
+   from the SERVER's source tree, which is behind. Checking the container's
+   filesystem before deploying is what caught it; adding catalog entries for
+   files the server does not have would have recreated the exact defect this
+   ticket fixes.
+
+**The drift check stopped the first attempt, and its diagnosis was wrong.**
+`progress.md` and `changed_files.md` differed from baseline, and the script
+reported "edited on the server and never committed". The opposite was true: the
+server copies were from **Aug 1** and BEHIND git. The check compares against a
+baseline, so "ahead" and "behind" look identical to it.
+
+Rather than force past the guard with `--apply`, the difference was measured:
+`changed_files.md` had **zero** server-only lines (git a strict superset), and
+`progress.md` had exactly **six**, all of them the superseded "Not deployed —
+local build only" paragraph that git replaces with "UPDATE 2026-08-06 (#525):
+GA-4 and GA-5 are now DEPLOYED … the framing above is superseded". Nothing
+unique was lost.
+
+The script now distinguishes the two cases in its message, and an inspected
+difference must be recorded in `ACCEPT_STALE` with what was verified before it
+will proceed. A guard that can be silenced by rerunning with a flag is not a
+guard; one that requires writing down what you checked is.
+
+Script and its findings kept at `planp/scripts/deploy_786.sh` and
+`planp/scripts/deploy_786.ACCEPT_STALE`.
