@@ -84,3 +84,48 @@ class TestEveryCatalogEntryActuallyResolves:
         filenames = {d['filename'] for d in body['documents']}
         assert 'sso_technical_manual.md' not in filenames
         assert 'sso_user_guide.md' not in filenames
+
+
+class TestNoDocumentIsShadowed:
+    """#786 item 3, follow-up — a hazard the resolver fix itself created.
+
+    Adding `planp/` to the search path is what made `db_schema_snapshot.md`
+    resolvable, because that is where it lives. But `planp/` now sits BEFORE
+    the project root, so any document present in both locations silently
+    resolves to the `planp/` copy.
+
+    That is not hypothetical: writing this ticket's notes, progress.md and
+    changed_files.md were appended under `planp/` instead of the repo root,
+    creating 135-line and 15-line stubs beside the real 1142-line and 447-line
+    files. /docs then served the stubs. The resolver was doing exactly what it
+    was told; the two files were the mistake.
+
+    So the invariant is not "the resolver works" but "no catalog document
+    exists in more than one search directory". A shadowed document is worse
+    than a missing one: a missing one 404s, a shadowed one serves a plausible
+    wrong answer.
+    """
+
+    def test_no_catalog_document_exists_in_two_search_directories(self):
+        import os
+        from app.api import capability
+        from app.api.capability import DOCS_CATALOG
+
+        planp_dir = os.path.dirname(os.path.dirname(
+            os.path.dirname(os.path.abspath(capability.__file__))))
+        search_dirs = [
+            os.path.join(planp_dir, 'docs'),
+            planp_dir,
+            os.path.dirname(planp_dir),
+            '/project-docs',
+        ]
+        shadowed = {}
+        for filename in DOCS_CATALOG:
+            hits = [d for d in search_dirs
+                    if os.path.isfile(os.path.join(d, filename))]
+            if len(hits) > 1:
+                shadowed[filename] = hits
+        assert shadowed == {}, (
+            'these documents exist in more than one search directory, so /docs '
+            'serves whichever comes first and the other copy is invisible: %r'
+            % shadowed)
