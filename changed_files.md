@@ -443,3 +443,5 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/technical.md — three references marked retired.
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/tools/load_catalogue.py — marked RETIRED; kept for the wire format.
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_loader_identity_retired.py — NEW, 3 tests.
+- planp/app/services/dispatch_service.py (#771 — match a contract topic under either identifier)
+- planp/tests/test_dispatch_both_ids.py (#771)
