@@ -1,0 +1,9 @@
+# Paths whose server copy I have INSPECTED and found to be an older version of
+# the local file, not uncommitted server-side work.
+#
+# The baseline comparison cannot tell "server is behind" from "server is
+# ahead" -- both merely differ. Recording what was checked is the price of
+# proceeding; a guard that a flag can silence is not a guard.
+#
+# format: <path><TAB><what was verified>
+progress.md	server 1277 lines, local 1396; ZERO lines exist only on the server, and the server file is a STRICT PREFIX of the local one (verified by comparison, not inspection). It is behind by exactly the deploy-record section written after the 12:49 deploy shipped it. Nothing unique is lost.

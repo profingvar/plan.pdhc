@@ -1394,3 +1394,60 @@ delimiter.
 cdr_6's own `SIM_PDHC_SERVICE_KEY` is unchanged — this removes plan's *copy* of
 a borrowed credential, it does not rotate sim's key or alter cdr_6. Rotating it
 would break sim, which legitimately uses it.
+
+### 2026-10-07 — /transfer retirement DEPLOYED
+
+Live: `{"database":"connected","service":"plan.pdhc","status":"ok"}`.
+Backup `miserver:~/backups/predeploy/plan.pdhc/20261007T125833Z/` (10 files,
+including the `.env` at chmod 600).
+
+**Verified in production:**
+
+| check | result |
+|---|---|
+| `GET /transfer` | **404** (was 302 to login) |
+| `GET /api/v1/transfer/targets` | **404** (was 401) |
+| `POST /api/v1/transfer/execute` | **404** |
+| `api/transfer.py`, `routes/transfer.py`, `transfer.html` in the image | all gone |
+| `CDR6_*` in the container environment | **0** |
+| the four settings in `app.config` | all absent |
+| url rules mentioning transfer | **0** |
+| Transfer in the nav | absent |
+
+`.env` now holds 0 CDR6 references and carries a dated tombstone saying why.
+
+**cdr_6 and sim are untouched, checked rather than assumed:** `cdr_6_app` up 21
+hours, `SIM_PDHC_SERVICE_KEY` still set, cdr_6 `/healthz` ok. This removed
+plan's *copy* of a borrowed credential; rotating sim's key would have broken
+the service that legitimately uses it.
+
+### The first --apply aborted, and the reason is worth keeping
+
+It died immediately after the backup line, having written nothing. Cause:
+
+```bash
+[ -f "$REPO/$f" ] && { mkdir -p ...; cp -p ...; }
+```
+
+returns 1 when the file is absent. Under `set -euo pipefail` that makes the
+enclosing `while` loop fail and the script exit. The backup list ends with
+`planp/tests/test_transfer.py`, which was already gone — so the last iteration
+failed, and the run stopped after backing up 9 files and before copying or
+deleting anything.
+
+Fail-safe, but silent: it printed "Backing up to …" and simply ended. For a
+list that deliberately contains both new and already-removed files, a missing
+file is not an error, so it is now an explicit `if`. The lesson is that `&&` as
+a statement is a trap under `set -e` — the guard was correct to stop, but it
+should not have looked like success.
+
+### One thing to know for the next .env change
+
+`docker-compose up -d --build app` **also recreated `pdhc_db`**, because the
+changed `.env` is shared by both services in the compose file. The data is on a
+volume and survived — verified by counts, not assumed: concepts 99, plandefs 3,
+canonical_libs 8, valuesets 12, values 51, transactions 14, units 70, all
+identical to the pre-deploy measurement. Worth expecting next time: editing
+`.env` here restarts the database too.
+
+Scripts kept at `planp/scripts/deploy_786_retire.sh` (+ `.ACCEPT_STALE`).
