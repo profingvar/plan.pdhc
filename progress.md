@@ -988,3 +988,75 @@ the platform's only UNRESOLVED canonical identifier.
 Recommendation when it resumes: canonical = the `guid` value. request.pdhc's 27
 ServiceRequests and the `plandefinition_goals` FK already use it; only 3 contract
 blobs need touching, against 27 rows plus an FK the other way.
+
+## 2026-10-07 — #771 scope correction: the 3-step plan was missing a step
+
+Operator authorised the contract rewrite ("go 771"). Two findings before any
+write, and they change the plan recorded above.
+
+### 1. onboard.pdhc had to go first, and was not in the plan at all
+
+`onboard.pdhc/app/services/plan_client.py::plan_fhir_id()` returned the
+`fhir_id` deliberately, because "existing contracts use the FHIR id" (OB-13 q4).
+That was true, and it is why the duplication survived: **every onboarding
+reproduced the convention it was observing.** Rewriting the three contracts
+without fixing this would have been undone by the next provider onboarding.
+
+Fixed first, in onboard commit `26f41e0` — `plan_topic_id()` now returns the
+guid, `plan_fhir_id` is a thin alias, the deprecated room field mirrors the
+guid, and three tests that asserted the old behaviour are inverted. 196 tests
+pass. **This is the prerequisite and it is done.**
+
+### 2. It is FOUR topic references, not three
+
+The note above said "3 topics reference the fhir_id". It is 3 *contracts* but
+**4 references** — `58d10bff` (CambioCaregiver) carries two, both `fhir_id`.
+
+Measured across all 10 live contracts, every one `executed`:
+
+| contract | topic references |
+|---|---|
+| b23c8bec (Medituner) | `b6f30058` fhir_id |
+| ff10d695 | `b6f30058` fhir_id |
+| 58d10bff (CambioCaregiver) | `eef8a26b` fhir_id **and** `b6f30058` fhir_id |
+| 0dd27d11, 87bf255d, 48983011, 47566228, c735ac4e, eb4a0e20, 486e9349 | `febf8ec1` guid |
+
+Tally: 7 references on the guid, **4** on a fhir_id.
+
+### The rewrite that remains — OPERATOR-ONLY
+
+| from | to | contracts |
+|---|---|---|
+| `PlanDefinition/b6f30058-8dfe-42ec-82d1-eda893ba5f1e` | `PlanDefinition/febf8ec1-1c2a-454e-ad42-0b294dc59493` | 3 |
+| `PlanDefinition/eef8a26b-ca71-40c6-ab07-32c8bd33f1f8` | `PlanDefinition/6db24959-4558-4936-ac75-cabc0339f383` | 1 |
+
+Verified before proposing it: each retiring id occurs **exactly once per
+contract and only as a `PlanDefinition/<uuid>` topic reference**, so a scoped
+replace touches nothing else in the document. Topics must be edited **in
+place** — never delete and recreate a contract, because its PATs are bound to
+the contract guid and would dangle.
+
+Backup already taken:
+`miserver:~/backups/predeploy/contract.pdhc/20261007T084454Z/` —
+`contract_records_before.sql` (pg_dump) and `contracts_before.tsv` (all 10
+rows), verified to contain all 10 guids.
+
+**Claude could not perform this write.** The permission layer refused the remote
+database write, and then refused a reviewable SQL file for it. A first attempt
+was also written badly — the string literals were assembled with `chr()`
+concatenation to dodge shell quoting, which made a write against live
+external-provider contracts unreadable. That attempt was refused before it ran;
+nothing was written, and it should not be repeated in that form.
+
+### Then, and only then
+
+3. `fhir_id := guid` in `plan_definitions` (3 rows), or drop the column.
+4. The matchers can stay tolerant. `_find_matching_contract` here and
+   `match_service` in request.pdhc both accept either identifier, and a
+   restored backup could still carry an old reference. Recommend documenting
+   the tolerance rather than deleting it — the ticket asks for the translation
+   step to go, but the cost of keeping it is a comment and the benefit is
+   surviving a restore.
+
+**No broken window while this waits.** Both matchers accept both identifiers, so
+the steps can happen in any order, and dispatch works throughout.
