@@ -29,3 +29,58 @@ class TestDeploymentPlanNotServed:
         # Sanity: legitimate docs are still served.
         resp = client.get('/api/v1/docs/api_reference.md')
         assert resp.status_code == 200
+
+
+class TestEveryCatalogEntryActuallyResolves:
+    """#786 item 3. The catalog advertised a document that 404'd, and hid the
+    two most current ones.
+
+    The failure was invisible by construction: `_get_docs_list()` uses the same
+    resolver as the download route and simply OMITS anything that does not
+    resolve. So a broken entry disappeared from the listing instead of
+    appearing as broken, and nobody could see that the catalog and the
+    filesystem disagreed. These tests compare the two directly.
+    """
+
+    def test_no_catalog_entry_is_unresolvable(self, client):
+        """`db_schema_snapshot.md` was the one that failed: it lives at
+        `planp/db_schema_snapshot.md`, and the resolver searched `planp/docs/`,
+        the project root and `/project-docs` -- never `planp/` itself.
+        """
+        from app.api.capability import DOCS_CATALOG, _resolve_doc_path
+        unresolved = [f for f in DOCS_CATALOG if _resolve_doc_path(f) is None]
+        assert unresolved == [], (
+            'these are advertised in DOCS_CATALOG but resolve to no file, so '
+            'they are silently dropped from /docs: %r' % unresolved)
+
+    def test_the_schema_snapshot_is_served(self, client):
+        resp = client.get('/api/v1/docs/db_schema_snapshot.md')
+        assert resp.status_code == 200
+
+    def test_the_schema_snapshot_is_generated_not_hand_written(self, client):
+        """It was hand-maintained, dated 2026-03-20, and claimed 17 tables
+        while the database had 22 -- the whole forms/questionnaire subsystem
+        was absent while the dashboard counted Forms on its front page.
+        It is now generated, and the marker says so.
+        """
+        body = client.get('/api/v1/docs/db_schema_snapshot.md').data.decode()
+        assert 'gen_db_schema_snapshot.py' in body
+        assert 'Tables: 22' in body or '**Tables:** 22' in body
+
+    def test_the_two_rule_25_documents_are_offered(self, client):
+        """Rule 25 requires docs/technical.md and docs/user_manual.md to
+        exist. They did -- and were advertised nowhere, while /docs listed
+        eleven documents older than 60 days."""
+        body = client.get('/api/v1/docs').get_json()
+        filenames = {d['filename'] for d in body['documents']}
+        assert 'technical.md' in filenames
+        assert 'user_manual.md' in filenames
+
+    def test_sso_documents_stay_out_of_this_services_catalog(self, client):
+        """Deliberately absent. routes/main.py records that a previous second
+        copy of this catalog drifted by advertising exactly these; sso.pdhc
+        serves its own documentation."""
+        body = client.get('/api/v1/docs').get_json()
+        filenames = {d['filename'] for d in body['documents']}
+        assert 'sso_technical_manual.md' not in filenames
+        assert 'sso_user_guide.md' not in filenames

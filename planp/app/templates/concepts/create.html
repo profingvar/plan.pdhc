@@ -37,13 +37,24 @@
     </div>
 
     <div class="form-group">
-      <label for="canonical_lib">Canonical Library *</label>
-      <select id="canonical_lib" name="canonical_lib" class="form-control" required>
-        <option value="">Select...</option>
+      {#
+        #786 item 2: no longer `required` with an empty "Select..." option.
+        A term with no reference into a published vocabulary IS local, so local
+        is pre-selected and leaving it alone is a valid, meaningful answer. The
+        server applies the same default (services/canonical_libs.py), so this is
+        a convenience, not the enforcement.
+      #}
+      <label for="canonical_lib">Canonical Library</label>
+      <select id="canonical_lib" name="canonical_lib" class="form-control">
+        <option value="">local — no canonical vocabulary (default)</option>
         {% for lib in canonical_libs %}
-        <option value="{{ lib.guid }}" data-name="{{ lib.canonical_lib_name }}">{{ lib.canonical_lib_display_text or lib.canonical_lib_name }}</option>
+        <option value="{{ lib.guid }}" data-name="{{ lib.canonical_lib_name }}"
+                {% if lib.canonical_lib_name | lower == 'local' %}selected{% endif %}>{{ lib.canonical_lib_display_text or lib.canonical_lib_name }}</option>
         {% endfor %}
       </select>
+      <small class="form-hint">Leave as local when the clinic defines the term
+        itself. Pick a vocabulary only when you also have its reference number
+        below — the two belong together.</small>
     </div>
 
     <div class="form-group">

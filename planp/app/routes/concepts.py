@@ -12,6 +12,7 @@ from app.services.concept_importer import (
     parse_xlsx, parse_csv, validate_and_import, compute_sha256, ImportError_,
 )
 from app.services.save_guard import guard_concept, SaveBlocked  # #521 GA-5
+from app.services.canonical_libs import resolve_or_local
 
 concepts_web_bp = Blueprint('concepts_web', __name__, url_prefix='/concepts')
 
@@ -30,7 +31,11 @@ def list_concepts():
 def create_concept():
     if request.method == 'POST':
         name = request.form.get('concept_name', '').strip()
-        canon_lib = request.form.get('canonical_lib')
+        # #786 item 2: no canonical library chosen means the term is local.
+        # Resolved before guard_concept() so the validator sees the real value
+        # rather than an empty string it would reject.
+        canon_lib = resolve_or_local(request.form.get('canonical_lib'),
+                                     author=name or None)
 
         error = NameUniquenessService.validate_name_for_manual_entry(
             name, Concept, 'concept_name'
@@ -116,7 +121,7 @@ def edit_concept(guid):
                 'response_type': response_type_guid or None,
                 'unit': request.form.get('unit') or None,
                 'valueset': valueset_guid or None,
-                'canonical_lib': request.form.get('canonical_lib'),
+                'canonical_lib': resolve_or_local(request.form.get('canonical_lib')),
                 'canonical_refnumber': request.form.get('canonical_refnumber'),
                 'range_low': request.form.get('range_low', type=float),
                 'range_high': request.form.get('range_high', type=float),
@@ -127,7 +132,10 @@ def edit_concept(guid):
             return redirect(url_for('concepts_web.edit_concept', guid=guid))
 
         concept.concept_name = name
-        concept.canonical_lib = request.form.get('canonical_lib')
+        # #786 item 2: same rule on edit. Clearing the field means local --
+        # it must not write NULL into a NOT NULL column.
+        concept.canonical_lib = resolve_or_local(
+            request.form.get('canonical_lib'))
         concept.canonical_refnumber = request.form.get('canonical_refnumber')
         concept.concept_display_text = request.form.get('concept_display_text')
         concept.concept_explain = request.form.get('concept_explain')

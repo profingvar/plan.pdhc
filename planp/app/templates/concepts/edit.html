@@ -39,9 +39,11 @@
     </div>
 
     <div class="form-group">
-      <label for="canonical_lib">Canonical Library *</label>
-      <select id="canonical_lib" name="canonical_lib" class="form-control" required>
-        <option value="">Select...</option>
+      {# #786 item 2: clearing this means local, not NULL -- the column is NOT
+         NULL, so the old empty option could only ever have been an error. #}
+      <label for="canonical_lib">Canonical Library</label>
+      <select id="canonical_lib" name="canonical_lib" class="form-control">
+        <option value="">local — no canonical vocabulary</option>
         {% for lib in canonical_libs %}
         <option value="{{ lib.guid }}" {% if concept.canonical_lib == lib.guid %}selected{% endif %}>{{ lib.canonical_lib_name }}</option>
         {% endfor %}

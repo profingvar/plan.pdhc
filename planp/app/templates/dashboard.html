@@ -6,6 +6,48 @@
   <h1>PDHC PlanDef Builder</h1>
 </div>
 
+{#
+  #786 item 1. The dashboard was nine cards and nine counts, with no statement
+  of how the objects relate -- a reader had to infer that concepts come before
+  valuesets and that a PlanDefinition is made of transactions. The operator's
+  own wording is used almost verbatim; the chain below it is the same sentence
+  drawn, so the ordering of the cards that follow is not a mystery.
+#}
+<div class="card model-explainer">
+  <h2>What this builds</h2>
+  <p>
+    A <strong>concept</strong> is based on a <strong>term</strong> that is either
+    <em>local</em> or taken from a <strong>canonical vocabulary</strong>
+    (SNOMED CT, LOINC, ATC and the others). The concept has a
+    <strong>value</strong> that is either <em>continuous</em> — a measurement on
+    a scale, with a unit and a range — or <em>categorical</em>, meaning separate
+    alternative responses. Those alternatives are collected in a
+    <strong>value set</strong>.
+  </p>
+  <p>
+    A <strong>PlanDefinition</strong> is a standard plan for the execution of
+    <strong>transactions</strong>, each of which is based on a concept.
+  </p>
+
+  <div class="model-chain" aria-label="term to concept to value set to plan definition">
+    <span class="model-chain-item">Term<small>local or canonical</small></span>
+    <span class="model-chain-arrow" aria-hidden="true">&rarr;</span>
+    <span class="model-chain-item">Concept<small>continuous or categorical</small></span>
+    <span class="model-chain-arrow" aria-hidden="true">&rarr;</span>
+    <span class="model-chain-item">Value set<small>the alternatives, if categorical</small></span>
+    <span class="model-chain-arrow" aria-hidden="true">&rarr;</span>
+    <span class="model-chain-item">Transaction<small>one concept, asked once</small></span>
+    <span class="model-chain-arrow" aria-hidden="true">&rarr;</span>
+    <span class="model-chain-item">PlanDefinition<small>the standard plan</small></span>
+  </div>
+
+  <p class="model-note">
+    A concept with no reference into a canonical vocabulary is
+    <strong>local</strong> &mdash; that is the assumption, not an omission to be
+    filled in later, and the authoring forms default to it.
+  </p>
+</div>
+
 <h2>Core Resources</h2>
 <div class="dash-grid">
   <a class="dash-card" href="{{ url_for('concepts_web.list_concepts') }}">

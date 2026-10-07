@@ -15,6 +15,7 @@ from app.services.concept_importer import (
     parse_xlsx, parse_csv, validate_and_import, compute_sha256, ImportError_,
 )
 from app.services.save_guard import guard_concept, SaveBlocked  # #521 GA-5
+from app.services.canonical_libs import resolve_or_local
 
 concepts_bp = Blueprint('concepts', __name__)
 # Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
@@ -96,9 +97,19 @@ def list_concepts():
 def create_concept():
     data = request.get_json(silent=True) or {}
     name = _sanitize(data.get('concept_name'))
-    canon_lib = data.get('canonical_lib')
-    if not name or not canon_lib:
-        return jsonify({'error': 'concept_name and canonical_lib are required'}), 400
+    # #786 item 2: an omitted canonical_lib means the term is LOCAL, so it is
+    # no longer an error. `concept_name` is still required -- a concept with no
+    # name is not a concept, whereas a concept with no published vocabulary is
+    # simply a local one.
+    #
+    # Note resolve_or_local also accepts a library NAME, so a caller may send
+    # "snomed" instead of its guid. An unrecognised non-empty value is handed
+    # back unchanged and still fails the checks below: silently rewriting a
+    # misspelled "snomd" to local would turn a typo into a wrong terminology
+    # binding, which is worse than a 404.
+    if not name:
+        return jsonify({'error': 'concept_name is required'}), 400
+    canon_lib = resolve_or_local(data.get('canonical_lib'), author=name)
     if not _is_valid_uuid(canon_lib):
         return jsonify({'error': 'Invalid canonical_lib UUID'}), 400
     if not CanonicalLib.query.filter_by(guid=canon_lib).first():

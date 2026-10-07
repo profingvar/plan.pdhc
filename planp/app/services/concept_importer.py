@@ -25,6 +25,7 @@ from app import db
 from app.models.concept_models import (
     Concept, CanonicalLib, ConceptType, ResponseType, Unit,
 )
+from app.services.canonical_libs import ensure_local_lib
 
 logger = logging.getLogger(__name__)
 
@@ -284,12 +285,23 @@ def _apply_row(raw, row_idx):
             f'(got {name!r})'
         )
 
+    # #786 item 2: a blank canonical_lib column means the term is LOCAL. This
+    # used to raise, which made a spreadsheet of purely local concepts -- the
+    # common case when a clinic writes its own -- impossible to import without
+    # typing "local" into every row.
+    #
+    # An unrecognised NON-blank value still raises. That distinction matters:
+    # blank is a statement ("this term is ours"), while "snomd" is a mistake,
+    # and quietly turning a mistake into a local binding would attach a wrong
+    # terminology claim to clinical data.
     canon_lib_val = _clean(raw.get('canonical_lib'))
     if not canon_lib_val:
-        raise ValueError('canonical_lib is required')
-    canon_lib_row = _resolve_lookup(CanonicalLib, 'canonical_lib_name', canon_lib_val)
-    if not canon_lib_row:
-        raise ValueError(f'canonical_lib not found: {canon_lib_val!r}')
+        canon_lib_row = ensure_local_lib(author='csv import (#786)')
+    else:
+        canon_lib_row = _resolve_lookup(CanonicalLib, 'canonical_lib_name',
+                                        canon_lib_val)
+        if not canon_lib_row:
+            raise ValueError(f'canonical_lib not found: {canon_lib_val!r}')
 
     canon_ref = _clean(raw.get('canonical_ref'))
     display_text = _clean(raw.get('display_text'))

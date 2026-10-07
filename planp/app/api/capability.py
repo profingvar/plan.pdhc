@@ -552,7 +552,7 @@ def list_endpoints():
 
 DOCS_CATALOG = {
     'api_reference.md': 'Comprehensive REST API reference with examples (includes FHIR R5 terminology profile §6)',
-    'db_schema_snapshot.md': 'Database schema — all 17 tables with samples and GUIDs',
+    'db_schema_snapshot.md': 'Database schema — every table, with columns, keys and row counts',
     'plan_description.md': 'Domain architecture — concepts, values, valuesets, PlanDefinitions, FHIR terminology profile',
     'readme.md': 'Deployment plan — step-by-step setup and configuration',
     'progress.md': 'Progress log — completed and pending steps (incl. §6 IMPLEMENTATION COMPLETE 2026-06-22)',
@@ -565,14 +565,33 @@ DOCS_CATALOG = {
     'plan_pdhc_fhir_terminology_profile_instruction.md': 'FHIR R5 terminology profile — implementation spec (Status: IMPLEMENTED 2026-06-22)',
     'plan_pdhc_fhir_terminology_profile_DECISIONS.md': 'FHIR R5 terminology profile — ADR for the five locked design decisions',
     'plandef_authoring_assistant_design.md': 'Guided PlanDef authoring assistant (epic #516) — opt-in Claude-assisted, guard-railed builder design',
+    # #786 item 3b. These three existed in docs/ and were offered nowhere,
+    # while /docs listed eleven documents older than 60 days. technical.md and
+    # user_manual.md are the two Rule 25 requires the repo to have, and
+    # technical.md was the most recently edited document in the service.
+    'technical.md': 'Technical manual — architecture, data model, deployment and operations',
+    'user_manual.md': 'User manual — authoring concepts, value sets, forms and PlanDefinitions',
+    'concept_import.md': 'Concept bulk import — the .xlsx/.csv column contract and conflict rules',
+    # Deliberately NOT listed: sso_technical_manual.md and sso_user_guide.md.
+    # They are sso.pdhc's documents sitting in this repo, and the comment in
+    # routes/main.py records that a previous second copy of this catalog
+    # drifted by advertising exactly those. sso.pdhc serves its own docs.
+    # ga5_cleanup_record_2026-08-01.md is a dated one-off record, not a manual.
 }
 
 
 def _resolve_doc_path(filename):
-    # Search order: planp/docs/ → project root → /project-docs/ (Docker mount)
+    # Search order: planp/docs/ → planp/ → project root → /project-docs/ (mount)
+    #
+    # #786 item 3a: `planp/` itself was missing from this list, and
+    # `db_schema_snapshot.md` lives there. So the doc was advertised on /docs
+    # and 404'd on click -- the listing uses this same resolver, but a file
+    # that resolves to None is simply omitted, which is why the broken entry
+    # was invisible until the catalog was audited against the filesystem.
     planp_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     search_dirs = [
         os.path.join(planp_dir, 'docs'),
+        planp_dir,
         os.path.dirname(planp_dir),
         '/project-docs',
     ]
