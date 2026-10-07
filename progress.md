@@ -959,3 +959,32 @@ because the route is open. sim never touches `KNOWN_SERVICES` at all.
    deliberate — these are definitions, not patient data — but it is worth being
    a recorded decision rather than an accident, because the service-key
    machinery sitting beside it implies someone once thought otherwise.
+
+## 2026-10-07 — #771 PARTIAL: the bridge is in, the merge is not
+
+**Done:** `_find_matching_contract` accepts every identifier a PlanDefinition
+answers to. It was passed only `fhir_id`, while 7 of the 10 live contracts
+reference the `guid` — so dispatch answered "No active contract found" for all
+seven. That was a live defect underneath the identifier question, now fixed and
+verified against the real contracts.
+
+**NOT done, by operator decision 2026-10-07 ("don't touch the contracts now"):**
+
+1. rewrite the 3 contract topics that use `fhir_id`
+   `b6f30058 → febf8ec1` and `eef8a26b → 6db24959`
+2. set `fhir_id := guid`, or drop the column
+3. simplify the matcher back to a single reference
+
+Those 3 contracts are **b23c8bec (Medituner)**, **58d10bff (CambioCaregiver)**
+and **ff10d695** — the live external provider integrations, which is why they
+are not being rewritten casually.
+
+**The bridge is stable indefinitely.** Because the matcher accepts both, the
+three steps above can happen in any order with no window in which dispatch
+breaks. The cost of leaving it is that two identifiers for one object remain
+alive — exactly what #771 exists to end, and what #777's register records as
+the platform's only UNRESOLVED canonical identifier.
+
+Recommendation when it resumes: canonical = the `guid` value. request.pdhc's 27
+ServiceRequests and the `plandefinition_goals` FK already use it; only 3 contract
+blobs need touching, against 27 rows plus an FK the other way.
