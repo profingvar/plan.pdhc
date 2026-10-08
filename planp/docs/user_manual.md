@@ -25,6 +25,20 @@ a design workbench. Think of it as the "master library" of the platform:
 - **ValueSets and Values** — the reusable answer sets that coded concepts point
   at (e.g. a *Severity* value set of Mild / Moderate / Severe).
 
+**The landing page states this model, rather than listing links.** Since #786
+the first thing the service tells you is what a concept, a plan, a form and a
+value set *are* and how they relate — because the four nouns above are the
+whole service, and a newcomer who has not been told them cannot use any screen
+here. If you are reading this manual to learn the model, the landing page now
+says the same thing in shorter form.
+
+**`/transfer` is gone** (#786, retired 2026-10-07). It was a page that proxied
+data to cdr_6. Moving data is not authoring, and plan is a design workbench —
+the route sat outside the service's purpose and duplicated machinery that
+belongs to sim.pdhc and the CDRs. Its configuration (`CDR6_*`,
+`CDR_TRANSFER_TARGETS`) was removed with it. If you used that page, the
+equivalent now lives with the transfer tooling rather than here.
+
 Everything you author is versioned and identified by a stable GUID, so
 downstream services always reference exactly the concept you built.
 
@@ -91,6 +105,34 @@ Terminology authors can bulk-load concepts from a spreadsheet. An operator runs
 `flask import-concepts <file.xlsx|.csv>` (with an optional `--dry-run` to
 validate without committing). Rejected rows are reported with the reason, so a
 large curation batch can be cleaned up before it lands.
+
+#### A blank `canonical_lib` means the term is LOCAL
+
+Since #786, leaving the `canonical_lib` column **empty** is read as a
+statement: *"this term is ours."* The concept is bound to the local library and
+the row is accepted.
+
+Before that it was rejected, which made the common case — a clinic authoring
+its own concepts — impossible to import without typing `local` into every row.
+
+**An unrecognised non-blank value still fails.** That distinction is the point:
+blank is a decision, while `snomd` is a typo, and quietly turning a typo into a
+local binding would attach a wrong terminology claim to clinical data. So the
+importer accepts silence and refuses nonsense.
+
+#### Loading a whole catalogue in one file
+
+For a full instrument — all its concepts, value sets and values together —
+there is a single-file catalogue loader rather than three separate imports.
+Two worked examples ship in `tools/`:
+
+| catalogue | what it contains |
+|---|---|
+| **EQ-5D-5L** | the five dimensions, the VAS, and their value sets |
+| **asthma home monitoring** | baseline characteristics plus the monitoring concepts, with the GINA step and inhaler device coded |
+
+Each ships with a committed name-to-GUID map, so a later run refers to the same
+concepts rather than creating a second set under the same names.
 
 ---
 
@@ -183,6 +225,15 @@ Important properties:
 - The operator can pick which Claude model backs it (a cheaper one for quick
   checks, a stronger one for the hardest terminology calls). Without a key, the
   tool still runs Layer 1 (validation-only) and never breaks.
+- **The API key is supplied per session and is never stored in the service**
+  (#571/#527). You paste it into the assistant panel when you start working and
+  it lives in that browser session only — it is not in the code, not in the
+  database and not in a config file on the server.
+
+    That is a deliberate trade: it means re-entering the key when you come back,
+    and in exchange a key never sits anywhere that a backup, a log, a container
+    image or a git history could carry it off. The usual way these leak is not
+    an attack — it is a config file that got committed.
 
 There is also a "Check openEHR export" helper that asks rosetta.pdhc whether your
 concept set can be exported to openEHR, degrading quietly if that service isn't

@@ -471,3 +471,5 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 | 2026-10-07 | planp/.env.example | CDR6 block tombstoned (ROSETTA_SERVICE_KEY over-deleted and restored) |
 | 2026-10-07 | planp/tests/test_transfer.py | DELETED (12 tests asserting the feature worked) |
 | 2026-10-07 | planp/tests/test_transfer_retired.py | NEW — 8 guards, incl. a stale-env reload check |
+/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/user_manual.md
+/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/technical.md

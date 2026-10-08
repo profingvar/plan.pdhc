@@ -45,7 +45,9 @@ integer id.
 
 **Core terminology / concepts** (`concept_models.py`)
 - `concepts` — the central resource: `response_type`, `unit`, `valueset`,
-  `canonical_lib` + `canonical_refnumber` (terminology binding), `range_low/high`,
+  `canonical_lib` + `canonical_refnumber` (terminology binding — on bulk import
+  a **blank** `canonical_lib` binds the concept to the local library, while an
+  unrecognised non-blank value is rejected; see below), `range_low/high`,
   `anchor_*`, `status` (default `draft`). One CHECK constraint `ck_concept_range`
   (`range_low ≤ range_high`).
 - `values_catalog` — reusable coded values.
@@ -248,7 +250,7 @@ Key env vars (see `.env.example`):
 | `AUTHORING_ASSISTANT_MODELS` / `_DEFAULT_MODEL` / `_MAX_TOKENS` / `_TIMEOUT_SECONDS` | model allowlist + bounds |
 | `PLANDEF_VALIDATION_ENFORCED` | GA-5 fail-closed on save (default true; kill-switch) |
 | `ROSETTA_BASE_URL` / `ROSETTA_SERVICE_KEY` | openEHR-realisable proxy |
-| `CDR6_BASE_URL` / `CDR6_SERVICE_KEY` / `CDR_TRANSFER_TARGETS` | #530 Transfer page (thin proxy to cdr_6) |
+| ~~`CDR6_BASE_URL` / `CDR6_SERVICE_KEY` / `CDR_TRANSFER_TARGETS`~~ | **REMOVED 2026-10-07 (#786 item 4)** — the #530 Transfer page was retired along with its two blueprints, template and config. Moving data is not authoring; plan is a design workbench, and the route duplicated machinery owned by sim.pdhc and the CDRs. Tombstoned in `config.py` so a stale `.env` carrying these does not look meaningful. |
 | `RATELIMIT_DEFAULT` (`200/minute`) / `RATELIMIT_STORAGE_URI` | Flask-Limiter |
 | `BOOTSTRAP_SU_USERNAME` / `BOOTSTRAP_SU_PASSWORD` | first-run SU bootstrap |
 | `APP_VERSION` | reported by `/api/health` |
@@ -263,6 +265,19 @@ Key env vars (see `.env.example`):
   [--operator NAME] [--dry-run] [--json-out]`. Parses, validates, and imports
   concepts; reports created/updated/rejected with per-row reasons; exit code 1 if
   any row is rejected.
+
+    **Blank `canonical_lib` = LOCAL (#786 item 2).** An empty cell is read as
+    *"this term is ours"* and binds the concept to the local library via
+    `ensure_local_lib`. It used to raise, which made a spreadsheet of purely
+    local concepts — a clinic authoring its own — impossible to import without
+    typing `local` into every row.
+
+    An unrecognised **non-blank** value still raises, and the asymmetry is
+    deliberate: blank is a decision, `snomd` is a typo, and silently resolving a
+    typo to a local binding would attach a wrong terminology claim to clinical
+    data. `canonical_lib` and `canonical_refnumber` remain identity fields — a
+    row that changes either on an existing concept is reported as a conflict
+    rather than overwriting.
 - **Migrations:** `flask db upgrade` (Alembic). Note: `alembic_version` is
   `varchar(32)` — keep revision ids short.
 - **Docker:** `docker compose up -d --build` (Dockerfiles `COPY . .`, so a plain
