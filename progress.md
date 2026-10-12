@@ -1451,3 +1451,62 @@ identical to the pre-deploy measurement. Worth expecting next time: editing
 `.env` here restarts the database too.
 
 Scripts kept at `planp/scripts/deploy_786_retire.sh` (+ `.ACCEPT_STALE`).
+
+---
+
+## 2026-10-12 — a plausibility range on the FEV1 concept
+
+Operator: "add a range to plan.pdhc for FEV1".
+
+`FEV1` (`6521528c-db59-45c5-a492-003c28f27623`) had `range_low` and
+`range_high` NULL. Set to **0.3 – 7.0 L**.
+
+### Why that band
+
+The house convention is a **clinical plausibility band**, not the full
+instrument scale — surveyed before choosing:
+
+```
+  bp_systolic      70..230 mmHg      bmi               12..60 kg/m²
+  bp_diastolic     30..140 mmHg      B-glucos           1..12 mmol/L
+  alt / ast         5..500 IU/L      cgm_mean_glucose   2..25 mmol/L
+  asthma-feno       0..300 ppb       asthma-eosinophils 0..5 10^9/L
+```
+
+So: a non-zero floor where physiology demands one, and a ceiling above the
+largest real measurement rather than at the top of the instrument.
+
+For FEV1 in litres, 0.3 is below severe obstruction — anything lower is almost
+certainly a measurement error — and 7.0 clears a large healthy adult. Midrange
+3.65 L, which is itself a plausible adult FEV1.
+
+### Applied through the guard, not with an UPDATE
+
+The edit route runs `guard_concept()` (#521 GA-5) before writing, so a direct
+`UPDATE concepts SET …` would have bypassed that validation. The change was
+made in-container through `create_app()` + the same `guard_concept()` call the
+form makes, dry-run first:
+
+```
+  BEFORE  range_low=None  range_high=None
+  guard_concept: PASSED
+  AFTER   range_low=0.3   range_high=7.0   (midrange 3.65)
+```
+
+`vers_number` and `date_valid` untouched; the `ck_concept_range`
+(`range_low <= range_high`) constraint held.
+
+### Consequence downstream, with no sim change
+
+sim's #820 default now derives from it — `normal(mean=3.65, sd=1.117)` clamped
+to 0.3–7.0 — so a cohort with no FEV1 override went from
+
+```
+  min 79.63   mean 100.11   max 121.40      (litres, before)
+  min  0.98   mean   3.69   max   6.49      (after, all inside the range)
+```
+
+**The midrange is a sane fallback, not clinical truth.** For an asthma cohort
+the plausible FEV1 is 2–3.5 L, so the asthma profile's own override
+(2.85 → 2.70) is still the better answer, exactly as `spo2` has range 0–100,
+midrange 50, and a plausible value of 97.

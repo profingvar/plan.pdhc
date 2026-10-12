@@ -473,3 +473,4 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 | 2026-10-07 | planp/tests/test_transfer_retired.py | NEW — 8 guards, incl. a stale-env reload check |
 /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/user_manual.md
 /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/technical.md
+- 2026-10-12 (DATA, not code) concepts.FEV1 range_low=0.3 range_high=7.0 — applied via guard_concept in-container
