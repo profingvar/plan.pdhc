@@ -1510,3 +1510,55 @@ to 0.3–7.0 — so a cohort with no FEV1 override went from
 the plausible FEV1 is 2–3.5 L, so the asthma profile's own override
 (2.85 → 2.70) is still the better answer, exactly as `spo2` has range 0–100,
 midrange 50, and a plausible value of 97.
+
+---
+
+## 2026-10-12 — CI red: a catalogue entry that only resolves on a Mac
+
+The pytest workflow failed on my FEV1 push:
+
+```
+  these are advertised in DOCS_CATALOG but resolve to no file, so they are
+  silently dropped from /docs: ['readme.md']
+```
+
+### Not a missing file — a case mismatch
+
+The file is **`README.md`**. The catalogue asked for **`readme.md`**. macOS is
+case-insensitive, so `os.path.isfile(".../readme.md")` found `README.md` and
+every local test passed; CI and the Linux server are case-sensitive, so the
+entry resolved to None. And because `_get_docs_list()` omits anything that
+does not resolve, the only symptom was a document quietly absent from `/docs`
+on exactly the two machines that matter.
+
+I misread my own first two checks as one story: `ls readme.md` succeeded (the
+filesystem ignores case) while `git ls-files --error-unmatch readme.md` failed
+(git's index does not). Both were right. I nearly committed a file that was
+already tracked under a different case.
+
+Fixed by changing the catalogue key to `README.md` — the conventional name and
+what GitHub renders — rather than renaming a tracked file on a case-insensitive
+filesystem. The description was also wrong ("Deployment plan — step-by-step
+setup"); it is a service overview.
+
+Audited the other sixteen entries case-exactly against `git ls-files`: this was
+the only one.
+
+### Why it surfaced now
+
+The pytest workflow last ran on `dcad8707` (5 Oct). My push carried **eight**
+commits at once, including `217ed2f` — *"#786 follow-up: un-shadow progress.md,
+and guard against it recurring"* — which **added this very test**. CI saw it for
+the first time on my sha. The guard worked exactly as designed; it simply had
+nothing to run against until the commits reached CI.
+
+### The test could not have caught this locally, so it was widened
+
+`test_no_catalog_entry_is_unresolvable` asks the filesystem whether a path
+exists, which is the question macOS answers wrongly.
+`test_no_catalog_entry_depends_on_a_CASE_INSENSITIVE_filesystem` asks the
+**directory** what it actually holds and compares character for character, so
+it is red on a Mac too. Verified: restoring the lowercase key turns it red
+locally.
+
+346 tests pass.

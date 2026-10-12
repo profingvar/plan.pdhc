@@ -554,7 +554,13 @@ DOCS_CATALOG = {
     'api_reference.md': 'Comprehensive REST API reference with examples (includes FHIR R5 terminology profile §6)',
     'db_schema_snapshot.md': 'Database schema — every table, with columns, keys and row counts',
     'plan_description.md': 'Domain architecture — concepts, values, valuesets, PlanDefinitions, FHIR terminology profile',
-    'readme.md': 'Deployment plan — step-by-step setup and configuration',
+    # The file is README.md, uppercase — the conventional name, and what
+    # GitHub renders. This key said `readme.md`, which resolved fine on macOS
+    # (case-insensitive) and not at all in CI or on the Linux server
+    # (case-sensitive), so the entry silently vanished from /docs there. The
+    # resolver omits anything that does not resolve, which is why it took a
+    # test to notice.
+    'README.md': 'Service overview — what plan.pdhc does, and how to run it',
     'progress.md': 'Progress log — completed and pending steps (incl. §6 IMPLEMENTATION COMPLETE 2026-06-22)',
     'top_rules.md': 'Project rules (immutable)',
     'repo_css.md': 'Frontend design system — colours, typography, components',

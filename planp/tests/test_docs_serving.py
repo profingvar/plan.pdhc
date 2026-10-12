@@ -53,6 +53,40 @@ class TestEveryCatalogEntryActuallyResolves:
             'these are advertised in DOCS_CATALOG but resolve to no file, so '
             'they are silently dropped from /docs: %r' % unresolved)
 
+    def test_no_catalog_entry_depends_on_a_CASE_INSENSITIVE_filesystem(self):
+        """The one `_resolve_doc_path` cannot catch on a Mac.
+
+        `readme.md` was advertised; the file is `README.md`. macOS matches
+        those, so `os.path.isfile` returned True locally and every test
+        passed. CI and the Linux server do not, so the entry resolved to
+        None and vanished from /docs on exactly the two machines that
+        matter — and because the resolver omits what it cannot resolve, the
+        only symptom was a document quietly missing from the listing.
+
+        So this compares the catalogue against the REAL directory entries,
+        character for character, instead of asking the filesystem whether a
+        path exists.
+        """
+        import os
+        from app.api.capability import DOCS_CATALOG, _resolve_doc_path
+
+        mismatched = []
+        for name in DOCS_CATALOG:
+            path = _resolve_doc_path(name)
+            if path is None:
+                continue          # the other test reports these
+            actual = os.path.basename(path)
+            # `_resolve_doc_path` joins the catalogue name onto a directory,
+            # so `path` echoes the name back whatever the file is really
+            # called. Ask the DIRECTORY what it holds.
+            real = os.listdir(os.path.dirname(path))
+            if actual not in real:
+                exact = [f for f in real if f.lower() == actual.lower()]
+                mismatched.append((name, exact[0] if exact else "?"))
+        assert mismatched == [], (
+            'these resolve only because this filesystem ignores case; on '
+            'Linux they will not resolve at all: %r' % (mismatched,))
+
     def test_the_schema_snapshot_is_served(self, client):
         resp = client.get('/api/v1/docs/db_schema_snapshot.md')
         assert resp.status_code == 200
