@@ -479,3 +479,4 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - 2026-10-13 planp/app/config.py — _require_database_url() (refuses the published dev URL AND an empty password); _session_cookie_secure() + HttpOnly/SameSite=Lax
 - 2026-10-13 planp/tests/test_database_url_and_cookies.py (NEW)
 - 2026-10-13 planp/.env.example — DATABASE_URL/FLASK_SECRET_KEY marked required; SESSION_COOKIE_SECURE escape hatch documented
+- 2026-10-13 planp/migrations/versions/e5a6b7c8d901_add_missing_guid_fks.py (NEW) — #787.1: FKs on 3 of the 4 unenforced GUID columns; 4th recorded as deliberately unenforced
