@@ -476,3 +476,6 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - 2026-10-12 (DATA, not code) concepts.FEV1 range_low=0.3 range_high=7.0 — applied via guard_concept in-container
 - 2026-10-13 planp/app/config.py — _require_secret_key(): required in production, random in dev, never 'change-me'
 - 2026-10-13 planp/tests/test_secret_key_required.py (NEW)
+- 2026-10-13 planp/app/config.py — _require_database_url() (refuses the published dev URL AND an empty password); _session_cookie_secure() + HttpOnly/SameSite=Lax
+- 2026-10-13 planp/tests/test_database_url_and_cookies.py (NEW)
+- 2026-10-13 planp/.env.example — DATABASE_URL/FLASK_SECRET_KEY marked required; SESSION_COOKIE_SECURE escape hatch documented
