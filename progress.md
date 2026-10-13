@@ -1562,3 +1562,62 @@ it is red on a Mac too. Verified: restoring the lowercase key turns it red
 locally.
 
 346 tests pass.
+
+---
+
+## 2026-10-13 — the session key is required, not defaulted
+
+`SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'change-me')`.
+
+A deploy that lost the variable would **start**, pass its health check, and
+sign session cookies with a string committed to this repository — which is
+PUBLIC, so the value is known to anyone. Nothing would look wrong. That is the
+argument for failing: a missing secret is a deployment fault, and a deployment
+fault should stop the deployment rather than quietly degrade into a weaker one.
+
+`_require_secret_key()` now:
+
+- returns the key when it is set and is not the placeholder
+- **raises** when it is missing *or* is the placeholder and `AUTH_DISABLED` is
+  false (production, where sessions carry something worth signing)
+- in local dev returns a **random per-process** value rather than a shared
+  constant, so no guessable key exists in any environment. Dev sessions do not
+  survive a restart; that is the price.
+
+The error names the fix, including that a plain `restart` will not pick up a
+new value because this service uses `env_file:`.
+
+CI (`FLASK_SECRET_KEY: 'ci-secret'`) and the test suite
+(`'test-flask-secret'`) both supply their own and set `AUTH_DISABLED=false`, so
+they exercise the strict path and were unaffected.
+
+### Two mistakes of mine, both caught by running things
+
+**My test file poisoned 285 other tests.** It imported `app.config` at module
+level, so pytest imported it during COLLECTION — before conftest's
+session-scoped `app` fixture sets `DATABASE_URL` to a temp sqlite file. `Config`
+evaluates its attributes at import, so the postgres default
+(`…localhost:9031…`) was frozen in and everything afterwards failed with
+"connection refused". 346 passed without the file, 72 with it. Fixed by
+importing inside each test; the reason is written at the top of the file.
+
+**The first version of the tests could not fail.** They called
+`_require_secret_key()` directly, so reverting `Config.SECRET_KEY` to the old
+fallback left 11 of 11 green — the exact bug, undetected. Added a call-site
+assertion and a **subprocess** test that imports `app.config` with a
+production-shaped environment and asserts a non-zero exit. Both go red when the
+fallback returns.
+
+### Deployed
+
+Only `app` was recreated, not the whole compose project: yesterday's
+`--force-recreate` recreated `pdhc_db` too, which was safe only because the
+volume is named. Verified live:
+
+```
+  /api/health                            200
+  in-image config.py                     85063f6e3054 (matches local)
+  prod-shaped process with no key        refused to import
+```
+
+359 tests pass.

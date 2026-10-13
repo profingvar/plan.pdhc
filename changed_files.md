@@ -474,3 +474,5 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/user_manual.md
 /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/technical.md
 - 2026-10-12 (DATA, not code) concepts.FEV1 range_low=0.3 range_high=7.0 — applied via guard_concept in-container
+- 2026-10-13 planp/app/config.py — _require_secret_key(): required in production, random in dev, never 'change-me'
+- 2026-10-13 planp/tests/test_secret_key_required.py (NEW)

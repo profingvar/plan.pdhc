@@ -1,6 +1,62 @@
 import os
 
 
+#: The historical default. Kept named so it can be REJECTED rather than
+#: silently accepted: a fallback that is a public constant is worse than no
+#: fallback, because the service starts and looks healthy.
+_PLACEHOLDER_SECRET = 'change-me'
+
+
+def _require_secret_key():
+    """The Flask session-signing key — required in production, never guessable.
+
+    This was `os.environ.get('FLASK_SECRET_KEY', 'change-me')`. If the variable
+    ever went missing from a deploy, the key became the literal string
+    `change-me`: published in this repo, which is PUBLIC, and therefore known
+    to anyone. The service would start, pass its health check, and sign session
+    cookies with a value a stranger could reproduce. Nothing would look wrong.
+
+    That is the whole argument for failing instead. A missing secret is a
+    deployment fault, and a deployment fault should stop the deployment — not
+    degrade quietly into a weaker one.
+
+    Production is identified by `AUTH_DISABLED=false`, which is what makes
+    sessions carry anything worth signing. Both CI and the test suite set
+    AUTH_DISABLED=false AND supply their own key, so they are unaffected.
+
+    In local dev (AUTH_DISABLED defaults true) an unset key yields a RANDOM
+    per-process value rather than a shared constant. Sessions then do not
+    survive a restart, which is a fair price: it means no guessable key exists
+    anywhere, in any environment, ever.
+    """
+    key = os.environ.get('FLASK_SECRET_KEY', '')
+    auth_disabled = os.environ.get(
+        'AUTH_DISABLED', 'true').lower() in ('true', '1', 'yes')
+
+    if key and key != _PLACEHOLDER_SECRET:
+        return key
+
+    if not auth_disabled:
+        raise RuntimeError(
+            "FLASK_SECRET_KEY is %s, and AUTH_DISABLED is false.\n"
+            "\n"
+            "This key signs session cookies. Starting without a real one "
+            "would sign them with a value published in this repository, so "
+            "the service refuses to start instead.\n"
+            "\n"
+            "Set it in the service's .env and recreate the container:\n"
+            "  FLASK_SECRET_KEY=$(python3 -c "
+            "'import secrets; print(secrets.token_hex(32))')\n"
+            "  docker-compose up -d --force-recreate\n"
+            "(a plain `restart` keeps the old environment — this service "
+            "uses env_file)"
+            % ("set to the placeholder %r" % _PLACEHOLDER_SECRET
+               if key else "not set"))
+
+    import secrets as _secrets
+    return _secrets.token_hex(32)
+
+
 class Config:
     # DB name "pdhc_gateway" is the legacy name retained for data continuity
     # (rollup #325 / ticket #336). Pre-2026 the service was called
@@ -11,7 +67,7 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'change-me')
+    SECRET_KEY = _require_secret_key()
 
     FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
     DEBUG = FLASK_ENV == 'development'
