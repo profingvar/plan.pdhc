@@ -481,3 +481,6 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - 2026-10-13 planp/.env.example — DATABASE_URL/FLASK_SECRET_KEY marked required; SESSION_COOKIE_SECURE escape hatch documented
 - 2026-10-13 planp/migrations/versions/e5a6b7c8d901_add_missing_guid_fks.py (NEW) — #787.1: FKs on 3 of the 4 unenforced GUID columns; 4th recorded as deliberately unenforced
 - 2026-10-13 planp/tests/test_plandefinition_two_guids.py (NEW) — #771: pins the 1:1 invariant behind the decision NOT to merge guid and fhir_id
+
+## 2026-10-15 — #708 sibling smoke
+- planp/deploy/smoke_siblings.py  (NEW: 10 read-only checks against sso, contract, termbank, rosetta)
