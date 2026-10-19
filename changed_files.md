@@ -484,3 +484,15 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 
 ## 2026-10-15 — #708 sibling smoke
 - planp/deploy/smoke_siblings.py  (NEW: 10 read-only checks against sso, contract, termbank, rosetta)
+
+## #839 — derive the FHIR publication status; constrain Concept.status (2026-10-19)
+
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_helpers.py
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_codesystem.py
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_conceptmap.py
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_valueset.py
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/migrations/versions/a1b2c3d4e5f6_839_concept_status_check.py (new)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_fhir_publication_status.py (new)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_fhir_codesystem.py
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_fhir_conceptmap.py
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_fhir_valueset.py

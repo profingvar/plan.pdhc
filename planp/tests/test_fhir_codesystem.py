@@ -84,7 +84,14 @@ class TestReadCodeSystem:
         assert body['id'] == LOCAL_CODESYSTEM_ID
         # ADR D3 — canonical url
         assert body['url'] == LOCAL_CS_URL
-        assert body['status'] == 'active'
+        # #839 — this used to assert 'active', which was a hardcoded
+        # literal in the wrapper while every Concept underneath was 'draft'.
+        # The status is now DERIVED from the content, so the honest answer for
+        # a draft fixture is 'draft'. Do not pin this back to a constant: the
+        # point is that it moves. tests/test_fhir_publication_status.py proves
+        # it follows the data.
+        assert body['status'] in ('draft', 'active', 'retired')
+        assert body['status'] == 'draft'
         assert body['content'] == 'complete'
         assert body['caseSensitive'] is True
         assert body['count'] >= 1

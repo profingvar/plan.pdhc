@@ -39,12 +39,14 @@ from flask import Blueprint, jsonify, request
 
 from app import db
 from app.api.fhir_helpers import (
+    derive_publication_status,
     fhir_json_response,
     operation_outcome,
     parameters_response,
     parse_parameters_body,
 )
 from app.models.concept_models import (
+    Concept,
     CanonicalLib,
     PLAN_BASE,
     ValueCatalog,
@@ -156,6 +158,12 @@ def _build_expansion(vs: ValueSet) -> dict:
     }
 
 
+def _derived_valueset_status(valueset_guid: str) -> str:
+    """Publication status of one ValueSet, from the Concepts that bind it."""
+    rows = (db.session.query(Concept.status)
+            .filter(Concept.valueset == valueset_guid).all())
+    return derive_publication_status(r[0] for r in rows)
+
 def _to_fhir_valueset(vs: ValueSet, *, with_expansion: bool = False) -> dict:
     """Project a ValueSet model row into a FHIR R5 ValueSet resource."""
     body: dict = {
@@ -164,7 +172,11 @@ def _to_fhir_valueset(vs: ValueSet, *, with_expansion: bool = False) -> dict:
         'url': fhir_canonical_url('ValueSet', vs.guid),
         'version': fhir_version(vs),
         'name': vs.valueset_name,
-        'status': 'active',
+        # #839 — derived. A ValueSet has no status column of its own and its
+        # members are ValueCatalog values, which have none either, so the
+        # honest source is the Concepts that BIND this valueset
+        # (Concept.valueset). A valueset nothing binds yet reports 'draft'.
+        'status': _derived_valueset_status(vs.guid),
         'experimental': False,
         'date': (
             vs.date_created.strftime('%Y-%m-%dT%H:%M:%SZ')

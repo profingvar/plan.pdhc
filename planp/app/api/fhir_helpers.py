@@ -22,6 +22,47 @@ from flask import Response, jsonify, request
 
 FHIR_CONTENT_TYPE = 'application/fhir+json'
 
+# FHIR R5 PublicationStatus. `unknown` exists for when the status cannot be
+# determined; we always can, so it is deliberately not produced here.
+FHIR_PUBLICATION_STATUSES = ('draft', 'active', 'retired', 'unknown')
+
+# What Concept.status is allowed to hold. fhir_codesystem advertises exactly
+# these three in its CodeSystem property description, and as of #839 a CHECK
+# constraint enforces them — the column is a bare String(20) and accepted any
+# value before that.
+CONCEPT_STATUSES = ('draft', 'active', 'retired')
+
+
+def derive_publication_status(statuses) -> str:
+    """FHIR resource-level status, derived from the content's own statuses.
+
+    #839 — the three terminology wrappers each hardcoded ``'status': 'active'``
+    while every Concept underneath carried ``status='draft'``. A client reading
+    both was told the CodeSystem was active and that every concept in it was
+    editorially draft, which cannot both be useful.
+
+    The rule, and why:
+
+      * any content ``active``  -> ``active``. A resource that publishes even
+        one adopted concept is in use.
+      * content, all ``retired`` -> ``retired``.
+      * anything else, including no content at all -> ``draft``. Nothing has
+        been adopted, so claiming otherwise is the bug this function exists to
+        remove.
+
+    Unrecognised and empty values are ignored rather than trusted, so a stray
+    status cannot promote a resource.
+    """
+    seen = {str(s).strip().lower() for s in statuses
+            if s is not None and str(s).strip()}
+    seen &= set(CONCEPT_STATUSES)
+    if 'active' in seen:
+        return 'active'
+    if seen == {'retired'}:
+        return 'retired'
+    return 'draft'
+
+
 
 # ---------------------------------------------------------------------------
 # OperationOutcome
