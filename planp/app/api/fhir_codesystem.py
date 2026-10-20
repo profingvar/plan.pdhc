@@ -31,7 +31,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from app import db
 from app.api.fhir_helpers import (
-    derive_publication_status,
+    RESOURCE_PUBLICATION_STATUS,
     fhir_json_response,
     operation_outcome,
     parse_parameters_body,
@@ -45,11 +45,6 @@ from app.models.concept_models import (
     fhir_canonical_url,
 )
 
-
-def _derived_concept_status() -> str:
-    """Publication status of the local CodeSystem, from its own concepts."""
-    rows = db.session.query(Concept.status).all()
-    return derive_publication_status(r[0] for r in rows)
 
 def _codesystem_version() -> str:
     """FHIR `version` for the local CodeSystem (ADR D4).
@@ -123,12 +118,6 @@ CODESYSTEM_PROPERTY_DEFS = [
         ),
         'type': 'string',
     },
-    {
-        'code': 'status',
-        'uri': f'{LOCAL_CS_URL}#status',
-        'description': "Concept editorial status (draft, active, retired).",
-        'type': 'string',
-    },
 ]
 
 
@@ -151,8 +140,6 @@ def _concept_to_fhir_entry(c: Concept,
         ))
     if c.canonical_refnumber:
         props.append(_property_part('canonical-ref', c.canonical_refnumber))
-    if getattr(c, 'status', None):
-        props.append(_property_part('status', c.status))
 
     if props:
         # CodeSystem.concept[].property uses a simpler shape than the
@@ -186,9 +173,9 @@ def _build_codesystem(*, include_concepts: bool = True) -> dict:
         'version': _codesystem_version(),
         'name': LOCAL_CS_NAME,
         'title': 'plan.pdhc local concept system',
-        # #839 — derived from the Concepts this CodeSystem publishes, not
-        # hardcoded. It said 'active' while all 99 concepts were 'draft'.
-        'status': _derived_concept_status(),
+        # #841 — a property of this resource, not a fold over Concept.status.
+        # See RESOURCE_PUBLICATION_STATUS for why that derivation was removed.
+        'status': RESOURCE_PUBLICATION_STATUS,
         'experimental': False,
         'date': _now_iso(),
         'publisher': 'PDHC',
@@ -234,8 +221,6 @@ def _build_local_lookup_response(c: Concept) -> dict:
         parts.append(_property_part(
             'canonical-ref', c.canonical_refnumber,
         ))
-    if getattr(c, 'status', None):
-        parts.append(_property_part('status', c.status))
 
     return {'resourceType': 'Parameters', 'parameter': parts}
 

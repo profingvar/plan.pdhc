@@ -142,7 +142,6 @@ def create_concept():
         canonical_refnumber=_sanitize(data.get('canonical_refnumber')),
         concept_display_text=_sanitize(data.get('concept_display_text')),
         concept_explain=_sanitize(data.get('concept_explain')),
-        status=data.get('status', 'draft'),
         concept_type=data.get('concept_type'),
         response_type=data.get('response_type'),
         unit=data.get('unit'),
@@ -219,7 +218,7 @@ def update_concept(guid):
             setattr(concept, f, _sanitize(data[f]))
 
     direct_fields = ('canonical_lib', 'concept_type', 'response_type', 'unit',
-                     'valueset', 'status', 'range_low', 'range_high')
+                     'valueset', 'range_low', 'range_high')
     for f in direct_fields:
         if f in data:
             setattr(concept, f, data[f])

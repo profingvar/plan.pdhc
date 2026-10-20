@@ -1,116 +1,93 @@
-"""#839 — the FHIR resource status must follow the content, not a constant.
+"""#841 — the FHIR resource status is a property of the RESOURCE, not of
+Concept.status, and Concept.status is retired.
 
-All three terminology wrappers hardcoded ``'status': 'active'`` while every one
-of plan's 99 Concepts carried ``status='draft'``. A client reading a `$lookup`
-got a CodeSystem declaring itself active whose every concept carried the
-property ``status = draft``. Both came from this service, and they contradicted
-each other.
+This file previously pinned the opposite (#839): the three terminology
+wrappers derived their `status` from the Concepts underneath, having formerly
+hardcoded `'active'`. #841 found why that derivation could not work. Nothing in
+plan could move a Concept out of `draft` — no promote/publish/activate/retire
+route, no control in `concepts/create.html` or `concepts/edit.html`, and the
+importer hardcodes `status='draft'` — so all 99 Concepts held the column
+default. A required FHIR field derived from a field that cannot change is
+permanently one value, and looks like information while carrying none.
 
-These tests pin the derivation itself, which is pure, and then the thing that
-actually matters: that each endpoint's status CHANGES when the content changes.
-A test asserting only `== 'draft'` today would pass just as happily against the
-old hardcoded constant if someone reinstated it with a different literal.
+The operator's decision (2026-10-20): status is not meant to gate adoption.
+
+So these tests now pin the inverse property, which is the one worth guarding:
+
+  * each resource reports `active`, because it IS in use — plan's Concepts
+    validate every CDR write through the canonicaliser's plan-Concept tier;
+  * the resource status does NOT move when a Concept's status changes, which
+    is what proves the derivation is gone rather than merely returning `active`
+    today by coincidence;
+  * the retired field is gone from every surface that used to expose it, so it
+    cannot quietly come back as a half-wired gate.
+
+Asserting only `== 'active'` would pass against the #839 derivation on a
+database that happened to hold one active Concept, which is why
+`test_status_does_not_follow_concept_status` exists.
 """
 from __future__ import annotations
+
+import uuid
 
 import pytest
 
 from app.api.fhir_helpers import (
-    CONCEPT_STATUSES,
     FHIR_PUBLICATION_STATUSES,
-    derive_publication_status,
+    RESOURCE_PUBLICATION_STATUS,
 )
+from tests.conftest import set_sso_session, SAMPLE_ACCESS_BLOB
 
 
-# ---------------------------------------------------------------- the rule
+# ------------------------------------------------------------- the constant
 
-@pytest.mark.parametrize("statuses,expected", [
-    ([], "draft"),                              # no content claims nothing
-    (["draft"], "draft"),
-    (["draft", "draft"], "draft"),
-    (["active"], "active"),
-    (["draft", "active"], "active"),            # one adopted concept is enough
-    (["retired", "active"], "active"),
-    (["retired"], "retired"),
-    (["retired", "retired"], "retired"),
-    (["draft", "retired"], "draft"),            # not all retired
-])
-def test_derivation(statuses, expected):
-    assert derive_publication_status(statuses) == expected
+def test_resource_status_is_a_valid_fhir_publication_status():
+    assert RESOURCE_PUBLICATION_STATUS in FHIR_PUBLICATION_STATUSES
 
 
-def test_production_state_derives_draft():
-    """99 concepts, all draft — so the real answer today is draft, not active."""
-    assert derive_publication_status(["draft"] * 99) == "draft"
+def test_resource_status_is_active():
+    """`draft` would be the #839 regression; `unknown` would be a cop-out."""
+    assert RESOURCE_PUBLICATION_STATUS == 'active'
 
 
-@pytest.mark.parametrize("junk", [
-    [None], [""], ["  "], ["DRAFT "], ["unknown"], ["published"], ["Active"],
-])
-def test_unrecognised_values_cannot_promote(junk):
-    """A stray status must not promote a resource.
-
-    `DRAFT ` and `Active` are normalised (trimmed, lowercased) and so count;
-    anything outside the three allowed values is ignored rather than trusted.
-    """
-    got = derive_publication_status(junk)
-    assert got in FHIR_PUBLICATION_STATUSES
-    if junk in ([None], [""], ["  "], ["unknown"], ["published"]):
-        assert got == "draft"
+def test_the_derivation_is_gone():
+    """Guard against reinstatement. #841 removed the fold over content; if it
+    comes back, it must come back with a governance answer attached."""
+    import app.api.fhir_helpers as helpers
+    assert not hasattr(helpers, 'derive_publication_status')
+    assert not hasattr(helpers, 'CONCEPT_STATUSES')
 
 
-def test_case_and_whitespace_normalised():
-    assert derive_publication_status(["  Active  "]) == "active"
-    assert derive_publication_status(["RETIRED"]) == "retired"
-
-
-def test_allowed_set_matches_what_the_codesystem_advertises():
-    """fhir_codesystem describes the property as (draft, active, retired).
-
-    If that description and the enforced set ever diverge, the CHECK
-    constraint added by this ticket's migration becomes a lie.
-    """
-    assert CONCEPT_STATUSES == ("draft", "active", "retired")
-    assert set(CONCEPT_STATUSES) <= set(FHIR_PUBLICATION_STATUSES)
-
-
-def test_generator_input_is_accepted():
-    """The call sites pass a generator over query rows, not a list."""
-    assert derive_publication_status(s for s in ["draft", "active"]) == "active"
-
-
-# ------------------------------------------------- it must actually be wired
+# ---------------------------------------------------------------- the wiring
 
 @pytest.fixture
 def one_concept(app):
     """A Concept that definitely exists, so the wiring tests never skip.
 
-    The two tests below are the only ones that prove the endpoints are actually
-    wired to the derivation rather than to a fresh constant. Skipping them on an
-    empty database would leave exactly the gap #839 was filed about — a check
-    that reports success without having run.
+    An empty database would leave exactly the gap #839 was filed about — a
+    check reporting success without having run.
     """
     from app import db as _db
     from app.models.concept_models import CanonicalLib, Concept
 
     with app.app_context():
         lib = CanonicalLib.query.filter_by(
-            canonical_lib_name='status839_lib').first()
+            canonical_lib_name='status841_lib').first()
         if lib is None:
             lib = CanonicalLib(
-                canonical_lib_name='status839_lib',
-                canonical_lib_url='https://termbank.pdhc.se/CodeSystem/status839',
+                canonical_lib_name='status841_lib',
+                canonical_lib_url='https://termbank.pdhc.se/CodeSystem/status841',
                 author='test',
             )
             _db.session.add(lib)
             _db.session.flush()
-        c = Concept.query.filter_by(concept_name='status839_concept').first()
+        c = Concept.query.filter_by(concept_name='status841_concept').first()
         if c is None:
             c = Concept(
                 canonical_lib=lib.guid,
-                canonical_refnumber='839',
-                concept_name='status839_concept',
-                concept_display_text='Status derivation test concept',
+                canonical_refnumber='841',
+                concept_name='status841_concept',
+                concept_display_text='Status retirement test concept',
             )
             _db.session.add(c)
             _db.session.commit()
@@ -125,12 +102,7 @@ def one_concept(app):
 
 
 def _resource(body):
-    """Unwrap a FHIR searchset Bundle, or pass a bare resource through.
-
-    `GET /api/v1/CodeSystem` answers a Bundle; `$lookup` and the by-id routes
-    answer the resource. Handling both keeps the test about status derivation
-    rather than about which shape the route happens to return.
-    """
+    """Unwrap a FHIR searchset Bundle, or pass a bare resource through."""
     if isinstance(body, dict) and body.get("resourceType") == "Bundle":
         entries = body.get("entry") or []
         assert entries, "Bundle had no entry to read a status from"
@@ -138,57 +110,95 @@ def _resource(body):
     return body or {}
 
 
-def _statuses_of(app, db, Concept):
-    return [r[0] for r in db.session.query(Concept.status).all()]
+@pytest.mark.parametrize("url", [
+    '/api/v1/CodeSystem',
+    '/api/v1/ValueSet',
+    '/api/v1/ConceptMap',
+])
+def test_every_terminology_resource_reports_active(client, one_concept, url):
+    resp = client.get(url)
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    res = _resource(resp.get_json())
+    assert res.get('status') == 'active', url
 
 
-def test_codesystem_status_tracks_its_concepts(client, app, one_concept):
-    """The endpoint must MOVE with the data.
+@pytest.mark.parametrize("url", [
+    '/api/v1/CodeSystem',
+    '/api/v1/ValueSet',
+    '/api/v1/ConceptMap',
+])
+def test_status_does_not_follow_concept_status(client, app, one_concept, url):
+    """THE test. Move a Concept's status through every allowed value and the
+    resource status must not budge.
 
-    This is the regression that matters: a hardcoded literal satisfies any
-    single-value assertion, so the test flips the content and requires the
-    answer to follow.
+    Under #839's derivation, flipping this Concept to `active` or `retired`
+    changed the CodeSystem and ConceptMap answer. That coupling is what #841
+    removed, so a resource status that still tracked it would be the
+    regression — and a test asserting only `== 'active'` could not see it.
     """
-    from app import db
+    from app import db as _db
     from app.models.concept_models import Concept
 
+    seen = set()
+    for value in ('draft', 'active', 'retired', 'anything-at-all'):
+        with app.app_context():
+            c = Concept.query.filter_by(guid=one_concept).first()
+            c.status = value
+            _db.session.commit()
+        res = _resource(client.get(url).get_json())
+        seen.add(res.get('status'))
+    assert seen == {'active'}, f"{url} status moved with Concept.status: {seen}"
+
+
+# -------------------------------------------------- the field is really gone
+
+def test_codesystem_no_longer_advertises_a_status_property(client, one_concept):
+    """It described "Concept editorial status (draft, active, retired)" — an
+    editorial lifecycle that did not exist."""
+    res = _resource(client.get('/api/v1/CodeSystem').get_json())
+    codes = {p.get('code') for p in res.get('property', [])}
+    assert 'status' not in codes, codes
+
+
+def test_no_concept_emits_a_status_property(client, one_concept):
+    res = _resource(client.get('/api/v1/CodeSystem').get_json())
+    for concept in res.get('concept', []):
+        codes = {p.get('code') for p in concept.get('property', [])}
+        assert 'status' not in codes, concept.get('code')
+
+
+def test_to_dict_has_no_status_key(app, one_concept):
+    from app.models.concept_models import Concept
     with app.app_context():
         c = Concept.query.filter_by(guid=one_concept).first()
-
-        c.status = "draft"
-        db.session.commit()
-        assert _resource(client.get("/api/v1/CodeSystem").get_json())["status"] \
-            == "draft"
-
-        c.status = "active"
-        db.session.commit()
-        assert _resource(client.get("/api/v1/CodeSystem").get_json())["status"] \
-            == "active", ("CodeSystem.status did not follow the content — it is "
-                          "probably hardcoded again")
-
-        # all-retired only reports retired when NOTHING else is draft/active
-        c.status = "retired"
-        db.session.commit()
-        others = [r[0] for r in db.session.query(Concept.status)
-                  .filter(Concept.guid != one_concept).all()]
-        expected = derive_publication_status(["retired"] + others)
-        assert _resource(client.get("/api/v1/CodeSystem").get_json())["status"] \
-            == expected
+        assert 'status' not in c.to_dict()
 
 
-def test_conceptmap_status_is_not_a_constant(client, app, one_concept):
-    from app import db
+def test_the_api_will_not_set_status_on_create(client, app):
+    """A caller POSTing `status` must not be able to set it. The column keeps
+    its default; the field is not part of the write surface any more."""
     from app.models.concept_models import Concept
 
+    set_sso_session(client, SAMPLE_ACCESS_BLOB)
+    name = f'status841-create-{uuid.uuid4().hex[:8]}'
+    resp = client.post('/api/v1/concepts', json={
+        'concept_name': name,
+        'status': 'active',
+    })
+    assert resp.status_code == 201, resp.get_json()
+    assert 'status' not in resp.get_json()
+    with app.app_context():
+        c = Concept.query.filter_by(concept_name=name).first()
+        assert c is not None
+        assert c.status == 'draft', "POSTed status reached the column"
+
+
+def test_the_api_will_not_set_status_on_update(client, app, one_concept):
+    set_sso_session(client, SAMPLE_ACCESS_BLOB)
+    resp = client.put(f'/api/v1/concepts/{one_concept}',
+                      json={'status': 'active'})
+    assert resp.status_code in (200, 204), resp.get_data(as_text=True)
+    from app.models.concept_models import Concept
     with app.app_context():
         c = Concept.query.filter_by(guid=one_concept).first()
-
-        c.status = "draft"
-        db.session.commit()
-        assert _resource(client.get("/api/v1/ConceptMap").get_json())["status"] \
-            == "draft"
-
-        c.status = "active"
-        db.session.commit()
-        assert _resource(client.get("/api/v1/ConceptMap").get_json())["status"] \
-            == "active"
+        assert c.status != 'active', "PATCHed status reached the column"

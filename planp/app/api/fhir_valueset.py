@@ -24,10 +24,12 @@ Canonical url scheme per ADR D3:
 
 Version per ADR D4: ``version = str(vers_number)``.
 
-Status: every plan.pdhc ValueSet is emitted as ``status: active`` (the
-schema has no dedicated status column; everything in the editorial set
-is treated as in-use). If a dedicated status column is added later, this
-can be sharpened without a route change.
+Status: every plan.pdhc ValueSet is emitted as ``status: active`` -- the
+schema has no status column of its own and everything in the editorial set
+is in use. #839 briefly derived this from ``Concept.status`` instead; #841
+removed that, because nothing could promote a Concept out of ``draft`` so
+the derived value was permanently ``draft``. See
+``fhir_helpers.RESOURCE_PUBLICATION_STATUS``.
 """
 from __future__ import annotations
 
@@ -37,16 +39,14 @@ from urllib.parse import urlparse
 
 from flask import Blueprint, jsonify, request
 
-from app import db
 from app.api.fhir_helpers import (
-    derive_publication_status,
+    RESOURCE_PUBLICATION_STATUS,
     fhir_json_response,
     operation_outcome,
     parameters_response,
     parse_parameters_body,
 )
 from app.models.concept_models import (
-    Concept,
     CanonicalLib,
     PLAN_BASE,
     ValueCatalog,
@@ -158,12 +158,6 @@ def _build_expansion(vs: ValueSet) -> dict:
     }
 
 
-def _derived_valueset_status(valueset_guid: str) -> str:
-    """Publication status of one ValueSet, from the Concepts that bind it."""
-    rows = (db.session.query(Concept.status)
-            .filter(Concept.valueset == valueset_guid).all())
-    return derive_publication_status(r[0] for r in rows)
-
 def _to_fhir_valueset(vs: ValueSet, *, with_expansion: bool = False) -> dict:
     """Project a ValueSet model row into a FHIR R5 ValueSet resource."""
     body: dict = {
@@ -172,11 +166,10 @@ def _to_fhir_valueset(vs: ValueSet, *, with_expansion: bool = False) -> dict:
         'url': fhir_canonical_url('ValueSet', vs.guid),
         'version': fhir_version(vs),
         'name': vs.valueset_name,
-        # #839 — derived. A ValueSet has no status column of its own and its
-        # members are ValueCatalog values, which have none either, so the
-        # honest source is the Concepts that BIND this valueset
-        # (Concept.valueset). A valueset nothing binds yet reports 'draft'.
-        'status': _derived_valueset_status(vs.guid),
+        # #841 — a property of this resource. The #839 derivation from the
+        # Concepts that bind the valueset is removed: Concept.status was never
+        # an adoption gate, so it could only ever yield 'draft'.
+        'status': RESOURCE_PUBLICATION_STATUS,
         'experimental': False,
         'date': (
             vs.date_created.strftime('%Y-%m-%dT%H:%M:%SZ')

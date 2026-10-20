@@ -122,14 +122,15 @@ class TestReadConceptMap:
         # D3 — canonical url
         assert body['url'] == \
             f'{PLAN_BASE}/fhir/ConceptMap/{LOCAL_CONCEPTMAP_ID}'
-        # #839 — this used to assert 'active', which was a hardcoded
-        # literal in the wrapper while every Concept underneath was 'draft'.
-        # The status is now DERIVED from the content, so the honest answer for
-        # a draft fixture is 'draft'. Do not pin this back to a constant: the
-        # point is that it moves. tests/test_fhir_publication_status.py proves
-        # it follows the data.
+        # #841 — back to a constant, deliberately. #839 derived this from
+        # Concept.status; nothing could promote a Concept out of 'draft', so
+        # the derived value was permanently 'draft' for every resource.
+        # The resource is active because it is in use.
+        # tests/test_fhir_publication_status.py proves the status does NOT
+        # move when a Concept's status changes, which is the property that
+        # distinguishes this from the pre-#839 hardcoded literal.
         assert body['status'] in ('draft', 'active', 'retired')
-        assert body['status'] == 'draft'
+        assert body['status'] == 'active'
         # sourceScopeUri is intentionally NOT emitted — FHIR R5 requires
         # it to reference a ValueSet (not a CodeSystem), and we don't
         # define a single ValueSet covering every local concept. The

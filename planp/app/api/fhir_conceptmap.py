@@ -31,7 +31,7 @@ from flask import Blueprint, request
 
 from app import db
 from app.api.fhir_helpers import (
-    derive_publication_status,
+    RESOURCE_PUBLICATION_STATUS,
     fhir_json_response,
     operation_outcome,
     parse_parameters_body,
@@ -45,11 +45,6 @@ from app.models.concept_models import (
     fhir_canonical_url,
 )
 
-
-def _derived_concept_status() -> str:
-    """Publication status of the bindings map, from the concepts it maps."""
-    rows = db.session.query(Concept.status).all()
-    return derive_publication_status(r[0] for r in rows)
 
 def _conceptmap_version() -> str:
     """FHIR `version` for the platform ConceptMap (ADR D4).
@@ -196,7 +191,7 @@ def _build_conceptmap() -> dict:
         'title': 'plan.pdhc local concepts ↔ external canonicals',
         # #839 — derived from the Concepts whose bindings this map expresses,
         # not hardcoded. It said 'active' while all 99 were 'draft'.
-        'status': _derived_concept_status(),
+        'status': RESOURCE_PUBLICATION_STATUS,
         'experimental': False,
         'date': _now_iso(),
         'publisher': 'PDHC',

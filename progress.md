@@ -1621,3 +1621,48 @@ volume is named. Verified live:
 ```
 
 359 tests pass.
+
+## #841 — Concept.status is retired, not promoted (2026-10-20)
+
+Operator decision: **status is not meant to gate adoption** — the ticket's
+answer (2). So the field is retired.
+
+The consequence is sharper than "delete a column". #839 had made the FHIR
+surface *derive* `CodeSystem.status` / `ValueSet.status` / `ConceptMap.status`
+from `Concept.status`. If the column was never an adoption gate, that
+derivation took a vestigial field and made it load-bearing for a required FHIR
+element — and since nothing could move a Concept out of `draft` (no route, CLI
+or template; the importer hardcodes it; all 99 rows held the column default),
+every resource advertised `draft` permanently. That is worse than the
+hardcoded `'active'` it replaced, because a permanent value looks like
+information.
+
+So the constant is back, with a reason attached:
+`fhir_helpers.RESOURCE_PUBLICATION_STATUS = 'active'`. These resources ARE in
+use — plan's Concepts validate every CDR write through the canonicaliser's
+plan-Concept tier, and ten of them sit behind ~41,000 observations on
+cdr1/cdr2/cdr3. Status is a property of the resource, not a fold over content.
+
+Retired from every surface: the per-concept `status` CodeSystem property (it
+advertised an editorial lifecycle that does not exist), the POST constructor,
+the PUT `direct_fields` tuple, and `to_dict()`.
+
+**The column is kept.** It holds one distinct value, so dropping it loses no
+information, and keeping it avoids an irreversible migration on the platform's
+semantic authority. Migration `b2c3d4e5f6a7` drops only #839's CHECK
+constraint — a constraint on a field nothing reads or writes guards nothing —
+and is reversible both ways.
+
+Found while doing it: nothing outside plan reads a plan Concept's status. The
+four cross-service greps that looked like hits (rosetta realisability and
+template_synthesiser, gateway contract_scope and report_ingestion) are each
+service's own unrelated status. So this change has no cross-service surface.
+
+Also worth recording: **#839 is live in production while the server's git
+checkout is four commits behind it.** `derive_publication_status` is in the
+running container at `/app/app/api/` and `alembic_version` is `a1b2c3d4e5f6`,
+yet `/usr/local/www/plan.pdhc` is at `98bf711`. Container ahead of the release
+dir again. So production currently serves `draft` on 1 CodeSystem, 12
+ValueSets and 1 ConceptMap, and will keep doing so until this is deployed.
+
+399 tests green. **NOT DEPLOYED** — operator will deploy later.

@@ -84,14 +84,15 @@ class TestReadCodeSystem:
         assert body['id'] == LOCAL_CODESYSTEM_ID
         # ADR D3 — canonical url
         assert body['url'] == LOCAL_CS_URL
-        # #839 — this used to assert 'active', which was a hardcoded
-        # literal in the wrapper while every Concept underneath was 'draft'.
-        # The status is now DERIVED from the content, so the honest answer for
-        # a draft fixture is 'draft'. Do not pin this back to a constant: the
-        # point is that it moves. tests/test_fhir_publication_status.py proves
-        # it follows the data.
+        # #841 — back to a constant, deliberately. #839 derived this from
+        # Concept.status; nothing could promote a Concept out of 'draft', so
+        # the derived value was permanently 'draft' for every resource.
+        # The resource is active because it is in use.
+        # tests/test_fhir_publication_status.py proves the status does NOT
+        # move when a Concept's status changes, which is the property that
+        # distinguishes this from the pre-#839 hardcoded literal.
         assert body['status'] in ('draft', 'active', 'retired')
-        assert body['status'] == 'draft'
+        assert body['status'] == 'active'
         assert body['content'] == 'complete'
         assert body['caseSensitive'] is True
         assert body['count'] >= 1

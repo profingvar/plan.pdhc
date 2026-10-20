@@ -306,6 +306,16 @@ class Concept(db.Model):
     concept_name = db.Column(db.String(255), nullable=False)
     concept_display_text = db.Column(db.String(500), nullable=True)
     concept_explain = db.Column(db.Text, nullable=True)
+    # RETIRED by #841; read by nothing. Concept.status was never an adoption
+    # gate -- no route, CLI or template could move a Concept out of 'draft',
+    # so all 99 rows held the column default and the FHIR surface that derived
+    # from it (#839) could only ever report 'draft'. The column is KEPT rather
+    # than dropped: it holds a single constant value, so there is no
+    # information to lose either way, and keeping it avoids an irreversible
+    # migration on the platform's semantic authority. It is deliberately not
+    # in to_dict(), not writable through the API, and not advertised as a
+    # CodeSystem property. Do not read it, and do not reinstate it without
+    # answering #841's governance question first.
     status = db.Column(db.String(20), default='draft')
 
     concept_type = db.Column(db.String(36), db.ForeignKey('concept_types.guid'), nullable=True)
@@ -356,7 +366,6 @@ class Concept(db.Model):
             'concept_name': self.concept_name,
             'concept_display_text': self.concept_display_text,
             'concept_explain': self.concept_explain,
-            'status': self.status,
             'concept_type': self.concept_type,
             'response_type': self.response_type,
             'unit': self.unit,

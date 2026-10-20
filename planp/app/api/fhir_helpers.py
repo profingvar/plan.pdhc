@@ -26,41 +26,31 @@ FHIR_CONTENT_TYPE = 'application/fhir+json'
 # determined; we always can, so it is deliberately not produced here.
 FHIR_PUBLICATION_STATUSES = ('draft', 'active', 'retired', 'unknown')
 
-# What Concept.status is allowed to hold. fhir_codesystem advertises exactly
-# these three in its CodeSystem property description, and as of #839 a CHECK
-# constraint enforces them — the column is a bare String(20) and accepted any
-# value before that.
-CONCEPT_STATUSES = ('draft', 'active', 'retired')
-
-
-def derive_publication_status(statuses) -> str:
-    """FHIR resource-level status, derived from the content's own statuses.
-
-    #839 — the three terminology wrappers each hardcoded ``'status': 'active'``
-    while every Concept underneath carried ``status='draft'``. A client reading
-    both was told the CodeSystem was active and that every concept in it was
-    editorially draft, which cannot both be useful.
-
-    The rule, and why:
-
-      * any content ``active``  -> ``active``. A resource that publishes even
-        one adopted concept is in use.
-      * content, all ``retired`` -> ``retired``.
-      * anything else, including no content at all -> ``draft``. Nothing has
-        been adopted, so claiming otherwise is the bug this function exists to
-        remove.
-
-    Unrecognised and empty values are ignored rather than trusted, so a stray
-    status cannot promote a resource.
-    """
-    seen = {str(s).strip().lower() for s in statuses
-            if s is not None and str(s).strip()}
-    seen &= set(CONCEPT_STATUSES)
-    if 'active' in seen:
-        return 'active'
-    if seen == {'retired'}:
-        return 'retired'
-    return 'draft'
+# The publication status plan.pdhc's terminology resources carry (#841).
+#
+# This is a property OF THE RESOURCE -- published, served and relied on in
+# production -- and deliberately NOT an aggregate of per-concept editorial
+# state. #839 made it the latter, deriving it from ``Concept.status``, and the
+# whole terminology surface consequently advertised ``draft``.
+#
+# #841 established that ``Concept.status`` was never meant to gate adoption:
+# no route, CLI or template could move a Concept out of ``draft``, all 99 rows
+# held the column default, and so a status derived from it could only ever say
+# ``draft`` -- permanently, and for every resource. Deriving a required FHIR
+# field from a field that cannot change is worse than the constant it
+# replaced, because it looks like information.
+#
+# So the constant is back, but for a stated reason rather than by accident:
+# these resources ARE active. The local CodeSystem's concepts validate every
+# CDR write through the canonicaliser's plan-Concept tier, and ten of them sit
+# behind roughly 41,000 observations on cdr1/cdr2/cdr3. A resource in that
+# position is in use, whatever editorial metadata is or is not recorded
+# beside it.
+#
+# If plan ever gains a real editorial lifecycle, this is the one place that
+# changes -- and it should then read a status on the resource's own row, not
+# fold over its content.
+RESOURCE_PUBLICATION_STATUS = 'active'
 
 
 
