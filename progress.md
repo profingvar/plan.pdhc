@@ -1665,4 +1665,22 @@ yet `/usr/local/www/plan.pdhc` is at `98bf711`. Container ahead of the release
 dir again. So production currently serves `draft` on 1 CodeSystem, 12
 ValueSets and 1 ConceptMap, and will keep doing so until this is deployed.
 
-399 tests green. **NOT DEPLOYED** — operator will deploy later.
+399 tests green.
+
+**DEPLOYED 2026-10-20** (#852). All three terminology resource types now report
+`active` where they had reported `draft`; the CodeSystem advertises 2 properties
+instead of 3 and none of its 99 concepts emits a `status` property; alembic
+moved `a1b2c3d4e5f6` → `b2c3d4e5f6a7` on container start (the entrypoint runs
+`flask db upgrade`), one head, `ck_concepts_status` gone, concept row count
+unchanged at 99. plan smoke 10/10, cdr1 smoke 18/18, 41 containers, 0
+unhealthy. Backup: `backups/predeploy/plan.pdhc/20261020T105142Z` — it holds the
+six pre-change modules, the dropped constraint's DDL and the prior alembic
+revision, so the rollback does not depend on this repo.
+
+Deploy method worth reusing: the six modules were verified byte-identical
+across local `04c62b2^`, the server source dir and the running container
+BEFORE copying, which is what established there were no server-only edits to
+preserve. The payload was then hash-checked against the commit on the server,
+so a truncated transfer could not be deployed. `git pull` was deliberately not
+used — the checkout at `/usr/local/www/plan.pdhc` is at `98bf711` and is not
+what runs.
