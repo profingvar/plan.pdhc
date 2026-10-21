@@ -70,11 +70,21 @@ def _validate_parameters(result: bool, **fields):
 def validate_code():
     """Is `(system, code)` adopted by plan.pdhc?
 
-    "Adopted" means: there exists at least one ``Concept`` or
+    "Adopted" means one of two things, depending on the library.
+
+    For a MEASUREMENT vocabulary (the default, and all five originally
+    seeded libraries): there exists at least one ``Concept`` or
     ``ValueCatalog`` row with ``canonical_lib`` matching the named
     library and ``canonical_refnumber`` equal to ``code``. We don't
     require an "active" flag — plan.pdhc's editorial state IS the
     working set; if a row exists, the code is in scope.
+
+    For a CLASSIFICATION — a library whose ``whole_system_answer_space``
+    is true — every code in the system is adopted, because the adopted
+    set is the classification itself and cannot be enumerated in
+    advance. A per-code row is still preferred when one exists (it
+    carries a display and a ref_guid), so that check runs first and this
+    one is the fallback.
 
     §6.2 — if the caller supplies a ``url`` or ``valueSet`` query
     parameter, the question becomes scoped: "is (system, code) in *this
@@ -165,6 +175,35 @@ def validate_code():
             display=value.value_name,
             ref_via="ValueCatalog",
             ref_guid=value.guid,
+            system=system,
+            code=code,
+        ))
+
+    # A CLASSIFICATION declares adoption at system granularity. Checked LAST,
+    # on purpose: if a specific Concept or ValueCatalog row does exist for this
+    # code, the branches above have already answered with its display and
+    # ref_guid, which is strictly more information than "the system is adopted".
+    #
+    # Why this branch exists (measured 2026-10-21 from icd11.pdhc's first live
+    # Condition projection): an ICD-11 diagnosis is chosen from ~85 000 codes at
+    # the point of care, so no per-code row can be pre-populated and cdr.pdhc
+    # rejected every projected Condition with `plan_miss`. For such a library
+    # the per-code question has no meaningful answer, and asking it anyway
+    # returns a false negative rather than a fact.
+    #
+    # This is NOT a loosening of cdr's write gate: cdr still asks, still
+    # believes only `result: true`, and plan still answers False for a library
+    # it does not know -- the `lib is None` branch above is untouched.
+    if lib.whole_system_answer_space:
+        return jsonify(_validate_parameters(
+            result=True,
+            message=(
+                f"'{system}' declares its answer space to be the entire code "
+                "system, so every code in it is adopted"
+            ),
+            ref_via="CanonicalLib",
+            ref_guid=lib.guid,
+            whole_system=True,
             system=system,
             code=code,
         ))

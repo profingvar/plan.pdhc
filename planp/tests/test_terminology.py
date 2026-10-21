@@ -96,6 +96,27 @@ def diabetes_value(app, seeded_libs):
         yield v.guid
 
 
+@pytest.fixture()
+def icd11_lib(app):
+    """A CLASSIFICATION library: answer space is the whole code system."""
+    with app.app_context():
+        lib = CanonicalLib.query.filter_by(
+            canonical_lib_name="icd11-mms").first()
+        if lib is None:
+            lib = CanonicalLib(
+                canonical_lib_name="icd11-mms",
+                canonical_lib_display_text="ICD-11 MMS (WHO)",
+                canonical_lib_url="https://termbank.pdhc.se/CodeSystem/icd11-mms",
+                author="termbank.pdhc",
+                whole_system_answer_space=True,
+            )
+            _db.session.add(lib)
+        else:
+            lib.whole_system_answer_space = True
+        _db.session.commit()
+        yield lib.guid
+
+
 # ---------------------------------------------------------------------------
 # $validate-code
 # ---------------------------------------------------------------------------
@@ -131,6 +152,81 @@ class TestValidateCode:
         params = {p["name"]: p for p in resp.get_json()["parameter"]}
         assert params["result"]["valueBoolean"] is False
         assert "not registered" in params["message"]["valueString"]
+
+    # -- a CLASSIFICATION declares adoption at system granularity -----------
+    # Measured 2026-10-21 from icd11.pdhc's first live Condition projection:
+    # an ICD-11 diagnosis is chosen from ~85 000 codes at the point of care, so
+    # no per-code row can be pre-populated and cdr.pdhc rejected every
+    # projected Condition with plan_miss.
+    def test_true_for_ANY_code_in_a_whole_system_library(self, client, icd11_lib):
+        resp = client.get(
+            "/api/v1/ValueSet/$validate-code?system=icd11-mms&code=1A00")
+        assert resp.status_code == 200
+        params = {p["name"]: p for p in resp.get_json()["parameter"]}
+        assert params["result"]["valueBoolean"] is True
+        assert params["ref_via"]["valueString"] == "CanonicalLib"
+        assert params["whole_system"]["valueBoolean"] is True
+
+    def test_a_code_never_seen_before_is_still_adopted(self, client, icd11_lib):
+        # The actual requirement. A clinician may record a code nobody has
+        # registered anywhere, and that must not be a write rejection.
+        params = {p["name"]: p for p in client.get(
+            "/api/v1/ValueSet/$validate-code"
+            "?system=icd11-mms&code=ZZ99.ZZ").get_json()["parameter"]}
+        assert params["result"]["valueBoolean"] is True
+
+    def test_a_postcoordinated_cluster_code_is_adopted(self, client, icd11_lib):
+        # cdr splits the termbank canonical, so the code it sends can be a stem
+        # or a cluster expression. Neither can be enumerated in advance.
+        params = {p["name"]: p for p in client.get(
+            "/api/v1/ValueSet/$validate-code"
+            "?system=icd11-mms&code=1A00%26XN62R").get_json()["parameter"]}
+        assert params["result"]["valueBoolean"] is True
+
+    def test_an_UNKNOWN_library_is_still_refused(self, client, icd11_lib):
+        # The guard that keeps this from being a loosening of the gate: the
+        # flag widens one library, it does not make plan answer yes to anything.
+        params = {p["name"]: p for p in client.get(
+            "/api/v1/ValueSet/$validate-code?system=notalib&code=1A00"
+        ).get_json()["parameter"]}
+        assert params["result"]["valueBoolean"] is False
+        assert "not registered" in params["message"]["valueString"]
+
+    def test_per_code_libraries_are_UNCHANGED(self, client, icd11_lib, seeded_libs):
+        # loinc has no whole_system flag, so an unreferenced code is still a
+        # clean "no". Every existing library must behave exactly as before.
+        params = {p["name"]: p for p in client.get(
+            "/api/v1/ValueSet/$validate-code?system=loinc&code=NOPE-1"
+        ).get_json()["parameter"]}
+        assert params["result"]["valueBoolean"] is False
+        assert "not adopted" in params["message"]["valueString"]
+
+    def test_a_real_Concept_still_WINS_over_the_system_answer(
+            self, client, app, icd11_lib):
+        # Ordering matters: a per-code row carries a display and a ref_guid,
+        # which is strictly more information than "the system is adopted". The
+        # whole-system branch is the fallback, not the first answer.
+        with app.app_context():
+            _db.session.add(Concept(
+                canonical_lib=icd11_lib,
+                canonical_refnumber="5A11",
+                concept_name="Diabetes mellitus typ 2",
+            ))
+            _db.session.commit()
+        params = {p["name"]: p for p in client.get(
+            "/api/v1/ValueSet/$validate-code?system=icd11-mms&code=5A11"
+        ).get_json()["parameter"]}
+        assert params["result"]["valueBoolean"] is True
+        assert params["ref_via"]["valueString"] == "Concept"
+        assert params["display"]["valueString"] == "Diabetes mellitus typ 2"
+        assert "whole_system" not in params
+
+    def test_icd10_is_deliberately_NOT_whole_system(self, client, seeded_libs):
+        # An ICD-10-SE *diagnosis* has the same mismatch, but icd10 is also used
+        # for non-diagnosis purposes in existing plans, so flipping it is a
+        # separate editorial decision. Pinned so it cannot drift silently.
+        with_lib = CanonicalLib.query.filter_by(canonical_lib_name="icd10").first()
+        assert bool(with_lib.whole_system_answer_space) is False
 
     def test_missing_params_400(self, client):
         resp = client.get("/api/v1/ValueSet/$validate-code")

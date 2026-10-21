@@ -54,6 +54,25 @@ class CanonicalLib(db.Model):
     canonical_lib_url = db.Column(db.String(500), nullable=True)
     author = db.Column(db.String(255), nullable=True)
     vers_number = db.Column(db.Integer, default=1)
+    # Is this library's answer space the ENTIRE code system?
+    #
+    # Default False, which is the behaviour every existing library has: a code
+    # is adopted only if some Concept or ValueCatalog row references it, and
+    # $validate-code answers per code. That is right for a measurement
+    # vocabulary, where an unplanned code is meaningless.
+    #
+    # True says the opposite and is for a CLASSIFICATION: a diagnosis is chosen
+    # from the whole of ICD-11 (~85 000 codes) at the point of care, so the
+    # adopted set cannot be enumerated in advance and plan declares adoption at
+    # SYSTEM granularity instead. This is not a loosening of the gate -- plan
+    # still answers the question, and still says no for an unregistered library.
+    #
+    # It also completes the design in icd11.pdhc's plan §5.b, which specifies a
+    # single system-bound Concept with no `valueset` because "its answer space is
+    # an entire code system". Without this flag that Concept makes ICD-11
+    # authorable in a PlanDefinition but leaves every actual code unadopted.
+    whole_system_answer_space = db.Column(
+        db.Boolean, nullable=False, server_default='false', default=False)
     date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     date_valid = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -65,6 +84,7 @@ class CanonicalLib(db.Model):
             'canonical_lib_url': self.canonical_lib_url,
             'author': self.author,
             'vers_number': self.vers_number,
+            'whole_system_answer_space': bool(self.whole_system_answer_space),
             'date_created': self.date_created.isoformat() if self.date_created else None,
             'date_valid': self.date_valid.isoformat() if self.date_valid else None,
         }
