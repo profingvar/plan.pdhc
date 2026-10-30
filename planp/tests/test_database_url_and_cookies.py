@@ -269,3 +269,60 @@ def test_the_production_shaped_process_also_refuses_an_EMPTY_PASSWORD():
     assert r.returncode != 0, (
         'started against a database reached with an empty password')
     assert 'POSTGRES_PASSWORD' in r.stderr
+
+
+# ---------------------------------------------------------------------------
+# The DEPLOYABLE files, not just the runtime check (#854)
+# ---------------------------------------------------------------------------
+#
+# Every test above checks what `_require_database_url()` does with a value it
+# is handed. None of them checks the value this repo would actually DEPLOY,
+# and that is where #854 lived: `docker-compose.yml` set a bare
+# `postgresql://`, while the deployed compose on miserver had been corrected
+# to `+psycopg2` and never mirrored back. The repo was the divergence.
+#
+# A bare scheme is safe ONLY because requirements.txt pins SQLAlchemy at
+# 2.0.x. From 2.1 a bare `postgresql://` resolves to psycopg v3, which is not
+# installed, and the service crash-loops on
+# `ModuleNotFoundError: No module named 'psycopg'`. cdr.pdhc walked into this
+# on 2026-10-21 (#853) by bumping the pin while leaving its DSNs bare. These
+# tests make the pin a compatibility decision again instead of a load-bearing
+# safety measure.
+
+def _lines_with(path, needle):
+    with open(path, encoding='utf-8') as fh:
+        return [l.strip() for l in fh if needle in l and not l.lstrip().startswith('#')]
+
+
+def test_the_COMPOSE_file_names_the_postgres_DRIVER():
+    """#854. `postgresql://` here is a time bomb armed by a dependency bump."""
+    found = _lines_with(os.path.join(REPO, 'docker-compose.yml'), 'DATABASE_URL=')
+    assert found, 'no DATABASE_URL line in docker-compose.yml — did it move?'
+    for line in found:
+        assert 'postgresql+' in line, (
+            'docker-compose.yml sets a bare postgresql:// DSN. SQLAlchemy >= 2.1 '
+            'resolves that to psycopg v3, which is not installed. Name the '
+            f'driver explicitly: postgresql+psycopg2://  ->  {line}')
+
+
+def test_the_ENV_EXAMPLE_names_the_driver_too():
+    """The example is what an operator copies on a fresh deploy."""
+    found = _lines_with(os.path.join(REPO, '.env.example'), 'DATABASE_URL=')
+    assert found, 'no DATABASE_URL in .env.example'
+    for line in found:
+        assert 'postgresql+' in line, f'bare DSN in .env.example: {line}'
+
+
+def test_the_COMPOSE_PROJECT_NAME_is_pinned_and_matches_the_LIVE_volume():
+    """Unpinned, compose derives the project from the directory name.
+
+    A release swap then silently creates a SECOND parallel project with its
+    own volume — dashboard.pdhc hit this (#113) and needed a dump/restore.
+    The value is not free: production runs project `planp` on volume
+    `planp_pdhc_pgdata`, so any other value would orphan the live data.
+    """
+    found = _lines_with(os.path.join(REPO, '.env.example'), 'COMPOSE_PROJECT_NAME=')
+    assert found, 'COMPOSE_PROJECT_NAME is not documented in .env.example'
+    assert found[0].split('=', 1)[1].strip() == 'planp', (
+        'must stay `planp` — it is the prefix of the live volume '
+        f'planp_pdhc_pgdata; got {found[0]}')

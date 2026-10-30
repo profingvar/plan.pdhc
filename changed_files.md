@@ -503,3 +503,49 @@ Backup of plan.pdhc planp/.env on miserver: `.env.bak.20260428-loader`.
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/terminology.py
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/migrations/versions/c3d4e5f6a7b8_whole_system_answer_space.py
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_terminology.py
+
+## 2026-10-30 — #854: the bare DSN, and a test for the files we actually deploy
+
+Edited:
+
+- `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docker-compose.yml` — line
+  39, `DATABASE_URL=postgresql://` → `postgresql+psycopg2://`. Safe today only
+  because `requirements.txt:52` pins `SQLAlchemy==2.0.52`; from 2.1 a bare
+  scheme resolves to psycopg v3, which is not installed, and the service
+  crash-loops on `ModuleNotFoundError: No module named 'psycopg'`. cdr.pdhc
+  walked into this on 2026-10-21 (#853) by bumping the pin with bare DSNs.
+- `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/.env.example` —
+  `COMPOSE_PROJECT_NAME=planp` added, with why. Production already pins it;
+  only the repo lacked it. The value is **not** free: the live volume is
+  `planp_pdhc_pgdata`, so any other value would orphan the data.
+- `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_database_url_and_cookies.py`
+  — three tests on the files this repo would DEPLOY, which is where #854 lived.
+  Every existing test in that file checks what `_require_database_url()` does
+  with a value it is handed; none looked at the compose file or the example.
+- `/Users/martiningvar/T7_sidewinder/plan.pdhc/planp/.env` (gitignored, local
+  dev only) — same scheme fix.
+
+Verified: 409 passed. The new test was proved to FAIL — the defect was
+reintroduced, `test_the_COMPOSE_file_names_the_postgres_DRIVER` went red with
+an actionable message, then the file was restored and it went green again.
+
+NOT changed, and worth knowing why:
+
+- **Production was already correct**, as in #858. The deployed
+  `/usr/local/www/plan.pdhc/planp/docker-compose.yml:39` has `+psycopg2` and
+  the deployed `.env:28` pins `COMPOSE_PROJECT_NAME=planp`. The repo was the
+  divergence, and the repo is what a fresh deploy would use.
+- **The ticket's item 3 is disproved.** It worried the deployed container might
+  publish on `0.0.0.0:9030`. It does not: `127.0.0.1:9030`.
+- **Three of the four bare `postgresql://` hits in this repo are not defects.**
+  `app/config.py:106` is a docstring describing a URL;
+  `scripts/gen_db_schema_snapshot.py:30` strips `+driver` deliberately, because
+  `psycopg2.connect()` cannot parse a SQLAlchemy scheme;
+  `tests/test_database_url_and_cookies.py` uses the bare form as test input.
+  Only the compose line was real.
+
+OPERATOR ITEM: the deployed `.env:4` still holds a bare DSN. It is **inert
+today** — compose `environment:` overrides `env_file` — but that makes it a
+two-step trap: delete the compose line as a "duplicate" and the bare DSN
+becomes live. One scheme prefix on a 600-mode file holding a credential, so it
+is handed over rather than done here.
