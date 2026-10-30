@@ -544,8 +544,29 @@ NOT changed, and worth knowing why:
   `tests/test_database_url_and_cookies.py` uses the bare form as test input.
   Only the compose line was real.
 
-OPERATOR ITEM: the deployed `.env:4` still holds a bare DSN. It is **inert
-today** — compose `environment:` overrides `env_file` — but that makes it a
-two-step trap: delete the compose line as a "duplicate" and the bare DSN
-becomes live. One scheme prefix on a 600-mode file holding a credential, so it
-is handed over rather than done here.
+DEPLOYED `.env:4` — **done 2026-10-30**, after the above was written as an
+operator item. It held the last bare DSN on the box for this service. Inert at
+the time, because compose `environment:` overrides `env_file` — which is
+exactly what made it a two-step trap: delete that compose line as a
+"duplicate" and the bare DSN becomes live, then the next SQLAlchemy bump
+crash-loops plan.
+
+Done surgically, since the file is 600 and holds a credential: backup first to
+`~/backups/predeploy/plan.pdhc/2026-10-30T20-41-55Z/env.before` (600, parent
+700), then a single counted replacement. Asserted afterwards — exactly line 4
+differed, 46 lines before and after, mode 600 unchanged, zero bare DSNs left.
+Written through the same file rather than with `sed -i`, which would replace a
+symlink with a regular file (it is a regular file here, but the habit is the
+point).
+
+Nothing restarted, and nothing needed to be: `pdhc_app` still shows
+`StartedAt 2026-10-30T16:42:42Z`, its own `DATABASE_URL` is unchanged, and
+`/api/health` is 200.
+
+The proof that the trap is closed is a dry run, not the file itself —
+`docker-compose config` now resolves **both** DSNs with the driver named:
+
+```
+DATABASE_URL: postgresql+psycopg2://...@db:5432/pdhc_gateway    (environment)
+DATABASE_URL: postgresql+psycopg2://...@localhost:9031/...      (env_file)
+```
