@@ -570,3 +570,30 @@ The proof that the trap is closed is a dry run, not the file itself —
 DATABASE_URL: postgresql+psycopg2://...@db:5432/pdhc_gateway    (environment)
 DATABASE_URL: postgresql+psycopg2://...@localhost:9031/...      (env_file)
 ```
+
+## 2026-10-31 — #857 (c): a whole-system TRUE is an ADOPTION statement, not existence
+
+Edited:
+
+- `planp/app/api/terminology.py` — the `whole_system` TRUE branch's message now
+  says outright that it is an adoption statement and **NOT** a membership test,
+  that it does not assert the code exists, who does check existence
+  (icd11.pdhc, against WHO's `codeinfo` at entry), and where to read why
+  (#857). The `validate_code` docstring carries the same with the measurement
+  (`icd11-mms&code=ZZ-nonsense` → true; `icd10&code=A00.9` → false as the
+  control) and names the exposure it leaves open.
+- `plan_pdhc_fhir_terminology_profile_instruction.md` — §2.2 gained the same,
+  as a table, because that section is what a caller reads before wiring to this
+  endpoint.
+- `planp/tests/test_terminology.py` — two tests. One pins the message wording;
+  until #857's option (a) exists the message **is** the compensating control,
+  so it should not survive the next edit on goodwill. The other is its control:
+  a measurement library's message must not pick up the new wording, because
+  there a False answer really is a membership result.
+
+Verified: 411 passed (was 409). The new test was proved to FAIL — the old
+message was restored, `test_the_message_says_it_is_NOT_a_membership_test` went
+red, the file was put back and it went green.
+
+The hole itself is closed on the cdr side, not here: see cdr.pdhc for #857
+option (b).

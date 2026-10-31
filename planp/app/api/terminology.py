@@ -86,6 +86,30 @@ def validate_code():
     carries a display and a ref_guid), so that check runs first and this
     one is the fallback.
 
+    **A `whole_system` TRUE answer is NOT a membership test (#857).**
+    It says the system is adopted; it does not say the code exists.
+    Measured 2026-10-21: ``system=icd11-mms&code=ZZ-nonsense`` answers
+    ``true``, while ``system=icd10&code=A00.9`` answers ``false`` — the
+    icd10 row being the control that shows the flag is what flipped the
+    answer rather than a blanket pass.
+
+    That is correct and was ratified: plan holds no copy of an 85 000-code
+    classification, so the per-code question has no meaningful answer here
+    and asking it anyway returns a false negative rather than a fact. But
+    it MOVES a check rather than removing one. Per-code existence now rests
+    entirely on **icd11.pdhc validating against WHO's ``codeinfo`` at
+    entry**, and the projection only sends concepts whose registered
+    termbank URI matches the code.
+
+    So a caller must not read this as validation. The exposure is beside
+    the designed path: cdr's ``KNOWN_FHIR_SERVICES`` admits several
+    identities and gates FHIR WRITES as well as reads (#760), so any of
+    them could POST a Condition carrying a fabricated ``icd11-mms`` code,
+    plan would assent, and cdr would store it. Closing that is #857's
+    option (a) — cdr checking the code against termbank's used-concept
+    record — and it is not done. The message string says all of this, so
+    an operator reading a response learns it without reading this file.
+
     §6.2 — if the caller supplies a ``url`` or ``valueSet`` query
     parameter, the question becomes scoped: "is (system, code) in *this
     specific ValueSet*?". The scoped path is delegated to
@@ -199,7 +223,11 @@ def validate_code():
             result=True,
             message=(
                 f"'{system}' declares its answer space to be the entire code "
-                "system, so every code in it is adopted"
+                f"system, so adoption is answered at SYSTEM level. This is an "
+                f"ADOPTION statement and NOT a membership test: it does not "
+                f"assert that '{code}' exists in the classification. Per-code "
+                f"existence is checked at entry by icd11.pdhc against WHO's "
+                f"codeinfo — see #857 before relying on this as validation."
             ),
             ref_via="CanonicalLib",
             ref_guid=lib.guid,

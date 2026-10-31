@@ -73,6 +73,23 @@ be preserved as-is:**
    `app/api/fhir_read.py:1034`) depend on this exact contract. Do **not** change
    its semantics in place — see §6.2 for the compatibility strategy.
 
+   **It is an ADOPTION question, never a membership test, and for a
+   `whole_system_answer_space` library the difference is load-bearing (#857).**
+   `icd11-mms` is such a library, so `$validate-code` answers `true` for ANY
+   code in it — including one that does not exist. Measured:
+
+   | query | answer |
+   |---|---|
+   | `system=icd11-mms&code=1A00` | `true` |
+   | `system=icd11-mms&code=ZZ-nonsense` | **`true`** |
+   | `system=icd10&code=A00.9` | `false` (the control: `icd10` is deliberately not whole-system) |
+
+   This is correct — plan holds no copy of an 85 000-code classification — but
+   it MOVES the existence check rather than removing it. Per-code existence
+   rests entirely on **icd11.pdhc validating against WHO's `codeinfo` at
+   entry**. A caller that treats a `true` here as "this code is real" is
+   mistaken, and the response message says so explicitly.
+
 ---
 
 ## 3. Data-model facts the implementation must respect

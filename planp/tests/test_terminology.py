@@ -221,6 +221,40 @@ class TestValidateCode:
         assert params["display"]["valueString"] == "Diabetes mellitus typ 2"
         assert "whole_system" not in params
 
+    # -- #857: the answer is ADOPTION, and must not read as existence --------
+
+    def test_the_message_says_it_is_NOT_a_membership_test(self, client, icd11_lib):
+        """The compensating control, since there is no technical one.
+
+        A whole_system TRUE answer is correct and was ratified, but it MOVES
+        the per-code existence check onto icd11.pdhc's WHO validation at entry
+        rather than removing it. Nothing downstream enforces that: cdr's
+        KNOWN_FHIR_SERVICES gates FHIR writes as well as reads (#760), so a
+        caller beside the designed path could POST a Condition with a
+        fabricated icd11-mms code and plan would assent.
+
+        Until #857 option (a) lands, the message IS the control — so it is
+        pinned here rather than left to survive the next edit on goodwill.
+        """
+        params = {p["name"]: p for p in client.get(
+            "/api/v1/ValueSet/$validate-code"
+            "?system=icd11-mms&code=ZZ-nonsense").get_json()["parameter"]}
+        assert params["result"]["valueBoolean"] is True
+        msg = params["message"]["valueString"]
+        assert "NOT a membership test" in msg
+        assert "does not assert" in msg
+        assert "icd11.pdhc" in msg          # who DOES check existence
+        assert "#857" in msg                # where to read why
+
+    def test_a_MEASUREMENT_library_message_is_unchanged(self, client, seeded_libs):
+        """The control. The new wording must not leak onto the per-code path,
+        where a False answer really is a membership result."""
+        params = {p["name"]: p for p in client.get(
+            "/api/v1/ValueSet/$validate-code"
+            "?system=icd10&code=A00.9").get_json()["parameter"]}
+        assert params["result"]["valueBoolean"] is False
+        assert "membership" not in params["message"]["valueString"]
+
     def test_icd10_is_deliberately_NOT_whole_system(self, client, seeded_libs):
         # An ICD-10-SE *diagnosis* has the same mismatch, but icd10 is also used
         # for non-diagnosis purposes in existing plans, so flipping it is a
