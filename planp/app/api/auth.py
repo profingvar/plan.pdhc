@@ -1,4 +1,5 @@
 import functools
+import hmac
 import secrets
 from flask import Blueprint, request, jsonify, redirect, session, url_for, current_app, g
 from app import limiter  # noqa: F401  (kept for parity with sibling blueprints)
@@ -31,16 +32,44 @@ def _phases(blob):
 # mint a NEW identity under its own name with its own key, rather than reviving
 # this one — reusing a retired credential is how the platform accumulated three
 # orphan identities in the first place.
+#: Service-key callers, each mapped to the config var holding its key AND
+#: **the role that key grants** (#912).
+#:
+#: The role used to be implicit, and the implication was `admin`: a valid key
+#: returned from `requires_role` before `min_role` was ever compared, so
+#: `@requires_role('admin')` and `@requires_role('read_only')` were the same
+#: decorator for a key holder. #736's own write-up noticed the symptom —
+#: "a valid key skipped the SSO gate entirely" — and framed it as an SSO
+#: bypass rather than as the role problem it is.
+#:
+#: Grant the NARROWEST role that works. `sim.pdhc` creates values, valuesets
+#: and members, which are all `read_write`; nothing it does needs `admin`,
+#: and the one admin route is `concepts.import_concepts` — bulk import into
+#: the terminology store that cdr, gateway and ips all resolve codes against.
+#:
+#: Nothing gets `admin` here. A service that genuinely needs it should be
+#: granted it visibly, which is the point of naming a role rather than
+#: returning a boolean.
 KNOWN_SERVICES = {
-    'sim.pdhc': 'SIM_PDHC_SERVICE_KEY',
+    'sim.pdhc': ('SIM_PDHC_SERVICE_KEY', 'read_write'),
 }
+
+#: Shared by both branches of `requires_role`, so the service path and the
+#: SSO path compare the same scale. Two scales would be two policies.
+ROLE_LEVELS = {'read_only': 1, 'read_write': 2, 'admin': 3}
 
 
 def _service_key_outcome():
     """Look at incoming headers and decide:
         None  → no service-key headers present, fall through to SSO
-        True  → valid service key, request is authenticated as g.source_service
+        str   → valid key; the ROLE it grants, per KNOWN_SERVICES. Sets
+                g.source_service and g.source_role.
         False → service-key headers present but invalid (signal 403)
+
+    It used to return True, and `requires_role` returned on that before
+    comparing `min_role` — so every role level was identical for a key
+    holder (#912). Returning the role instead is what lets one comparison
+    serve both branches.
     """
     source = request.headers.get('X-Source-Service', '').strip()
     key = request.headers.get('X-Service-Key', '').strip()
@@ -48,14 +77,29 @@ def _service_key_outcome():
         return None
     if not source or not key:
         return False
-    cfg_var = KNOWN_SERVICES.get(source)
-    if not cfg_var:
+    entry = KNOWN_SERVICES.get(source)
+    if not entry:
         return False
+    cfg_var, granted_role = entry
     expected = current_app.config.get(cfg_var, '')
-    if not expected or key != expected:
+    # An UNSET key admits nobody. Checked before the compare, so a caller
+    # sending an empty key cannot match a service whose key was never
+    # configured — plan carried `sim.pdhc` with an unset key for months and
+    # the entry admitted no one, which was correct and silent.
+    if not expected:
+        return False
+    # Constant-time (#912). The previous `key != expected` leaked the key by
+    # timing, and sso's own /api/auth/me/service says why in a comment:
+    # "this endpoint gates every service's token validation". So does this
+    # one. Encoded so a non-ASCII header refuses rather than raising.
+    try:
+        if not hmac.compare_digest(key.encode(), expected.encode()):
+            return False
+    except (UnicodeError, AttributeError):
         return False
     g.source_service = source
-    return True
+    g.source_role = granted_role
+    return granted_role
 
 
 # ---------------------------------------------------------------------------
@@ -108,8 +152,13 @@ def requires_role(min_role):
       read_only  → any authenticated session
       read_write → professional with "planning" in effective_phases, or SU admin
       admin      → is_su_admin
+
+    A SERVICE KEY grants the role named for it in `KNOWN_SERVICES`, and that
+    role is compared against `min_role` exactly as the blob's is (#912).
+    Before, a key returned before the comparison and this mapping described
+    only the SSO branch — the #804 shape, in an authorisation decorator.
     """
-    role_levels = {'read_only': 1, 'read_write': 2, 'admin': 3}
+    role_levels = ROLE_LEVELS
 
     def decorator(fn):
         @functools.wraps(fn)
@@ -117,11 +166,24 @@ def requires_role(min_role):
             if current_app.config.get('AUTH_DISABLED'):
                 return fn(*args, **kwargs)
 
+            required = role_levels.get(min_role, 0)
+
             sk = _service_key_outcome()
-            if sk is True:
-                return fn(*args, **kwargs)
             if sk is False:
                 return jsonify({'error': 'Invalid service credentials'}), 403
+            if sk is not None:
+                # #912: a key grants a ROLE and the role is compared, on the
+                # same scale the SSO branch uses below. The old code returned
+                # here unconditionally, which made `min_role` decorative on
+                # this path.
+                granted = role_levels.get(sk, 0)
+                if granted < required:
+                    return jsonify({
+                        'error': 'Insufficient permissions',
+                        'granted_role': sk,
+                        'required_role': min_role,
+                    }), 403
+                return fn(*args, **kwargs)
 
             blob = _refresh_blob_or_clear()
             if not blob:
@@ -133,8 +195,6 @@ def requires_role(min_role):
                     'error': 'Password change required',
                     'change_password_url': _sso_change_password_url(),
                 }), 403
-
-            required = role_levels.get(min_role, 0)
 
             # SU admins bypass all checks
             if blob.get('is_su_admin'):

@@ -678,3 +678,13 @@ Migration applied, reverted and re-applied against real Postgres (local
 (`icd10 at upgrade: 0 concepts, 0 values_catalog rows`) rather than trusting
 the measurement in its docstring — this database may not be the one that was
 measured. **NOT deployed to production.**
+
+## 2026-11-02 — #912: the service-key path is no longer role-blind
+- planp/app/api/auth.py — KNOWN_SERVICES values become
+  (config_var, granted_role); _service_key_outcome returns the ROLE, not True;
+  requires_role compares it against min_role on BOTH branches, on the same
+  scale (ROLE_LEVELS, now shared). hmac.compare_digest replaces `!=`.
+  The docstring's `admin → is_su_admin` promise now holds on both paths.
+- planp/tests/test_loader_identity_retired.py — the shape assertion updated;
+  its intent (loader.pdhc retired, one entry) preserved.
+- planp/tests/test_service_key_role_912.py (new) — 17 checks. 420 -> 438.

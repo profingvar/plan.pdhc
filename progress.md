@@ -1722,3 +1722,58 @@ premise when it runs rather than trusting the measurement in its docstring.
 **Not deployed to production.**
 
 Full account in `changed_files.md`, 2026-11-01.
+
+## #912 — a service key granted admin, because the role was never compared
+
+**438 passing**, from 420. Four controls, each failing on its own assertion.
+
+### The defect
+
+`requires_role` checked the service-key path first and returned on a valid
+key, before `min_role` was read. So `@requires_role('admin')` and
+`@requires_role('read_only')` were the same decorator for a key holder, and
+the decorator's docstring promised `admin → is_su_admin` — a gate that existed
+only on the SSO branch. The #804 shape, in an authorisation decorator, which
+is the worst place for it: the docstring is what a reader consults to decide
+whether a route is protected.
+
+**It had been noticed and mis-framed.** `test_loader_identity_retired.py`'s
+docstring says "plan.pdhc checks the service-key path FIRST in requires_role,
+so a valid key skipped the SSO gate entirely" — true, and the conclusion drawn
+was that loader.pdhc's key was dangerous rather than that the comparison was
+missing for everyone.
+
+### The fix
+
+The key path resolves a ROLE and the role is compared on the same scale the
+SSO branch uses. `KNOWN_SERVICES` now names the role it grants, so adding a
+service is a visible decision about privilege rather than a line nobody
+reviewed. Nothing is granted `admin`, asserted.
+
+The refusal names both roles — `granted_role` and `required_role` — so a
+sibling's log says what it had and what it needed, instead of sending someone
+to re-check a key that was never wrong.
+
+Also: `hmac.compare_digest` replaces `key != expected`. sso's own
+`/api/auth/me/service` says why in a comment, and the same argument applies to
+an endpoint that gates every service's access here.
+
+### Why this was urgent rather than merely true
+
+`alert.pdhc` step 2.b-ii needs alert in this exact dict. Adding it would have
+made the role-blindness reachable with a key that needs only `read_write`,
+and the one admin route is `concepts.import_concepts` — bulk import into the
+terminology store that cdr, gateway and ips all resolve codes against.
+
+One entry and an unset key meant nobody could reach it today; the same shape
+as #874, and the same reason to fix it before the first caller.
+
+### The fourth occurrence of one instrument error
+
+A source guard asserting `'key != expected' not in src` failed, because the
+function's own comment explains the fix by quoting the expression it replaced.
+That is the FOURTH time in this session — #885 once, #904 twice, now here —
+that I have written a guard which matches the comment explaining the guard.
+It now parses with `ast` and looks for a NotEq Compare between the two names,
+because `ast.unparse` drops comments entirely. Recorded in platform CLAUDE.md,
+since four is a pattern rather than an accident.

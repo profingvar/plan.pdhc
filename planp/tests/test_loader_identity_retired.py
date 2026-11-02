@@ -15,7 +15,13 @@ from __future__ import annotations
 def test_loader_is_not_a_known_service():
     from app.api.auth import KNOWN_SERVICES
     assert 'loader.pdhc' not in KNOWN_SERVICES
-    assert KNOWN_SERVICES == {'sim.pdhc': 'SIM_PDHC_SERVICE_KEY'}
+    # The shape changed in #912: the value is now (config_var, granted_role),
+    # because this file's own docstring described the symptom — "a valid key
+    # skipped the SSO gate entirely" — and the cause was that the key path
+    # returned before `min_role` was ever compared. The ALLOWLIST is what this
+    # test is about and is unchanged: one entry, and it is not loader.
+    assert KNOWN_SERVICES == {'sim.pdhc': ('SIM_PDHC_SERVICE_KEY',
+                                           'read_write')}
 
 
 def test_the_loader_key_is_not_read_into_config(app):
