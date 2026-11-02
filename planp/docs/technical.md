@@ -146,6 +146,61 @@ clients that encode `$`.
 **Terminology surface** (`app/api/terminology.py`): a `$validate-code` entry point
 plus termbank proxies (`/termbank/concept/<system>/<code>`, `/termbank/search`).
 
+### Adoption granularity — what `result: true` actually means (#872)
+
+`$validate-code` answers **two different questions** depending on the canonical
+library, and the response does not look different unless you read one field.
+
+| library kind | `result: true` means | basis |
+|---|---|---|
+| measurement vocabulary (the default) | a `Concept` or `ValueCatalog` row exists for this exact code | the row, returned as `display` + `ref_guid` |
+| **classification** (`whole_system_answer_space = true`) | the whole **code system** is adopted; this code was never checked individually | the library, returned as `ref_via: CanonicalLib` |
+
+The second kind also carries **`whole_system: true`** and a message naming who
+*does* verify per-code existence. **If you need to know which of the two answers
+you got, read `whole_system`** — `result: true` alone does not distinguish them.
+
+**Why the second kind exists.** An ICD-11 or ICD-10 diagnosis is chosen from
+~85 000 codes at the point of care. plan holds no copy of such a classification,
+so the per-code question has no meaningful answer here and asking it anyway
+returns a *false negative* rather than a fact.
+
+**Check order, which matters:** `Concept` → `ValueCatalog` → whole-system. The
+flag is the **fallback**, so a code that *does* have a row still answers per code,
+with its display and ref_guid — strictly more information than "the system is
+adopted". Flipping the flag changes the answer only for a code with **no** row,
+from `false` to `true`.
+
+**Flagged libraries** (`canonical_libs.whole_system_answer_space`):
+
+| library | flagged | since |
+|---|---|---|
+| `icd11-mms` | yes | 2026-10-21 (#857) |
+| `icd10` | yes | **2026-11-02 (#872)** |
+| everything else (`loinc`, `snomed`, `atc`, `local`, …) | no | — |
+
+A measurement vocabulary must **never** be flagged: for LOINC the per-code
+question is exactly the right one, and a flag there would turn every typo into
+an accepted code.
+
+**Who checks existence instead.** For `icd11-mms`, icd11.pdhc validates against
+WHO's `codeinfo` at entry. For `icd10` there is no equivalent entry-point
+validator today — see #874.
+
+**Consumers should record which basis they got.** cdr.pdhc does: it writes a row
+to `cdr_audit_whole_system_accept` for every coding accepted on the whole-system
+branch, the mirror of `cdr_audit_plan_miss`. Read together they answer "on what
+grounds is this code in the repository?". Both capability surfaces
+(`/api/v1/metadata` and `/api/v1/capability-statement`) state this rule, its
+reason and the required action.
+
+**What this does NOT give you.** The flag is per **library**, so it accepts any
+code of that classification for any **purpose**, diagnosis or not. The scoped
+path cannot narrow it either: `scoped_validate_code` enumerates `values_catalog`
+rows, so a ValueSet can express "one of these twelve codes" but never "any code
+of this classification". Per-release acceptance is also untouched — nothing here
+stops a code being used after it stops being nationally accepted.
+
 **FHIR PlanDefinition read** (`app/api/fhir_plandefinitions.py`):
 `GET /PlanDefinition`, `GET /PlanDefinition/<fhir_id>`,
 `GET /PlanDefinition/<fhir_id>/$expand`.

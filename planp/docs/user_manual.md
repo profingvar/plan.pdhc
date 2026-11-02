@@ -167,6 +167,18 @@ other systems read the library you build — but it is useful to know it exists:
   list of allowed answers.
 - **ValueSet `$validate-code`** — check whether a given code is a legal answer in
   one of your value sets.
+
+  **One caveat worth knowing (#872).** For a *classification* — a coding system
+  so large that nobody can list it in advance, like ICD-10 or ICD-11 diagnoses —
+  the honest answer is not "yes, that code is in my list" but "we have adopted
+  that whole coding system". A diagnosis is picked from roughly 85 000 codes in
+  the consultation room, so there is no row here per code, and answering per
+  code would mean saying *no* to perfectly valid diagnoses. For those systems
+  the service answers yes and adds a marker (`whole_system`) saying which kind
+  of yes it gave, plus who *does* check that the individual code exists. If you
+  are building something that depends on the difference, read that marker — a
+  bare yes does not tell the two apart. Your own measurement vocabularies
+  (LOINC and the like) are unaffected and still answer per code.
 - **CodeSystem `$lookup`** — look up one of your local concepts and get its
   display text and terminology binding back. (Locally, a concept's *code* is its
   GUID.)
