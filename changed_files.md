@@ -597,3 +597,84 @@ red, the file was put back and it went green.
 
 The hole itself is closed on the cdr side, not here: see cdr.pdhc for #857
 option (b).
+
+## 2026-11-01 — #872: the adoption rule is now readable, and ICD-10 is decided
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/capability.py
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/migrations/versions/d4e5f6a7b8c9_icd10_whole_system.py
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_adoption_granularity_872.py
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_terminology.py
+
+Two halves of the operator decision #872 asked for.
+
+**1. The rule was not discoverable.** The semantics have been right since
+c3d4e5f6a7b8 and the message has been honest since #857, but measured
+2026-11-01 **nothing outside this service read the `whole_system` boolean** —
+zero readers in the whole workspace. A contract nobody can discover is a
+contract nobody follows. It is now stated on BOTH capability surfaces, because
+they have different readers: the FHIR CapabilityStatement at
+`/api/v1/metadata` (what cdr.pdhc parses) and the human-readable index at
+`/api/v1/capability-statement`. Documenting one would leave the other
+advertising less than the truth.
+
+The advertisement says three things on purpose: the rule, the REASON (~85 000
+codes picked at the point of care — a rule without its reason gets
+"simplified" away by the next reader), and what a caller should DO about it
+("Read whole_system"). Each is a separate test.
+
+**2. ICD-10 was deferred on a premise that is empty.** c3d4e5f6a7b8 left
+`icd10` FALSE because it "is also used for non-diagnosis purposes in existing
+plans, so flipping it is a separate editorial decision with its own blast
+radius". Measured against PRODUCTION 2026-11-01:
+
+    canonical_lib_name | concepts | values
+    -------------------+----------+-------
+    icd10              |        0 |      0
+
+Nine libs exist; `local` (34/48), `loinc` (35/3), `snomed` (21/0) and `atc`
+(9/0) carry everything. Nothing references icd10 at all. The concern was
+reasonable as a category and false in fact.
+
+Flipped rather than split. A second canonical lib for diagnoses only would
+give the same ICD-10 code two possible canonical URIs depending on which lib
+it came through, and cdr.pdhc deduplicates on `code_canonical` — so a
+diagnosis would stop deduplicating against itself. One identifier per code
+system is worth more here than purpose-purity.
+
+**What this does NOT solve, recorded so nobody assumes it did:** the flag is
+per-LIBRARY, so it accepts any ICD-10 code for any purpose. And that cannot be
+fixed in the scoped path either — `scoped_validate_code` walks enumerated
+`values_catalog` rows, so a ValueSet can say "one of these twelve codes" but
+never "any code of this classification". Purpose-scoping a whole
+classification is an open problem. Per-release acceptance is likewise
+untouched (icd11.pdhc open item 19b).
+
+**Two existing tests had to be rewritten, not deleted.**
+`test_icd10_is_deliberately_NOT_whole_system` pinned the old decision; it is
+now `test_icd10_IS_whole_system_per_872`, asserted against the MIGRATION FILE
+because this suite runs on SQLite with `create_all` and never applies
+migrations — so the fixture's flag value says nothing about what a deploy
+does. And `test_a_MEASUREMENT_library_message_is_unchanged` used `icd10` as
+its per-code example, which was always slightly wrong: ICD-10-SE is a
+classification and faces exactly the mismatch the flag exists for. It now uses
+`loinc`, which is what "MEASUREMENT library" means. A new
+`test_a_MEASUREMENT_library_is_never_flagged` replaces the lost pin with the
+drift that would actually hurt: flagging LOINC would accept any code ever
+minted.
+
+**A fixture of mine leaked and it looked like a code defect.** Flipping icd10's
+flag in a session-scoped SQLite database changed the answer two tests in
+test_terminology.py got, depending on file order. Both fixtures now restore the
+previous value — and the test that inserts an icd10 Concept deletes it again,
+because SQLite leaves foreign keys unenforced and an orphan row would survive
+into other tests instead of failing loudly.
+
+Controls proven by disabling the whole-system branch (`if False:`): 6 red
+across the two files, including the new ICD-10 test. Restored: 42/42 for the
+two files, **421/421** for the whole suite.
+
+Migration applied, reverted and re-applied against real Postgres (local
+`pdhc_db`): `icd10` f → t → f → t, `loinc` untouched at f throughout, head
+`d4e5f6a7b8c9`. It prints its own premise when it runs
+(`icd10 at upgrade: 0 concepts, 0 values_catalog rows`) rather than trusting
+the measurement in its docstring — this database may not be the one that was
+measured. **NOT deployed to production.**

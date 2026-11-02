@@ -129,7 +129,15 @@ ENDPOINTS = [
     _endpoint('POST', '/ValueSet/$expand', False, 'Expand by FHIR Parameters body (url or valueSet)'),
     _endpoint('GET', '/ValueSet/$validate-code', False,
               'Global (no url): the cdr.pdhc adoption-check shim (unchanged). '
-              'Scoped (with ?url= or ?valueSet=): FHIR ValueSet/$validate-code.'),
+              'Scoped (with ?url= or ?valueSet=): FHIR ValueSet/$validate-code. '
+              'ADOPTION GRANULARITY (#872): for a canonical library flagged '
+              'whole_system_answer_space, result:true is an ADOPTION statement '
+              'about the code SYSTEM and NOT a membership test for the code — '
+              'the response then carries whole_system:true plus a message '
+              'naming who does check per-code existence. A classification of '
+              '~85 000 codes picked at the point of care cannot have a row per '
+              'code, so asking per code returns a false negative rather than a '
+              'fact. Read whole_system if you need to know which answer you got.'),
     _endpoint('GET', '/ValueSet/<guid>/$validate-code', False, 'Scoped $validate-code by path id'),
     _endpoint('POST', '/ValueSet/$validate-code', False, 'Scoped $validate-code by Parameters body'),
 
@@ -439,7 +447,17 @@ def fhir_capability_statement():
                              'cdr.pdhc/cdr_app/app/services/plan_client.py). Preserved unchanged. '
                              '(2) scoped — same path with ?url=, or GET /ValueSet/{guid}/$validate-code, '
                              'or POST with Parameters body — checks (system, code) against THIS '
-                             "ValueSet's expansion."),
+                             "ValueSet's expansion. "
+                             'ADOPTION GRANULARITY (#872): in global mode, a canonical library '
+                             'flagged whole_system_answer_space answers result:true for ANY code '
+                             'in that system. That is an ADOPTION statement about the code system '
+                             'and NOT a membership test for the code — a classification of ~85 000 '
+                             'codes picked at the point of care cannot hold a row per code, so '
+                             'asking per code yields a false negative rather than a fact. Such a '
+                             'response carries whole_system:true and a message naming who checks '
+                             'per-code existence (for ICD-11: icd11.pdhc, against WHO, at entry). '
+                             'Read whole_system if you need to know which of the two answers you '
+                             'got; result:true alone does not distinguish them.'),
                         },
                     ],
                 },

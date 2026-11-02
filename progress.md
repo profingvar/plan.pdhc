@@ -1684,3 +1684,41 @@ preserve. The payload was then hash-checked against the commit on the server,
 so a truncated transfer could not be deployed. `git pull` was deliberately not
 used — the checkout at `/usr/local/www/plan.pdhc` is at `98bf711` and is not
 what runs.
+
+## #872 — adoption granularity is advertised, and ICD-10 is decided (2026-11-01)
+
+The operator decision #872 asked for, in two halves.
+
+**The rule is now readable.** The semantics were already right and the message
+already honest (#857), but measured 2026-11-01 **no caller anywhere read the
+`whole_system` boolean**. It is now stated on both capability surfaces — the
+FHIR CapabilityStatement at `/api/v1/metadata`, which cdr.pdhc parses, and the
+human-readable index — with the rule, its reason (~85 000 codes picked at the
+point of care) and what a caller should do about it. Three tests, one per
+claim.
+
+**`icd10` joins `icd11-mms` as a whole-system answer space.** Migration
+c3d4e5f6a7b8 deferred it because "icd10 is also used for non-diagnosis
+purposes in existing plans". Measured against production 2026-11-01: **icd10
+holds 0 concepts and 0 values_catalog rows.** The blast radius is empty.
+Flipped rather than split into a diagnosis-only library, because a second lib
+would give the same ICD-10 code two canonical URIs and cdr deduplicates on
+`code_canonical`.
+
+Not solved, and recorded as such: the flag is per-library, so it accepts any
+ICD-10 code for any purpose, and the scoped path cannot fix that —
+`scoped_validate_code` walks enumerated `values_catalog` rows, so a ValueSet
+can say "one of these twelve" but never "any code of this classification".
+Per-release acceptance is untouched (icd11.pdhc open item 19b).
+
+Tests: **421/421.** Two existing tests were rewritten rather than deleted —
+one pinned the old ICD-10 decision, the other used `icd10` as its example of a
+per-code library, which was always slightly wrong since ICD-10-SE is a
+classification. Controls proven by disabling the whole-system branch: 6 red.
+
+Migration `d4e5f6a7b8c9` applied, reverted and re-applied against local
+Postgres: icd10 f → t → f → t, `loinc` untouched throughout. It prints its own
+premise when it runs rather than trusting the measurement in its docstring.
+**Not deployed to production.**
+
+Full account in `changed_files.md`, 2026-11-01.

@@ -248,19 +248,55 @@ class TestValidateCode:
 
     def test_a_MEASUREMENT_library_message_is_unchanged(self, client, seeded_libs):
         """The control. The new wording must not leak onto the per-code path,
-        where a False answer really is a membership result."""
+        where a False answer really is a membership result.
+
+        Uses loinc, not icd10 (#872). This test originally used icd10 as its
+        per-code example — which was always slightly wrong, because ICD-10-SE
+        is a classification and faces exactly the mismatch the flag exists
+        for. loinc is a MEASUREMENT vocabulary, which is what the docstring
+        means and what the flag must never be applied to: an unplanned LOINC
+        code is meaningless, so requiring a row is the gate working."""
         params = {p["name"]: p for p in client.get(
             "/api/v1/ValueSet/$validate-code"
-            "?system=icd10&code=A00.9").get_json()["parameter"]}
+            "?system=loinc&code=99999-9").get_json()["parameter"]}
         assert params["result"]["valueBoolean"] is False
         assert "membership" not in params["message"]["valueString"]
 
-    def test_icd10_is_deliberately_NOT_whole_system(self, client, seeded_libs):
-        # An ICD-10-SE *diagnosis* has the same mismatch, but icd10 is also used
-        # for non-diagnosis purposes in existing plans, so flipping it is a
-        # separate editorial decision. Pinned so it cannot drift silently.
-        with_lib = CanonicalLib.query.filter_by(canonical_lib_name="icd10").first()
-        assert bool(with_lib.whole_system_answer_space) is False
+    def test_icd10_IS_whole_system_per_872(self):
+        """The 2026-10-21 deferral is resolved, in the opposite direction.
+
+        This test used to pin ``icd10`` as deliberately NOT whole-system, on
+        migration c3d4e5f6a7b8's stated reason: "icd10 is also used for
+        non-diagnosis purposes in existing plans, so flipping it is a separate
+        editorial decision with its own blast radius."
+
+        Measured against PRODUCTION 2026-11-01: icd10 holds **0 concepts and
+        0 values_catalog rows**. The blast radius is empty. The concern was
+        reasonable as a category and false in fact, so #872 flips it.
+
+        Asserted against the MIGRATION FILE rather than the database, because
+        this suite runs on SQLite with create_all and never applies
+        migrations — so the fixture's flag value says nothing about what a
+        deploy will do. The deployable artifact is the thing to check."""
+        import pathlib
+        src = pathlib.Path(__file__).resolve().parents[1] / "migrations" / \
+            "versions" / "d4e5f6a7b8c9_icd10_whole_system.py"
+        assert src.exists(), "the #872 migration is missing"
+        text = src.read_text(encoding="utf-8")
+        assert "LIB_NAME = 'icd10'" in text
+        assert "whole_system_answer_space = true" in text
+        assert "down_revision = 'c3d4e5f6a7b8'" in text, \
+            "must chain from the migration that deferred this"
+
+    def test_a_MEASUREMENT_library_is_never_flagged(self, client, seeded_libs):
+        """What replaces the old pin: the drift that would actually hurt.
+
+        Flagging a measurement vocabulary would accept any LOINC code ever
+        minted, which is the opposite of why plan validates at all. loinc
+        stays per-code, and this fails if anyone flips it."""
+        lib = CanonicalLib.query.filter_by(canonical_lib_name="loinc").first()
+        assert lib is not None
+        assert bool(lib.whole_system_answer_space) is False
 
     def test_missing_params_400(self, client):
         resp = client.get("/api/v1/ValueSet/$validate-code")
