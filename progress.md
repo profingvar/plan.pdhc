@@ -1777,3 +1777,69 @@ that I have written a guard which matches the comment explaining the guard.
 It now parses with `ast` and looks for a NotEq Compare between the two names,
 because `ast.unparse` drops comments entirely. Recorded in platform CLAUDE.md,
 since four is a pattern rather than an accident.
+
+## #913 — the terminology surface is read-public BY DESIGN, and I filed it wrong
+
+**447 passing**, from 438. Proxy checked, with authorisation.
+
+### What the proxy says
+
+`plan.pdhc.se.conf` is a bare `location / { proxy_pass http://127.0.0.1:9030; }`
+— no `auth_basic`, no `auth_request`, no `deny`, no `allow`, no per-location
+anything. And probed for the STATUS CODE only, never the body:
+
+    GET https://plan.pdhc.se/api/v1/ValueSet   ->  200   unauthenticated
+
+So the reachability half of #913 is confirmed. It is not a defence-in-depth
+gap; the endpoint answers a stranger.
+
+### But my framing was wrong, and the measurement is better than the ticket
+
+I filed #913 as "ten routes somebody forgot to gate". Measured properly it is a
+deliberate, consistent pattern:
+
+| module | reads | writes |
+|---|---|---|
+| `fhir_valueset.py` | 6 route functions (10 URL patterns), ungated | **0** |
+| `lookup_tables.py` | 7 ungated, GET-only | **12**, all `read_write` |
+
+**Zero ungated writes anywhere.** Thirteen open reads, twelve gated writes, no
+exceptions — and FHIR terminology servers commonly publish `$expand` and
+`$validate-code` as reference data. That is a design.
+
+My two "control" probes returned 200 and looked like the control failing. They
+were GETs on paths whose WRITE method is the gated one: I had probed the wrong
+method. Reporting that as a failed control would have been wrong twice over.
+
+### The numbers in my ticket were wrong twice
+
+"Ten routes" is **six route functions with ten URL patterns** — four declare
+both `$expand` and its `%24`-encoded spelling, and my grep counted decorators.
+And "9 gated / 5 ungated" in `lookup_tables.py` is **12 and 7**; there is a
+`list_items`/`read_item` pair I had not seen.
+
+Every count I asserted from a grep this session was off by something, and only
+measuring with `ast` fixed it. The finding is unchanged and slightly stronger.
+
+### What the ticket is actually about
+
+Not the gating. **alert.pdhc's step 2.b-ii would register the Socialstyrelsen
+urval — 19 ValueSets, 219 memberships, copyright-protected — into a surface
+that is public on purpose.** That is a licensing decision for the operator, and
+nothing here settles it.
+
+### What was built instead of a guess
+
+`tests/test_terminology_read_write_invariant_913.py` states the convention and
+enforces it, because it was enacted in 24 decorators and written down nowhere —
+which is precisely how I came to read it as a gap, and how the next person
+adding a route will guess.
+
+The valuable direction is the write one: a NEW write route added without a role
+gate is a silent privilege change, and nothing else in the suite would notice.
+Controlled: appending an ungated `POST` fires the invariant.
+
+It also pins `$validate-code` as reachable WITHOUT a role, with the reason —
+alert's candidate gate asks it per candidate, so gating it would fail every
+candidate closed as `vocabulary_miss`. Correct behaviour for an unaskable
+vocabulary, and a silent stop to the whole module.
