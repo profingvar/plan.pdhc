@@ -1893,12 +1893,61 @@ A test records the fact and will fire if either the gating or the
 
 ### Handover — this unblocks 2.b-ii
 
-Not deployed. In order:
+Steps 1 and 2 are DONE (2026-11-03T07:12Z). Steps 3 and 4 are the operator's.
 
-1. deploy plan (code only; no migration)
-2. add `'alert.pdhc': ('ALERT_PDHC_SERVICE_KEY', 'read_write')` to
-   `KNOWN_SERVICES` — `read_write` covers the enumerating reads too, since
-   level 2 ≥ level 1, so alert needs ONE grant
-3. mint `ALERT_PDHC_SERVICE_KEY` in plan's `.env` (operator)
+1. ~~deploy plan (code only; no migration)~~ — **done**, see below
+2. ~~add `'alert.pdhc': ('ALERT_PDHC_SERVICE_KEY', 'read_write')` to
+   `KNOWN_SERVICES`~~ — **done** (`db6b9e7`). `read_write` covers the
+   enumerating reads too, since level 2 ≥ level 1, so alert needs ONE grant
+3. mint `ALERT_PDHC_SERVICE_KEY` in plan's `.env` (operator) — **open**
 4. run alert's `python -m app.selection.register <xlsx> --dry-run`, then
-   `--commit` with `ALERT_ALLOW_PLAN_WRITE=1`
+   `--commit` with `ALERT_ALLOW_PLAN_WRITE=1` — **open**, blocked on 3
+
+## 2026-11-03 — #912 + #913 + alert's grant DEPLOYED
+
+One rebuild carried all three, deliberately: the role comparison (#912), the
+read_only gate on the enumerating terminology routes (#913), and alert's
+`KNOWN_SERVICES` entry. Gating a route and widening the allowlist in separate
+restarts would have left a window where alert's key existed but could not read.
+
+Deployed to `/usr/local/www/plan.pdhc/planp` (plain directory, no git,
+`.env` mode 600) with `docker-compose up -d --build app` — **`docker compose`
+v2 is absent on miserver**, only `docker-compose` 5.1.4 exists.
+
+| | before | after |
+|---|---|---|
+| container | `c6e288e687ea` | `e2b6841968a3` |
+| image | `31c64d407af7` | `6625c142138f` |
+| `/api/health` | 200 | 200, `database: connected` |
+| tracebacks since restart | — | **0** |
+| port mapping | — | `127.0.0.1:9030->9030` (§3 correct) |
+
+Rollback artifact: `~/backups/predeploy/plan.pdhc/planp_2026-11-03T07-11-03Z.tgz`
+(24.7 MB, 4640 entries, all three changed files present, dir `drwx------`).
+
+**Diff before the copy: 60 files each side, no orphans, no new files, 6
+differing.** Five matched git history. `capability.py` first flagged
+SERVER-ONLY, and that was MY error, not a server-side edit: reconstruction
+proved the deployed file is exactly local HEAD minus the README.md case fix.
+The wrong assumption was that every deployed state equals some commit. Only
+the three files this deploy is about were copied; their server hashes match
+local exactly (`8140ce0524d40b3c`, `99bc927c3dfa7ad3`, `1c1e232997c14da2`).
+
+**Verified inside the container, not merely on disk**: `alert.pdhc` in
+`KNOWN_SERVICES` (2 hits), `ROLE_LEVELS` (1), `compare_digest` (1), three
+`read_only` gates in `fhir_valueset.py` and three in `lookup_tables.py`.
+
+Live behaviour, status codes only (the bodies are the copyright-restricted
+material, so they were never read):
+
+| route | before | after | meaning |
+|---|---|---|---|
+| `GET /api/v1/ValueSet` | 200 | **401** | enumerating read now gated |
+| `GET /api/v1/lookup/values` | 200 | **401** | likewise |
+| `GET /api/v1/lookup/valuesets` | 200 | **401** | likewise |
+| `$validate-code` | 400 | **400** | NOT 401 — still public, per #913 |
+| `GET /api/v1/CodeSystem` | 200 | 200 | the recorded gap, see above |
+
+`400` on `$validate-code` is "you sent no parameters", not "you may not" —
+which is the right answer to an anonymous caller, and is what keeps cdr1's
+write gate and alert's per-candidate vocabulary check working.

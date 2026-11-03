@@ -697,3 +697,11 @@ measured. **NOT deployed to production.**
 - planp/tests/test_loader_identity_retired.py — shape assertion updated.
 - planp/tests/test_service_key_role_912.py — 4 checks on alert's grant,
   including that an UNSET key admits nobody (it will be unset until minted).
+
+## 2026-11-03 — DEPLOYED (no local file changed by this entry)
+- Deployed #912 + #913 + alert's grant in one rebuild of `pdhc_app`.
+  Server path `/usr/local/www/plan.pdhc/planp`; only these three files copied:
+  `app/api/auth.py`, `app/api/fhir_valueset.py`, `app/api/lookup_tables.py`.
+  Image `31c64d407af7` → `6625c142138f`. Rollback tgz in
+  `~/backups/predeploy/plan.pdhc/planp_2026-11-03T07-11-03Z.tgz`.
+  Live probe: `GET /ValueSet` 200→401, `$validate-code` still 400 (not 401).
