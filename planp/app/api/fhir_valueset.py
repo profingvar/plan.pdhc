@@ -57,6 +57,8 @@ from app.models.concept_models import (
 )
 
 
+from app.api.auth import requires_role
+
 fhir_valueset_bp = Blueprint('fhir_valueset', __name__)
 
 
@@ -274,6 +276,7 @@ def read_valueset(guid: str):
 # GET /ValueSet — searchset Bundle
 # ---------------------------------------------------------------------------
 @fhir_valueset_bp.route('/ValueSet', methods=['GET'])
+@requires_role('read_only')
 def search_valuesets():
     url_filter = (request.args.get('url') or '').strip() or None
 
@@ -322,6 +325,7 @@ def search_valuesets():
 # ---------------------------------------------------------------------------
 @fhir_valueset_bp.route('/ValueSet/<guid>/$expand', methods=['GET'])
 @fhir_valueset_bp.route('/ValueSet/<guid>/%24expand', methods=['GET'])
+@requires_role('read_only')
 def expand_valueset_by_id(guid: str):
     if not _is_valid_uuid(guid):
         return operation_outcome(
@@ -341,6 +345,7 @@ def expand_valueset_by_id(guid: str):
 # ---------------------------------------------------------------------------
 @fhir_valueset_bp.route('/ValueSet/$expand', methods=['POST'])
 @fhir_valueset_bp.route('/ValueSet/%24expand', methods=['POST'])
+@requires_role('read_only')
 def expand_valueset_by_parameters():
     params = parse_parameters_body()
     url = params.get('url') or params.get('valueSet')

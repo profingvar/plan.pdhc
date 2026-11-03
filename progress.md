@@ -1843,3 +1843,62 @@ It also pins `$validate-code` as reachable WITHOUT a role, with the reason —
 alert's candidate gate asks it per candidate, so gating it would fail every
 candidate closed as `vocabulary_miss`. Correct behaviour for an unaskable
 vocabulary, and a silent stop to the whole module.
+
+## #913 option three, built (2026-11-03)
+
+**461 passing**, from 447. Three controls, each failing on its own assertion.
+
+### The policy, in three tiers
+
+| tier | routes | rule |
+|---|---|---|
+| **writes** | 12 in `lookup_tables.py` | `read_write` (unchanged) |
+| **enumerating reads** | 6 — `search_valuesets`, `expand_valueset_by_id`, `expand_valueset_by_parameters`, `list_values`, `list_valuesets`, `list_valueset_values` | **`read_only`, new** |
+| **public by design** | both `$validate-code` forms, `read_valueset`, `read_value`, and the CRUD factory's `list_items`/`read_item` | ungated, each with its reason in the test |
+
+The asymmetry is the argument: `$validate-code` answers a question about a code
+the caller already holds; `$expand` and the list routes hand over the material.
+
+### Two measurements decided the scope
+
+- **The native surface was broader than the FHIR one.** `list_values()` returns
+  EVERY code in the store, not just one selection. Gating only
+  `fhir_valueset.py` would have been half a fix, and I nearly shipped that.
+- **The CRUD factory serves `canonical-libs`, `units`, `response-types` and
+  three more — and cdr.pdhc calls `/api/v1/lookup/canonical-libs` on its
+  whole-system write gate.** Gating `list_items` would have broken it.
+  Control 3 does exactly that and fires.
+
+### 19 tests had to start authenticating, and that is the finding's shadow
+
+`test_fhir_valueset.py` called these routes ANONYMOUSLY in 19 tests, and
+`test_fhir_publication_status.py` in two more. That is how the public-read
+design was asserted: implicitly, by tests that would have failed if it changed.
+They now establish a session through one autouse fixture whose docstring is the
+explanation.
+
+### What option three does NOT cover, recorded rather than rediscovered
+
+`GET /api/v1/CodeSystem` and `/CodeSystem/<id>` call `_build_codesystem()`,
+whose `include_concepts` defaults to **True** — so both hand over plan's entire
+local Concept catalogue, ungated. That is a second enumerating surface, and it
+is NOT what #913 decided: the restricted material is the Socialstyrelsen urval
+(which codes are flagged, living in the ValueSets), while a CodeSystem listing
+reveals PDHC's own concepts.
+
+Extending the gate there would have been scope creep on a decision about
+ValueSets, and `$lookup` sits on cdr's hot path the way `$validate-code` does.
+A test records the fact and will fire if either the gating or the
+`include_concepts` default changes.
+
+### Handover — this unblocks 2.b-ii
+
+Not deployed. In order:
+
+1. deploy plan (code only; no migration)
+2. add `'alert.pdhc': ('ALERT_PDHC_SERVICE_KEY', 'read_write')` to
+   `KNOWN_SERVICES` — `read_write` covers the enumerating reads too, since
+   level 2 ≥ level 1, so alert needs ONE grant
+3. mint `ALERT_PDHC_SERVICE_KEY` in plan's `.env` (operator)
+4. run alert's `python -m app.selection.register <xlsx> --dry-run`, then
+   `--commit` with `ALERT_ALLOW_PLAN_WRITE=1`

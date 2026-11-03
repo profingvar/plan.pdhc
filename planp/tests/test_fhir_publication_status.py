@@ -116,6 +116,10 @@ def _resource(body):
     '/api/v1/ConceptMap',
 ])
 def test_every_terminology_resource_reports_active(client, one_concept, url):
+    # #913: /ValueSet's search is @requires_role('read_only') as of
+    # 2026-11-03 because it enumerates. /CodeSystem and /ConceptMap are
+    # unchanged and still public; a session is harmless for those.
+    set_sso_session(client, SAMPLE_ACCESS_BLOB)
     resp = client.get(url)
     assert resp.status_code == 200, resp.get_data(as_text=True)
     res = _resource(resp.get_json())
@@ -139,6 +143,7 @@ def test_status_does_not_follow_concept_status(client, app, one_concept, url):
     from app import db as _db
     from app.models.concept_models import Concept
 
+    set_sso_session(client, SAMPLE_ACCESS_BLOB)   # #913, see above
     seen = set()
     for value in ('draft', 'active', 'retired', 'anything-at-all'):
         with app.app_context():

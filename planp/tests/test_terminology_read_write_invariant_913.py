@@ -8,12 +8,11 @@ properly, it is a deliberate and consistent pattern:
                                  `%24`-encoded spelling), ungated,
                                  0 write routes
     app/api/lookup_tables.py    19 route functions: 12 write routes, all
-                                 @requires_role('read_write'), and 7
-                                 ungated GET-only reads
+                                 @requires_role('read_write')
 
-Thirteen open reads, twelve gated writes, no exceptions. (#913 said nine
-and five. Both figures came from grep counts and both were wrong — the
-finding is unchanged and slightly stronger.) That is a design, not
+**As of 2026-11-03 the reads are no longer all public.** #913's third option
+was built: what ENUMERATES is `read_only`-gated, what answers about a single
+code the caller already holds stays public. See `TestOptionThree`. That is a design, not
 an oversight, and FHIR terminology servers commonly publish `$expand` and
 `$validate-code` as reference data.
 
@@ -149,40 +148,154 @@ class TestTheReadSurfaceIsPublicOnPurpose:
     def test_the_counts_are_what_the_measurement_found(self):
         """Numbers, so a drift in either direction is visible.
 
-        And a correction to #913, which said "ten FHIR ValueSet routes".
-        There are **six route FUNCTIONS carrying ten URL patterns**: four
-        functions declare two `@route` decorators each, for the literal
-        `$expand` / `$validate-code` and the `%24`-encoded spelling of the
-        same operation. My ticket counted DECORATORS with grep and called
-        them routes.
-
-        It changes nothing about the finding and it is the kind of number a
-        security ticket should get right, so both are asserted here with
-        the reason they differ.
+        Also a correction to #913, which said "ten FHIR ValueSet routes":
+        there are **six route FUNCTIONS carrying ten URL patterns**, four
+        declaring both the literal `$expand` / `$validate-code` and the
+        `%24`-encoded spelling. My ticket counted DECORATORS with grep. The
+        lookup figures in it ("9 gated / 5 ungated") were wrong too — 12 and
+        7 before this change — because a `list_items`/`read_item` pair was
+        missed. Every count asserted from a grep that day was off.
         """
         fhir = _routes(API / 'fhir_valueset.py')
         lookup = _routes(API / 'lookup_tables.py')
 
         assert len(fhir) == 6, 'route functions'
-        decorators = (API / 'fhir_valueset.py').read_text().count(
-            '@fhir_valueset_bp.route')
-        assert decorators == 10, 'URL patterns'
-
-        # 19 route functions: 12 gated writes, 7 ungated GET-only reads.
-        # My ticket said 9 and 5. Both came from grep counts taken before
-        # this file existed, and both were wrong — there is a
-        # `list_items`/`read_item` pair I had not seen. The FINDING is
-        # unchanged and slightly stronger; the numbers were not.
+        assert (API / 'fhir_valueset.py').read_text().count(
+            '@fhir_valueset_bp.route') == 10, 'URL patterns'
         assert len(lookup) == 19
-        assert sum(1 for _n, _m, d in lookup if _gated(d)) == 12
-        assert sum(1 for _n, m, d in lookup
-                   if m == {'GET'} and not _gated(d)) == 7
 
-    def test_EVERY_ungated_route_is_GET_only(self):
-        """The clean statement of the invariant, and the one worth having:
-        zero ungated writes anywhere in the terminology surface."""
-        for module in ('lookup_tables.py', 'fhir_valueset.py'):
-            for name, methods, decs in _routes(API / module):
-                if _gated(decs) or name in FHIR_READ_OPERATIONS:
-                    continue
-                assert methods == {'GET'}, (module, name, sorted(methods))
+
+class TestOptionThree:
+    """The policy as built on 2026-11-03, in three tiers.
+
+    #913 offered three options and this is the third: keep
+    `$validate-code` public, gate what ENUMERATES. The reason is the
+    asymmetry — `$validate-code` answers a question about a code the caller
+    already holds, while `$expand` and the list routes hand over the
+    material. One leaks a bit about something you brought; the others leak
+    the selection.
+
+    Chosen because it is the one that matches who actually calls what,
+    measured 2026-11-02:
+
+        $validate-code      cdr.pdhc, 7 files (its #857/#874 write gate)
+        $expand / listings  alert.pdhc only, and alert holds a key anyway
+
+    So gating the enumerating reads costs one consumer that needs a
+    credential regardless, while gating `$validate-code` would have cost cdr
+    a key on a hot path.
+    """
+
+    #: Routes that hand over a WHOLE selection, or the map to find one.
+    #: Named individually rather than matched on `list_`/`expand_`, so each
+    #: one is a decision rather than a side effect of a function name.
+    ENUMERATING = {
+        'search_valuesets',          # GET /ValueSet — the map
+        'expand_valueset_by_id',     # every member of one
+        'expand_valueset_by_parameters',
+        'list_values',               # EVERY code in the store, the broadest
+        'list_valuesets',
+        'list_valueset_values',      # every member of one, native spelling
+    }
+
+    #: Deliberately public. Each line is a reason, not a permission.
+    PUBLIC_BY_DESIGN = {
+        # One code, yes/no. cdr.pdhc asks it on its write gate and alert's
+        # candidate gate asks it per candidate; gating it would fail every
+        # candidate closed as vocabulary_miss.
+        'scoped_validate_code_by_id',
+        'scoped_validate_code_by_post',
+        # One resource's metadata, no expansion — a name, not a list.
+        'read_valueset',
+        'read_value',
+        # The generic CRUD factory's reads: canonical-libs, concept-types,
+        # response-types, units, plandef-types, intended-uses. None carries
+        # the restricted selection, and cdr.pdhc calls
+        # /api/v1/lookup/canonical-libs on its whole-system gate — gating
+        # these would have broken it.
+        'list_items',
+        'read_item',
+    }
+
+    def _all(self):
+        out = []
+        for module in ('fhir_valueset.py', 'lookup_tables.py'):
+            out += [(module, *r) for r in _routes(API / module)]
+        return out
+
+    @pytest.mark.parametrize('name', sorted(ENUMERATING))
+    def test_every_enumerating_read_is_gated(self, name):
+        found = [(m, d) for m, n, _meth, d in self._all() if n == name]
+        assert found, f'{name} no longer exists — update ENUMERATING'
+        for module, decs in found:
+            assert _gated(decs), (
+                f'{module}:{name} enumerates and is ungated. It hands over a '
+                'selection, and the Socialstyrelsen urval is registered here.'
+            )
+
+    @pytest.mark.parametrize('name', sorted(PUBLIC_BY_DESIGN))
+    def test_the_public_ones_stay_public(self, name):
+        found = [(m, d) for m, n, _meth, d in self._all() if n == name]
+        assert found, f'{name} no longer exists — update PUBLIC_BY_DESIGN'
+        for module, decs in found:
+            assert not _gated(decs), (
+                f'{module}:{name} became gated. If deliberate, check the '
+                'consumer first: cdr.pdhc calls $validate-code and '
+                '/lookup/canonical-libs, and alert asks $validate-code per '
+                'candidate.'
+            )
+
+    def test_the_two_sets_do_not_overlap(self):
+        assert not (self.ENUMERATING & self.PUBLIC_BY_DESIGN)
+
+    def test_every_route_is_classified(self):
+        """No route may be neither. A new one has to join a tier, which is
+        the point — the convention was enacted in 24 decorators and written
+        down nowhere, and that is how I came to read it as an oversight."""
+        unclassified = [
+            (m, n, sorted(meth)) for m, n, meth, d in self._all()
+            if n not in self.ENUMERATING
+            and n not in self.PUBLIC_BY_DESIGN
+            and not (meth & WRITE_METHODS)
+        ]
+        assert unclassified == [], (
+            f'unclassified read routes: {unclassified}. Add each to '
+            'ENUMERATING or PUBLIC_BY_DESIGN, with the reason.'
+        )
+
+
+class TestWhatOptionThreeDoesNOTCover:
+    """Measured while building it, and deliberately left alone.
+
+    `GET /api/v1/CodeSystem` and `GET /api/v1/CodeSystem/<id>` call
+    `_build_codesystem()`, whose `include_concepts` defaults to **True** —
+    so both hand over plan's ENTIRE local Concept catalogue, ungated.
+
+    That is a second enumerating surface and it is NOT what #913 decided.
+    The restricted material is the Socialstyrelsen URVAL: which codes are
+    flagged, which lives in the nineteen ValueSets and is now gated. A
+    CodeSystem listing reveals plan's own concepts — PDHC's content, not a
+    national selection under licence.
+
+    So the scope ends here, on purpose. Extending the gate into CodeSystem
+    would have been scope creep on a decision the operator made about
+    ValueSets, and `$lookup` is on cdr's hot path the same way
+    `$validate-code` is.
+
+    This test exists so the fact is recorded rather than rediscovered, and
+    so the day someone registers licence-restricted content as a CODE
+    SYSTEM rather than a selection, the question is already written down.
+    """
+
+    def test_the_codesystem_search_is_still_ungated_and_still_enumerates(self):
+        cs = API / 'fhir_codesystem.py'
+        routes = {n: d for n, _m, d in _routes(cs)}
+        assert 'search_codesystems' in routes
+        assert not _gated(routes['search_codesystems']), (
+            'the CodeSystem search became gated — if deliberate, good, but '
+            'cdr.pdhc calls $lookup on this blueprint and the note in this '
+            'test needs rewriting rather than deleting')
+        src = cs.read_text()
+        assert 'include_concepts: bool = True' in src, (
+            'the default changed — if it is now False the enumeration is '
+            'closed and this test should say so instead')

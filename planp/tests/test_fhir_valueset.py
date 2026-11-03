@@ -19,6 +19,8 @@ from fhir.resources.bundle import Bundle as FHIRBundle
 from fhir.resources.parameters import Parameters as FHIRParameters
 from fhir.resources.valueset import ValueSet as FHIRValueSetModel
 
+from tests.conftest import SAMPLE_ACCESS_BLOB, set_sso_session
+
 from app import db as _db
 from app.models.concept_models import (
     PLAN_BASE,
@@ -28,6 +30,30 @@ from app.models.concept_models import (
     ValueSetValue,
     fhir_canonical_url,
 )
+
+
+@pytest.fixture(autouse=True)
+def _authenticated(client):
+    """#913: the ENUMERATING reads now require an authenticated session.
+
+    `GET /ValueSet`, `$expand` by id and `$expand` by Parameters are
+    `@requires_role('read_only')` as of 2026-11-03, because they hand over a
+    whole selection — and alert.pdhc's step 2.b-ii registers the
+    copyright-protected Socialstyrelsen urval into this store.
+
+    Every test in this file used to call them ANONYMOUSLY, which is how the
+    public-read design was asserted: implicitly, by 19 tests that would have
+    failed if it changed. They now establish a session, and that is the
+    documentation of the change.
+
+    `read_only` is "any authenticated session", so the sample blob suffices —
+    the tests are about ValueSet behaviour, not about who may read it. What
+    stays PUBLIC is asserted separately, in
+    `test_terminology_read_write_invariant_913.py`: both forms of
+    `$validate-code`, because cdr.pdhc calls them on its write gate and
+    alert's candidate gate asks per candidate.
+    """
+    set_sso_session(client, SAMPLE_ACCESS_BLOB)
 
 
 # ---------------------------------------------------------------------------

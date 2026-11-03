@@ -126,6 +126,7 @@ _crud_routes(lookup_bp, '/intended-uses', IntendedUse, 'intended_use_name', 'int
 # ---------------------------------------------------------------------------
 
 @lookup_bp.route('/values', methods=['GET'])
+@requires_role('read_only')
 def list_values():
     items = ValueCatalog.query.order_by(ValueCatalog.value_name).all()
     return jsonify([i.to_dict() for i in items]), 200
@@ -207,6 +208,7 @@ def delete_value(guid):
 # ---------------------------------------------------------------------------
 
 @lookup_bp.route('/valuesets', methods=['GET'])
+@requires_role('read_only')
 def list_valuesets():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
@@ -317,6 +319,7 @@ def delete_valueset(guid):
 # ---------------------------------------------------------------------------
 
 @lookup_bp.route('/valuesets/<valueset_guid>/values', methods=['GET'])
+@requires_role('read_only')
 def list_valueset_values(valueset_guid):
     if not _is_valid_uuid(valueset_guid):
         return jsonify({'error': 'Invalid GUID'}), 400
