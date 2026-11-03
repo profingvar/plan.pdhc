@@ -688,3 +688,12 @@ measured. **NOT deployed to production.**
 - planp/tests/test_loader_identity_retired.py — the shape assertion updated;
   its intent (loader.pdhc retired, one entry) preserved.
 - planp/tests/test_service_key_role_912.py (new) — 17 checks. 420 -> 438.
+
+## 2026-11-03 — alert.pdhc added to KNOWN_SERVICES with read_write
+- planp/app/api/auth.py — `'alert.pdhc': ('ALERT_PDHC_SERVICE_KEY',
+  'read_write')`. Measured: all 12 write routes in lookup_tables.py are
+  read_write, none is admin, and level 2 covers #913's read_only reads, so
+  ONE grant suffices.
+- planp/tests/test_loader_identity_retired.py — shape assertion updated.
+- planp/tests/test_service_key_role_912.py — 4 checks on alert's grant,
+  including that an UNSET key admits nobody (it will be unset until minted).

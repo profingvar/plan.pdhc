@@ -239,3 +239,56 @@ class TestTheDocstringNowHolds:
         doc = requires_role.__doc__ or ''
         assert 'SERVICE KEY' in doc
         assert '#912' in doc
+
+
+class TestAlertsGrant:
+    """alert.pdhc's entry, added 2026-11-03 for its step 2.b-ii.
+
+    The order mattered and is worth recording: this line would have been a
+    mistake on either of the two preceding days. Before #912 a key granted
+    `admin` regardless of `min_role`, so alert's key would have reached
+    `concepts.import_concepts`. Before #913 the terminology surface was
+    read-public, so registering the nineteen Socialstyrelsen selections
+    would have made the whole urval enumerable via `$expand`.
+    """
+
+    def test_alert_is_present_with_read_write(self):
+        assert KNOWN_SERVICES.get('alert.pdhc') == (
+            'ALERT_PDHC_SERVICE_KEY', 'read_write')
+
+    def test_alert_is_NOT_granted_admin(self):
+        """The one admin route is bulk concept import. alert registers
+        ValueSets and asks $validate-code; it has no business there."""
+        _var, role = KNOWN_SERVICES['alert.pdhc']
+        assert role != 'admin'
+        assert ROLE_LEVELS[role] < ROLE_LEVELS['admin']
+
+    def test_read_write_also_covers_the_enumerating_reads(self):
+        """So alert needs ONE grant, not two. #913 made `$expand` and
+        `GET /ValueSet` `read_only`, and level 2 >= level 1 — asserted,
+        because the alternative is a second entry nobody would remember to
+        rotate."""
+        _var, role = KNOWN_SERVICES['alert.pdhc']
+        assert ROLE_LEVELS[role] >= ROLE_LEVELS['read_only']
+
+    def test_an_unset_alert_key_admits_nobody(self, app):
+        """It WILL be unset until the operator mints it, and that state has
+        to be a refusal rather than a match against the empty string."""
+        old = app.config.get('ALERT_PDHC_SERVICE_KEY')
+        app.config['ALERT_PDHC_SERVICE_KEY'] = ''
+        try:
+            for presented in ('', 'guess', None):
+                with app.test_request_context('/', headers={
+                        'X-Source-Service': 'alert.pdhc',
+                        **({'X-Service-Key': presented} if presented
+                           is not None else {})}):
+                    # `is False`, not `is not 'read_write'`: the first
+                    # version was an identity test against a string
+                    # literal, which passes for the wrong reason and which
+                    # Python warns about. The expected value is False.
+                    assert _service_key_outcome() is False
+        finally:
+            if old is None:
+                app.config.pop('ALERT_PDHC_SERVICE_KEY', None)
+            else:
+                app.config['ALERT_PDHC_SERVICE_KEY'] = old

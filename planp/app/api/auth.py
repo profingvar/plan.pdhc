@@ -52,6 +52,20 @@ def _phases(blob):
 #: returning a boolean.
 KNOWN_SERVICES = {
     'sim.pdhc': ('SIM_PDHC_SERVICE_KEY', 'read_write'),
+    # alert.pdhc's step 2.b-ii: registers the nineteen UMI selections — 19
+    # ValueSets, 219 memberships, 218 distinct codes — and then asks
+    # `$validate-code` per candidate on its own inflow gate.
+    #
+    # `read_write` and nothing more, measured: all 12 write routes in
+    # `lookup_tables.py` are `read_write` and none is `admin`. One grant
+    # covers the enumerating reads too, since level 2 >= level 1 — so alert
+    # needs no second entry for `$expand` / `GET /ValueSet` after #913.
+    #
+    # Added only after #912 (a key used to grant `admin` regardless of
+    # `min_role`) and #913 (registering a copyright-protected selection
+    # behind a public `$expand`). Either one would have made this line a
+    # mistake; both are closed.
+    'alert.pdhc': ('ALERT_PDHC_SERVICE_KEY', 'read_write'),
 }
 
 #: Shared by both branches of `requires_role`, so the service path and the
