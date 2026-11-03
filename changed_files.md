@@ -705,3 +705,16 @@ measured. **NOT deployed to production.**
   Image `31c64d407af7` → `6625c142138f`. Rollback tgz in
   `~/backups/predeploy/plan.pdhc/planp_2026-11-03T07-11-03Z.tgz`.
   Live probe: `GET /ValueSet` 200→401, `$validate-code` still 400 (not 401).
+
+## 2026-11-03 — the allowlist entry had no wire to config
+- planp/app/config.py — `ALERT_PDHC_SERVICE_KEY = os.environ.get(...)`.
+  `api/auth.py:98` resolves the expected key through `current_app.config`,
+  and config.py maps every variable BY HAND. Without this line the operator's
+  `.env` entry would have had NO effect and alert would have been refused
+  forever, with a correct-looking `.env`.
+- planp/tests/test_service_key_config_wire.py — asserts every KNOWN_SERVICES
+  variable reaches app.config, with sim.pdhc as the control. Proven to fail
+  without the config.py line.
+- DEPLOYED the same day: single-file scp + rebuild. Image
+  `6625c142138f` → `4cf5c7341d59`. Per-file rollback at
+  `~/backups/predeploy/plan.pdhc/config.py.2026-11-03T07-30Z.bak`.

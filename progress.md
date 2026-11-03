@@ -1951,3 +1951,47 @@ material, so they were never read):
 `400` on `$validate-code` is "you sent no parameters", not "you may not" —
 which is the right answer to an anonymous caller, and is what keeps cdr1's
 write gate and alert's per-candidate vocabulary check working.
+
+
+## 2026-11-03 — the allowlist entry had no wire to `config`
+
+Found while preparing step 3, before telling the operator to do it. The
+instruction would not have worked.
+
+`api/auth.py:98` resolves the expected key through `current_app.config`, and
+`config.py` maps each variable **by hand** — there is no generic
+`*_SERVICE_KEY` sweep. `ALERT_PDHC_SERVICE_KEY` was in `KNOWN_SERVICES` and
+nowhere in `config.py`, so it would have resolved to `''`, hit
+`if not expected: return False`, and refused alert forever while plan's `.env`
+looked correct. The allowlist entry and the config mapping are two halves of
+ONE wire and nothing tied them together.
+
+Proven with a control before fixing:
+
+| variable | reached `app.config` |
+|---|---|
+| control `SIM_PDHC_SERVICE_KEY` | **yes** |
+| `ALERT_PDHC_SERVICE_KEY` | **no** |
+
+The #912 suite could not have caught it: it supplies the key by assigning
+`app.config[...]` directly, which tests the comparison and never the wire —
+`feedback_test_the_dish_not_the_ingredient` exactly.
+
+`tests/test_service_key_config_wire.py` now asserts the property for **every**
+`KNOWN_SERVICES` entry, so the next service added cannot repeat it. It asserts
+PRESENCE, not a value, deliberately: `Config` is a class body, so
+`os.environ.get(...)` runs once at import, and a test that sets the variable
+afterwards and rebuilds the app proves nothing. Presence survives import order
+— a mapped variable is a config key (possibly empty), an unmapped one is
+absent. The control run (fix commented out) failed on that assertion naming
+`('alert.pdhc', 'ALERT_PDHC_SERVICE_KEY')`, while the premise and the sim
+control stayed green.
+
+Deployed the same day as a single-file scp + rebuild: image
+`6625c142138f` → `4cf5c7341d59`, the line verified INSIDE the container,
+`/api/health` 200, `GET /ValueSet` still 401, `$validate-code` still 400,
+0 tracebacks. Per-file rollback at
+`~/backups/predeploy/plan.pdhc/config.py.2026-11-03T07-30Z.bak`
+(hash `50f0700b173425ec`, which was byte-identical to local HEAD).
+
+468 tests pass (was 465).

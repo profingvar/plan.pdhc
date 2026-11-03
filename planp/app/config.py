@@ -217,6 +217,12 @@ class Config:
     # PLAN_LOADER_SERVICE_KEY was read here until 2026-10-05; nothing reads it
     # now, so the variable is inert wherever it is still set.
     SIM_PDHC_SERVICE_KEY = os.environ.get('SIM_PDHC_SERVICE_KEY', '')
+    # alert.pdhc reads the Socialstyrelsen urval out of plan's ValueSets and
+    # registers it back (read_write). KNOWN_SERVICES naming the variable is
+    # NOT enough: api/auth.py resolves it through `current_app.config`, so a
+    # variable that is only in `.env` resolves to '' and the caller is refused
+    # with a correct-looking `.env`. Mapping it here is the whole wire.
+    ALERT_PDHC_SERVICE_KEY = os.environ.get('ALERT_PDHC_SERVICE_KEY', '')
 
     # Upstream services
     CONTRACT_BASE_URL = os.environ.get('CONTRACT_BASE_URL', 'http://localhost:9021')
