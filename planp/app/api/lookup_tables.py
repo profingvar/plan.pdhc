@@ -35,13 +35,84 @@ def _sanitize(val):
     return bleach.clean(str(val).strip())
 
 
-def _crud_routes(bp, url, model_class, name_field, display_field=None):
-    """Register generic CRUD endpoints for a lookup table."""
+def _crud_routes(bp, url, model_class, name_field, display_field=None, *,
+                 public_read):
+    """Register generic CRUD endpoints for a lookup table.
+
+    ``public_read`` is REQUIRED and keyword-only (#925). Before, this function
+    decorated CREATE/UPDATE/DELETE with ``@requires_role('read_write')`` and
+    decorated LIST and READ with NOTHING, so six lookup tables served full
+    records to anyone who asked while CLAUDE.md §3 recorded this service as
+    `Auth: SSO`.
+
+    THAT WAS AN OMISSION, NOT A POSTURE, and the proof is in this same module:
+    ``/values`` is the one lookup route written by hand rather than through
+    this factory, and its GET carries ``@requires_role('read_only')``. The
+    author who wrote a read route reached for the gate; the factory forgot it.
+    ``/api/v1/ValueSet`` is gated too, while ``CodeSystem`` and ``ConceptMap``
+    are not — three postures across one set of blueprints.
+
+    Making the parameter required means a new lookup table CANNOT be
+    registered without someone deciding, and the decision is visible at the
+    registration line instead of being the absence of a decorator forty lines
+    away. That is the actual fix; gating two tables is the smaller half.
+
+    WHY SOME READS STAY OPEN, measured 2026-11-04 rather than assumed. The
+    deeper problem is that **plan.pdhc has no working machine-auth door**:
+    `KNOWN_SERVICES` holds only `sim.pdhc` and `SIM_PDHC_SERVICE_KEY` is unset
+    in production, so that dict admits nobody — and `outbound_session_headers()`,
+    which several clients do send, carries `X-Operator-Session-Id` only. It is
+    session propagation (#408), not authentication. So every internal consumer
+    reads plan unauthenticated BY NECESSITY, and the open reads are load-bearing
+    scaffolding for that absence rather than a convenience. Closing them is
+    sequenced behind giving those callers a credential, which needs an
+    operator-set key (§15) and is tracked as #931.
+    """
+    _read_gate = (lambda f: f) if public_read else requires_role('read_only')
+
+    def _project(item):
+        """The response body. On a PUBLIC read it drops `author` (#925).
+
+        Measured in production 2026-11-04, the publicly readable tables served:
+            canonical-libs   loader.pdhc x3, 'migration c3d4e5f6a7b8' x1
+            concept-types    loader.pdhc x1   (now gated)
+            response-types   one internal ticket slug x1
+            units            one internal ticket slug x1, 'system' x65
+
+        `loader.pdhc` was RETIRED by #736 — no repo, and its live never-rotated
+        key was destroyed. Serving its name, plus a migration revision id and
+        two internal ticket slugs, is internal history handed to anyone who
+        asks. Not a credential leak; it is the kind of detail used to date a
+        system and enumerate its services.
+
+        THE DATA IS NOT REWRITTEN, deliberately. `author` records WHO created
+        the row, and rewriting it would falsify that — the same argument
+        CLAUDE.md §2 makes for leaving a code comment that cites a superseded
+        ticket number alone. So the projection changes and the record stays
+        true.
+
+        The projection does NOT vary by caller. A route that may be read
+        anonymously should not return different fields to different callers:
+        that is a security-relevant difference which is harder to reason about
+        than a single shape. plan's own admin UI is unaffected either way — it
+        is server-rendered straight off the model (`{{ i.author }}`), not off
+        this API.
+
+        Verified before changing: no consumer reads `author` off a lookup
+        response. The four files that call these paths mention it only as the
+        word "authority" in prose or as `author_org_guid`, a different field;
+        alert.pdhc WRITES `author` in a POST body and never reads it back.
+        """
+        d = item.to_dict()
+        if public_read:
+            d.pop('author', None)
+        return d
 
     @bp.route(url, methods=['GET'], endpoint=f'{url}_list')
+    @_read_gate
     def list_items():
         items = model_class.query.order_by(getattr(model_class, name_field)).all()
-        return jsonify([i.to_dict() for i in items]), 200
+        return jsonify([_project(i) for i in items]), 200
 
     @bp.route(url, methods=['POST'], endpoint=f'{url}_create')
     @requires_role('read_write')
@@ -86,13 +157,14 @@ def _crud_routes(bp, url, model_class, name_field, display_field=None):
         return jsonify(item.to_dict()), 201
 
     @bp.route(f'{url}/<guid>', methods=['GET'], endpoint=f'{url}_read')
+    @_read_gate
     def read_item(guid):
         if not _is_valid_uuid(guid):
             return jsonify({'error': 'Invalid GUID'}), 400
         item = model_class.query.filter_by(guid=guid).first()
         if not item:
             return jsonify({'error': 'Not found'}), 404
-        return jsonify(item.to_dict()), 200
+        return jsonify(_project(item)), 200
 
     @bp.route(f'{url}/<guid>', methods=['PUT'], endpoint=f'{url}_update')
     @requires_role('read_write')
@@ -157,12 +229,47 @@ def _crud_routes(bp, url, model_class, name_field, display_field=None):
 
 
 # Register lookup table CRUD
-_crud_routes(lookup_bp, '/canonical-libs', CanonicalLib, 'canonical_lib_name', 'canonical_lib_display_text')
-_crud_routes(lookup_bp, '/concept-types', ConceptType, 'concept_type_name', 'concept_type_display_text')
-_crud_routes(lookup_bp, '/response-types', ResponseType, 'response_type_name', 'response_type_display_text')
-_crud_routes(lookup_bp, '/units', Unit, 'unit_name', 'unit_display_text')
-_crud_routes(lookup_bp, '/plandef-types', PlanDefType, 'plandef_type_name', 'plandef_type_display_text')
-_crud_routes(lookup_bp, '/intended-uses', IntendedUse, 'intended_use_name', 'intended_use_display_text')
+# #925: every read posture below is a DECISION with its consumer named. A
+# survey of all 26 repos found who actually calls each path and whether that
+# caller sends a credential; `public_read=True` means a DEPLOYED consumer reads
+# it with none, so gating it would break that consumer — one of them silently.
+#
+# `public_read=False` is the goal state for all six. The blocker is above: plan
+# has no machine-auth door, so these callers have nothing to send. #931 carries
+# it, including a cheaper route for canonical-libs specifically: cdr's gate needs
+# only three fields, so a narrow public endpoint would let the FULL table be
+# gated without giving cdr a credential at all.
+
+# cdr1's whole-system assertion gate (#874) reads this to learn which libraries
+# are whole-system answer spaces, through a client that sends only
+# `X-Operator-Session-Id`. Gating it would degrade a deployed SECURITY control
+# to its floor — it would still refuse `icd11-mms` and `icd10`, but would stop
+# following plan for anything flagged later.
+_crud_routes(lookup_bp, '/canonical-libs', CanonicalLib, 'canonical_lib_name', 'canonical_lib_display_text', public_read=True)
+
+# GATED. The only non-plan reference is `sim.pdhc/concepts/load_to_plan.py:110`,
+# and it calls `/api/v1/concept-types` WITHOUT the `/lookup` prefix — measured
+# 404 in production, alongside `/api/v1/canonical-libs` on the next line of that
+# tool. So that caller is already broken and gating this breaks nothing. (Its
+# own bug is not fixed here; it is not this ticket.)
+_crud_routes(lookup_bp, '/concept-types', ConceptType, 'concept_type_name', 'concept_type_display_text', public_read=False)
+
+# request.pdhc's `context_service.py:61-62` reads both of these with
+# `{'Accept': 'application/json'}` and nothing else. Its own comment says a
+# plan failure "doesn't regress every concept to 'text'/no-unit" because of
+# stale-if-error — which means gating these would regress exactly that, SILENTLY,
+# on the next cold start rather than at the moment of the change.
+_crud_routes(lookup_bp, '/response-types', ResponseType, 'response_type_name', 'response_type_display_text', public_read=True)
+_crud_routes(lookup_bp, '/units', Unit, 'unit_name', 'unit_display_text', public_read=True)
+
+# request.pdhc's `plan_definition_service.py:96` sends `_headers()`, which LOOKS
+# like a credential and is not: `{'Accept': ...} | outbound_session_headers()`.
+# I read it as safe to gate on the first pass and was wrong; the difference is
+# worth the comment.
+_crud_routes(lookup_bp, '/plandef-types', PlanDefType, 'plandef_type_name', 'plandef_type_display_text', public_read=True)
+
+# GATED. No consumer in any of the 26 repos, in Python, JS, HTML or shell.
+_crud_routes(lookup_bp, '/intended-uses', IntendedUse, 'intended_use_name', 'intended_use_display_text', public_read=False)
 
 
 # ---------------------------------------------------------------------------

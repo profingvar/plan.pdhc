@@ -1,6 +1,51 @@
 Current focus
 =============
 
+#925 lookup read posture — DONE AND DEPLOYED (2026-11-04). Ticket closed.
+559 tests pass (was 527). #931 carries the blocker behind it.
+
+WHAT CHANGED
+  `_crud_routes` takes a REQUIRED keyword-only `public_read`, so a lookup table
+  cannot be registered without a decision. Two tables GATED (`concept-types`,
+  `intended-uses`); four stay open, each with its consumer named at the
+  registration line. Public read bodies no longer carry `author` (the data is
+  untouched — only the projection).
+
+WHY ONLY TWO OF SIX — this is #931 and it is the thing to read first
+  plan has no usable machine-auth door: KNOWN_SERVICES holds only `sim.pdhc`
+  with its key unset, and `outbound_session_headers()` is session propagation
+  (#408), not authentication. So cdr.pdhc, request.pdhc and analyse.pdhc read
+  plan unauthenticated BY NECESSITY. Gating `canonical-libs` would degrade
+  cdr's #874 security gate to its floor; gating `response-types`/`units` would
+  regress request's concept maps to text/no-unit SILENTLY at the next cold
+  start.
+
+DEPLOYED AND VERIFIED 2026-11-04
+  concept-types + intended-uses -> 401; the four open ones -> 200;
+  loader.pdhc 0 occurrences (was 4); unauthenticated PUT -> 401 (the control);
+  /api/health 200; sibling smoke 10/10.
+
+  The dependent consumers were MEASURED, not assumed — the four open reads
+  exist for them: cdr1's #874 gate still resolves ['icd10','icd11-mms'] from
+  plan with its floor intact, and request.pdhc gets 7 response-types and 70
+  units over https://plan.pdhc.se (its real path, through the proxy) with
+  `author` absent.
+
+  The deploy gate that made this safe is worth reusing:
+  scratchpad/deploy925.sh compares REMOTE hashes against local and ABORTS
+  without building if they differ. For a baked image that is not optional — a
+  rebuild of unchanged source is indistinguishable from a successful deploy,
+  as the first #874 attempt proved.
+
+NEXT ON THIS REPO
+  #931 — the machine-auth door. Until plan has one, the four open reads cannot
+  be gated. It also carries a cheaper option for canonical-libs specifically:
+  cdr's gate needs only three fields, so a narrow public endpoint would let the
+  FULL table be gated without giving cdr a credential at all.
+  #923 — the canonical_lib_url convention (snomed's is a browser link; loinc
+  and atc are not the registered URIs).
+
+
 #530 — Transfer page (plan.pdhc): promote synthetic cdr_6 content into a
 working CDR. BUILT local 2026-08-06, full suite 320 passed. Thin proxy to
 cdr_6's server-side engine (#529, DEPLOYED). plan.pdhc is authoring-plane and

@@ -941,3 +941,80 @@ carries full records including `author: "loader.pdhc"` — an identity #736
 retired. Terminology metadata only, no clinical content, so the severity is
 structural rather than clinical — but it is §11's shape again: a handbook
 claim is not a control.
+
+## 2026-11-04 — #925: the read posture is a decision now, not a missing decorator
+
+- planp/app/api/lookup_tables.py — EDIT. `_crud_routes` takes a REQUIRED
+  keyword-only `public_read`; LIST and READ are gated unless it is True. All six
+  registration lines now state their posture with the consumer that forces it.
+  `concept-types` and `intended-uses` are GATED. A `_project()` helper drops
+  `author` from public read bodies.
+- planp/tests/test_lookup_read_posture_925.py — NEW. 32 tests.
+
+**The fix is the REQUIRED PARAMETER, not the two gates.** A lookup table can no
+longer be registered without someone deciding, and the decision is visible at
+the registration line instead of being the absence of a decorator forty lines
+away.
+
+**It was an omission, not a posture, and the proof is in the same module.**
+`/values` is the one lookup route written by hand rather than through the
+factory, and its GET carries `@requires_role('read_only')`. The author who wrote
+a read route reached for the gate; the factory forgot it. `/api/v1/ValueSet` is
+gated too while `CodeSystem` and `ConceptMap` are not — three postures across
+one set of blueprints.
+
+**Only 2 of 6 could be gated, and the reason is #931.** plan has no usable
+machine-auth door: `KNOWN_SERVICES` holds only `sim.pdhc` with its key unset, and
+`outbound_session_headers()` is session propagation (#408), not authentication.
+So every internal consumer reads plan unauthenticated BY NECESSITY. Measured per
+caller, with the file and the exact header:
+
+| caller | header it sends | what it reads |
+|---|---|---|
+| cdr.pdhc `plan_client.py` | `outbound_session_headers()` only | `canonical-libs` (the #874 gate), `CodeSystem/$lookup`, `ConceptMap/$translate` |
+| request.pdhc `context_service.py` | `{'Accept': …}` only | `response-types`, `units`, `/api/v1/concepts` |
+| request.pdhc `plan_definition_service.py` | `_headers()` — **looks** like a credential, is not | `plandef-types` |
+| analyse.pdhc `concept_display.py` | — | `CodeSystem/$lookup` |
+
+Gating `canonical-libs` would degrade a deployed **security control** to its
+floor. Gating `response-types`/`units` would regress every concept to
+`text`/no-unit **silently**, because request's cache is stale-if-error — at the
+next cold start rather than at the moment of the change.
+
+**`concept-types` was safe to gate for a reason worth recording:** its only
+non-plan caller, `sim.pdhc/concepts/load_to_plan.py:110`, requests
+`/api/v1/concept-types` WITHOUT the `/lookup` prefix, and that path measured
+**404** in production — as did `/api/v1/canonical-libs` on the line above it. The
+caller was already broken, so gating broke nothing. (Its bug is not fixed here.)
+
+**Decision 3 was answered differently from the way the ticket proposed.** It
+asked for the `author` DATA to be corrected; `author` records WHO created the
+row, and rewriting it falsifies that — the same argument CLAUDE.md §2 makes for
+leaving a superseded ticket number in a code comment alone. So the PROJECTION
+changed and the record stayed true. Measured before changing: no consumer reads
+`author` off a lookup response (the four candidate files mention only the word
+"authority" in prose or `author_org_guid`, a different field; alert.pdhc WRITES
+it and never reads it back). What was being served:
+
+    canonical-libs   loader.pdhc ×3, 'migration c3d4e5f6a7b8' ×1
+    concept-types    loader.pdhc ×1   (now gated)
+    response-types   one internal ticket slug ×1
+    units            one internal ticket slug ×1, 'system' ×65
+
+`loader.pdhc` was retired by #736. The projection does not vary by caller: a
+route that may be read anonymously should not return different fields to
+different callers. plan's admin UI is unaffected — it is server-rendered off the
+model, not off this API.
+
+559 tests pass (was 527). Six mutations fail 2, 3, 2, 2, 9 and 1.
+
+**One of those mutations caught a flaw in MY OWN tests.** Removing the `author`
+strip first failed only **1** of the eight tests meant to catch it: the test
+database holds none of production's rows, so "`loader.pdhc` is absent" was true
+before the fix and after it — a vacuous assertion. The tests now SEED the value
+they look for, and the same mutation fails **9**. A control that cannot fail is
+not a control, and the only thing that surfaced it was mutating the code it
+guards.
+
+**NOT DEPLOYED.** plan runs from a container (`pdhc_app`), so this needs a
+`--build`; see newtask.txt for the gate that must come first.

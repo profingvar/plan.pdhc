@@ -1995,3 +1995,62 @@ Deployed the same day as a single-file scp + rebuild: image
 (hash `50f0700b173425ec`, which was byte-identical to local HEAD).
 
 468 tests pass (was 465).
+## #925 — DEPLOYED 2026-11-04. The read posture is a decision now.
+
+**The ticket's own question was answered by the code.** It asked whether these
+reads should be open, and offered a real case for yes. But `/values` is the one
+lookup route written by hand rather than through `_crud_routes`, and its GET
+carries `@requires_role('read_only')`. Same authors, same module, a read route,
+a gate. So the open reads were an **omission in the factory**, not a posture —
+and `/api/v1/ValueSet` being gated while `CodeSystem` and `ConceptMap` are not
+makes three postures across one set of blueprints.
+
+**The fix is the required parameter, not the two gates.** `public_read` is
+keyword-only with no default, so a lookup table cannot be registered without a
+decision, and the decision is visible at the registration line instead of being
+the absence of a decorator forty lines away.
+
+**Only 2 of 6 could be gated, and that measurement is #931.** plan has no usable
+machine-auth door, so cdr.pdhc, request.pdhc and analyse.pdhc read it
+unauthenticated *by necessity*. The four that stay open each name the consumer
+that forces them.
+
+### Verified by behaviour after the deploy, unauthenticated
+
+| | |
+|---|---|
+| `lookup/concept-types`, `lookup/intended-uses` | **401** — gated |
+| `lookup/canonical-libs`, `response-types`, `units`, `plandef-types` | **200** — open by decision |
+| `loader.pdhc` in any open body | **0** (was 4) |
+| unauthenticated `PUT` | **401** — the control that makes the rows above evidence |
+| `/api/health` | 200 |
+
+### And the dependent consumers, through their OWN configuration
+
+Not assumed — the four open reads exist for these two, so they were measured:
+
+- **cdr1's #874 gate**: `flagged_systems()` resolves `['icd10', 'icd11-mms']`
+  from plan, `icd10 followed from plan: True`, floor intact. The chain
+  plan → cdr still works after plan's rebuild.
+- **request.pdhc**, over `https://plan.pdhc.se` (its real path, through the
+  reverse proxy): `response-types` 200 / 7 rows, `units` 200 / 70 rows, and
+  `carries author=False` — so the projection change reached it end to end.
+
+Sibling smoke 10/10. 559 tests (was 527). Pre-deploy state was clean: 48 of 48
+`app/*.py` byte-identical host-to-container, all 16 requirements pinned (#785).
+
+### Two things worth keeping from how this was done
+
+**The survey saved three breakages, and corrected me once.** My first plan gated
+six paths. A per-repo survey found real callers on `/api/v1/concepts`,
+`CodeSystem/$lookup` and `ConceptMap/$translate`, and `plandef-types` looked safe
+until I read `_headers()` — which is
+`{'Accept': ...} | outbound_session_headers()`. It **looks** like a credential
+and is not. Six became two.
+
+**A mutation caught a flaw in my own tests.** Removing the `author` strip first
+failed only **1** of the eight tests meant to catch it: the test database holds
+none of production's rows, so "`loader.pdhc` is absent" was true before the fix
+and after — a vacuous assertion. The tests now seed the value they look for, and
+the same mutation fails **9**. A control that cannot fail is not a control, and
+nothing but mutating the guarded code would have surfaced it.
