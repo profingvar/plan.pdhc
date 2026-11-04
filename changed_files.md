@@ -892,4 +892,52 @@ context", because the refusal path calls `flash()`. The helper was correct;
 the test needed `app.test_request_context()`. The two passing helper cases
 return before the flash, which is why only one failed.
 
-Suite: 527 passed. NOT DEPLOYED YET — two source files, no migration.
+Suite: 527 passed.
+
+### DEPLOYED 2026-11-04
+
+Gated first, as for #875: baseline (HEAD~1, the #875 commit, which is what
+was running), server disk and container agreed on both files — 0 drift. Dump
+taken (131 882 bytes, mode 600) and a per-file rollback pulled from the
+container into `~/backups/predeploy/plan.pdhc/files.2026-11-04T14-0512Z/`,
+even though this deploy touches no data.
+
+    image 67a6cd00670a -> ec60b64a791c   (--build --no-deps app)
+    alembic e5f6a7b8c9d0 -> UNCHANGED, correctly: no migration in this one
+    both files hash-identical in the new image
+
+Verified: `/api/health` 200 database connected; all SIX lookup endpoints
+answer 200; state untouched at 31 valuesets / 269 values / 270 memberships /
+9 libraries; `$validate-code` 219/219 with non-member codes still refused on
+all three libraries; sibling smoke 10/10.
+
+THE 409 PATH IS NOT VERIFIED IN PRODUCTION, and the reason is worth
+recording. I claimed it could be done safely, on the argument that renaming
+one existing library to another's name writes nothing either way — a 409
+refuses, and the old 500 rolled back. That argument holds, but the harness
+classified the PUT as a shared-resource write and refused it, which is the
+correct classification: it IS a write request. So the claim was wrong about
+what I could do, not about the risk. The path is mutation-tested in the
+suite across all ten places instead.
+
+Two instrument errors on the way, both mine, both corrected against an
+independent source rather than trusted:
+  - the first drift check reported DRIFT on both files because I built the
+    container path as `/app/api/...` instead of `/app/app/api/...`. Baseline
+    and disk already agreed, which is what showed the parse was at fault.
+  - the first production probe got 403 "Invalid service credentials" and I
+    nearly read it as an authorisation finding. `_service_key_outcome`
+    returns False when headers are PRESENT but incomplete, and I had sent
+    `X-Service-Key` without `X-Source-Service`. A malformed request, not a
+    policy.
+
+FOUND WHILE VERIFYING, filed as #925 and unrelated to this ticket: every
+lookup LIST and READ route answers 200 with NO credential, on a service
+CLAUDE.md §3 records as `Auth: SSO`. The control is that the same blueprint
+returns 401 for an unauthenticated PUT, so reads are open and writes are
+gated. `_crud_routes` decorates create/update/delete with
+`@requires_role('read_write')` and the two GETs with nothing. The response
+carries full records including `author: "loader.pdhc"` — an identity #736
+retired. Terminology metadata only, no clinical content, so the severity is
+structural rather than clinical — but it is §11's shape again: a handbook
+claim is not a control.
