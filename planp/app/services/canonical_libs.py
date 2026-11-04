@@ -93,3 +93,45 @@ def resolve_or_local(value: str | None, *, author: str | None = None) -> str:
             return by_name.guid
         return v                # unknown: hand it back, let the caller refuse
     return ensure_local_lib(author=author).guid
+
+
+# ---------------------------------------------------------------------------
+# #875 — the canonical URL rule, in one place for the same reason as above
+# ---------------------------------------------------------------------------
+#
+# `canonical_lib_url` is now UNIQUE, and FOUR write paths could set it with
+# no check at all: the JSON API create and update (`app/api/lookup_tables.py`)
+# and the HTML admin create and update (`app/routes/lookup_tables.py`). Every
+# one of them already guarded `canonical_lib_name` for uniqueness — the name
+# was protected in two layers and the URL in none, which is how `icd10` came
+# to hold `snomed`'s URL in production.
+#
+# Without these helpers the UNIQUE constraint turns that mistake from a
+# silent wrong answer into an IntegrityError 500, which is better but still
+# not an answer anyone can act on.
+
+def normalise_lib_url(raw: str | None) -> str | None:
+    """`''` and whitespace mean NO url — which is NULL, not an empty string.
+
+    Load-bearing for the UNIQUE constraint. Postgres permits many NULLs under
+    one, so any number of libraries may lack a URL; two empty STRINGS, by
+    contrast, collide with each other. Without this, the second library saved
+    with a blank URL field would be refused as conflicting with the first,
+    which is both wrong and baffling.
+    """
+    value = (raw or "").strip()
+    return value or None
+
+
+def url_conflict(url: str | None, *, exclude_guid: str | None = None):
+    """The CanonicalLib already holding ``url``, or None.
+
+    ``exclude_guid`` is the row being edited — without it, every update would
+    report the row conflicting with itself.
+    """
+    if not url:
+        return None
+    q = CanonicalLib.query.filter_by(canonical_lib_url=url)
+    if exclude_guid:
+        q = q.filter(CanonicalLib.guid != exclude_guid)
+    return q.first()

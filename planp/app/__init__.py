@@ -223,6 +223,28 @@ def create_app(testing=False):
         resp.headers['Cache-Control'] = 'no-store'
         return resp, code
 
+    # #875: a duplicate canonical identifier is a DATA fault, and it must
+    # not be answerable. Registered here rather than as a try/except at each
+    # resolver call site, for two reasons: there are three call sites today
+    # across valueset/codesystem/conceptmap, and the defect #875 records is
+    # precisely that the resolver existed in TWO copies and a fix applied to
+    # one would have left the other silent. A handler cannot be forgotten at
+    # a call site that does not exist yet.
+    #
+    # 409 Conflict, not 500: the server is working correctly and is refusing
+    # because its terminology data contradicts itself. The body names both
+    # libraries, because the previous behaviour picked one by row order and
+    # said nothing.
+    # Imported locally, matching every blueprint import above: `fhir_valueset`
+    # reaches the models, which import `db` from this package, so a
+    # module-level import here would be circular.
+    from app.api.fhir_valueset import AmbiguousCanonicalLib
+    from app.api.fhir_helpers import operation_outcome
+
+    @app.errorhandler(AmbiguousCanonicalLib)
+    def _ambiguous_canonical_lib(exc):
+        return operation_outcome('error', 'conflict', str(exc), 409)
+
     # Bootstrap superuser on first run
     with app.app_context():
         _bootstrap_superuser(app)

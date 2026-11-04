@@ -51,7 +51,19 @@ class CanonicalLib(db.Model):
     guid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     canonical_lib_name = db.Column(db.String(255), unique=True, nullable=False)
     canonical_lib_display_text = db.Column(db.String(500), nullable=True)
-    canonical_lib_url = db.Column(db.String(500), nullable=True)
+    # UNIQUE since #875. It was not, and two libraries held the same URL:
+    # `icd10` carried a copy of `snomed`'s, so `resolve_canonical_lib`'s
+    # `.first()` on this column collapsed them and answered with `snomed` by
+    # row order. The cost was measured — `$validate-code` said FALSE for 89
+    # correctly-stored ICD-10 codes, and `_build_compose` served them under
+    # the SNOMED CT system URI, which is wrong FHIR published outward.
+    #
+    # Nullable AND unique is deliberate: Postgres permits many NULLs under a
+    # UNIQUE, so a library with no URL is not a collision, while two claiming
+    # the same URL is. The write paths normalise '' to NULL for exactly this
+    # reason — empty strings DO collide with each other, and "no URL" must
+    # not become a conflict between two libraries that both lack one.
+    canonical_lib_url = db.Column(db.String(500), unique=True, nullable=True)
     author = db.Column(db.String(255), nullable=True)
     vers_number = db.Column(db.Integer, default=1)
     # Is this library's answer space the ENTIRE code system?

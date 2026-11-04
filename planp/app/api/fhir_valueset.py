@@ -192,18 +192,63 @@ def _to_fhir_valueset(vs: ValueSet, *, with_expansion: bool = False) -> dict:
 # ---------------------------------------------------------------------------
 # Scoped $validate-code helpers (§6.2)
 # ---------------------------------------------------------------------------
+class AmbiguousCanonicalLib(RuntimeError):
+    """Two or more CanonicalLib rows claim the same identifier (#875).
+
+    A data-integrity fault, not a client error. `canonical_lib_url` now
+    carries a UNIQUE constraint, so this is unreachable in a healthy
+    database — which is exactly why it is raised rather than worked
+    around. See :func:`resolve_canonical_lib`.
+    """
+
+    def __init__(self, field: str, value: str, names: list[str]):
+        super().__init__(
+            f"{len(names)} canonical libraries share {field}={value!r}: "
+            f"{', '.join(names)}. Refusing to pick one — the previous "
+            f"behaviour resolved this by row order, which silently answered "
+            f"with the WRONG library (#875)."
+        )
+        self.field = field
+        self.value = value
+        self.names = names
+
+
 def resolve_canonical_lib(system_or_url: str) -> CanonicalLib | None:
     """Find a CanonicalLib by either ``canonical_lib_url`` (FHIR-canonical
     form, preferred) or ``canonical_lib_name`` (legacy/cdr.pdhc form).
-    Returns None if neither matches."""
+    Returns None if neither matches.
+
+    REFUSES RATHER THAN GUESSING when more than one row matches (#875).
+
+    This used to be ``.first()`` on a non-unique column, and the cost was
+    measured: `icd10` held a copy of `snomed`'s URL, so the two libraries
+    collapsed into one and `.first()` returned `snomed` by row order.
+    Every `icd10` value was then skipped by
+    :func:`scoped_validate_code` — `$validate-code` answered FALSE for 89
+    codes that were correctly stored — and `_build_compose` served those
+    ICD-10 codes under the SNOMED CT system URI, which is wrong FHIR
+    published outward.
+
+    The failure mode is what matters: it answered CONFIDENTLY with the
+    wrong library. Nothing in the response said "ambiguous". A UNIQUE
+    constraint now prevents the state, and this raise makes it loud if the
+    constraint is ever absent — an older deployment, a test database built
+    from a stale model, or a constraint someone drops. A guard whose only
+    job is to be unreachable still has to exist, or the next duplicate is
+    silent again.
+    """
     if not system_or_url:
         return None
-    lib = CanonicalLib.query.filter_by(canonical_lib_url=system_or_url).first()
-    if lib is not None:
-        return lib
-    return CanonicalLib.query.filter_by(
-        canonical_lib_name=system_or_url,
-    ).first()
+
+    for field in ('canonical_lib_url', 'canonical_lib_name'):
+        matches = CanonicalLib.query.filter_by(**{field: system_or_url}).all()
+        if len(matches) > 1:
+            raise AmbiguousCanonicalLib(
+                field, system_or_url,
+                sorted(m.canonical_lib_name for m in matches))
+        if matches:
+            return matches[0]
+    return None
 
 
 def scoped_validate_code(vs: ValueSet, system: str, code: str) -> dict:

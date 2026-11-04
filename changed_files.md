@@ -718,3 +718,122 @@ measured. **NOT deployed to production.**
 - DEPLOYED the same day: single-file scp + rebuild. Image
   `6625c142138f` → `4cf5c7341d59`. Per-file rollback at
   `~/backups/predeploy/plan.pdhc/config.py.2026-11-03T07-30Z.bak`.
+
+## #875 — canonical_lib_url is unique, and the resolver refuses to guess (2026-11-04)
+
+Step 1 (correct icd10's URL) was applied in production 2026-11-04 and closed
+as #919. These are steps 2-4: the half that stops it recurring.
+
+- planp/app/api/fhir_valueset.py — `resolve_canonical_lib` no longer does
+  `.first()` on a non-unique column. It collects matches and RAISES the new
+  `AmbiguousCanonicalLib` on more than one, for url and for name alike. The
+  defect's shape is why: it answered CONFIDENTLY with the wrong library and
+  nothing in the response said "ambiguous" — `$validate-code` returned FALSE
+  for 89 correctly-stored ICD-10 codes, and `_build_compose` served them
+  under the SNOMED CT system URI.
+- planp/app/api/fhir_conceptmap.py — its byte-identical COPY of the resolver
+  is DELETED; it now imports the original. The copy's own docstring said it
+  "mirrors the lenience of" `fhir_valueset`'s, and it mirrored the defect
+  too, so fixing one would have left the other silent. `fhir_codesystem`
+  already imported the original, so conceptmap was the only duplicate.
+- planp/app/models/concept_models.py — `canonical_lib_url` is now
+  `unique=True`. Needed on the MODEL, not only in the migration, because the
+  tests build their schema with `create_all()`.
+- planp/migrations/versions/e5f6a7b8c9d0_unique_canonical_lib_url.py — NEW.
+  Normalises `''` to NULL first (two empty strings collide under a UNIQUE
+  where two NULLs do not), then REFUSES with both library names if any
+  duplicate remains, rather than failing on a raw IntegrityError or picking
+  — picking by row order is the defect itself. Head is now e5f6a7b8c9d0,
+  verified a single head.
+- planp/app/services/canonical_libs.py — `normalise_lib_url` and
+  `url_conflict`. In this module because its own docstring is about being
+  "the ONE place that decides it" so callers cannot drift; the same argument
+  applies to the URL rule.
+- planp/app/api/lookup_tables.py (create + update) and
+  planp/app/routes/lookup_tables.py (create + update) — all FOUR write paths
+  now check. This is where the production duplicate came from: every one of
+  them already guarded `canonical_lib_name` for uniqueness, so the name was
+  protected in two layers and the URL in none. No migration in the
+  directory writes this column, so the value did not come from the
+  migration history.
+- planp/app/__init__.py — an app-level errorhandler returning 409 +
+  OperationOutcome. Registered on the app rather than at each of the three
+  resolver call sites, because #875's own lesson is that the resolver existed
+  in two places and one would be forgotten. 409 and not 500: the server is
+  working and refusing because its terminology data contradicts itself.
+- planp/tests/test_canonical_lib_url_unique_875.py — NEW, 23 tests across
+  all four layers, each refusal paired with an acceptance control.
+  MUTATION-TESTED: reverting the resolver to `.first()`, dropping
+  `unique=True`, dropping the blank normalisation, dropping `exclude_guid`,
+  and giving conceptmap its own copy each fail exactly one test, and always
+  the right one.
+
+Two things the tests deliberately record rather than hide. The ambiguous
+state is unreachable through the database once the constraint exists, so the
+resolver's raise is exercised by injecting two rows at the query boundary —
+honest about testing "if handed this, does it refuse" rather than "can the
+database hold this". And the first injectivity test read whatever the
+database happened to hold and failed with "no library has a URL" because it
+ran after its fixtures; it now seeds its own four shapes, since a test whose
+outcome depends on execution order is not evidence.
+
+Suite: 491 passed. Migration branches verified on real Postgres in an
+isolated scratch database (created and dropped): the healthy path normalises
+one blank, finds zero duplicates, applies the constraint and keeps two NULLs
+coexisting under it; the abort path finds the duplicate and names both
+libraries.
+
+### DEPLOYED 2026-11-04, and verified by behaviour rather than by status
+
+Gated before anything was written. My git HEAD, the server disk and the
+running container agreed on all seven files — so there was no server-side
+edit to overwrite, AND the image was built from the current disk, which is
+the "container can be ahead of the release dir" trap. `requirements.txt` is
+16/16 pinned, so the `--build` was not also a dependency upgrade (#785).
+
+Dump first: `~/backups/predeploy/plan.pdhc/pdhc_gateway.2026-11-04T13-4212Z.pgdump`
+(131 481 bytes, mode 600, verified with `pg_restore -l`: 212 TOC entries, 44
+tables, 22 with data). Per-file rollback pulled straight from the container
+into `~/backups/predeploy/plan.pdhc/files.2026-11-04T13-4212Z/`.
+
+Order was forced and happened to be the safe one: the migration file has to
+be in the image, so the CODE went first. The constraint therefore never
+existed without the 409 checks in front of it — the reverse order would have
+left a window where a duplicate write 500'd.
+
+    image 4cf5c7341d59 -> 67a6cd00670a   (docker-compose up -d --build --no-deps app)
+    8 of 8 files hash-identical in the NEW image
+    entrypoint.sh ran `flask db upgrade` on recreate; the migration logged its
+      own premise: "[e5f6a7b8c9d0] no duplicates; adding uq_..."
+    alembic d4e5f6a7b8c9 -> e5f6a7b8c9d0
+
+Verified:
+
+  - the constraint EXISTS: `uq_canonical_libs_canonical_lib_url UNIQUE
+    (canonical_lib_url)`
+  - it BITES. Reproducing #875 exactly — `UPDATE canonical_libs SET
+    canonical_lib_url = <snomed's> WHERE canonical_lib_name='icd10'` — is now
+    refused by Postgres. Run inside a transaction and rolled back; icd10's URL
+    re-read afterwards and intact. That is the decisive test: the original
+    defect is no longer expressible.
+  - state preserved: 31 valuesets / 269 values / 270 memberships / 9 libraries,
+    unchanged across the deploy.
+  - `$validate-code` over ALL 219 memberships: 219/219, same as before the
+    deploy, with non-member codes still refused on all three libraries.
+  - `$translate` — the path whose resolver was rewired — answers
+    "no plan.pdhc Concept binds ('icd10', 'Z94.0')". It names ICD-10, which is
+    the behavioural proof the resolver no longer returns snomed for that URL.
+  - `$lookup` 200; an unknown system still reads as "not registered as a
+    CanonicalLib", not as an ambiguity.
+  - `/api/health` 200 database connected; sibling smoke 10/10.
+
+The 409 conflict path was NOT exercised in production, deliberately: proving
+it would mean creating a junk canonical library in live terminology data. It
+is mutation-tested in the suite instead.
+
+Two findings filed from this work rather than folded in: #922 (renaming a
+lookup row to a taken name is an unhandled IntegrityError — a 500, the #875
+shape one field over) and #923 (#875 step 3: snomed's URL is a BROWSER link
+with query parameters, not an identifier, and loinc/atc are not the registered
+URIs either — measured against 39/23/6 files platform-wide that do use the
+registered forms).

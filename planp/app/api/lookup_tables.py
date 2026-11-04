@@ -61,9 +61,23 @@ def _crud_routes(bp, url, model_class, name_field, display_field=None):
         for f in ('author',):
             if data.get(f):
                 setattr(item, f, _sanitize(data[f]))
-        # CanonicalLib extra field
-        if hasattr(model_class, 'canonical_lib_url') and data.get('canonical_lib_url'):
-            item.canonical_lib_url = _sanitize(data['canonical_lib_url'])
+        # CanonicalLib extra field. #875: this is UNIQUE now, and the check
+        # mirrors the `name already exists` 409 a few lines above — the name
+        # was guarded here and the URL was not, which is how `icd10` came to
+        # hold `snomed`'s URL in production and made the resolver answer with
+        # the wrong library.
+        if hasattr(model_class, 'canonical_lib_url') and 'canonical_lib_url' in data:
+            from app.services.canonical_libs import (normalise_lib_url,
+                                                     url_conflict)
+            url = normalise_lib_url(_sanitize(data['canonical_lib_url']))
+            clash = url_conflict(url)
+            if clash is not None:
+                return jsonify({
+                    'error': f'canonical_lib_url already belongs to '
+                             f'{clash.canonical_lib_name!r}',
+                    'canonical_lib_url': url,
+                }), 409
+            item.canonical_lib_url = url
 
         db.session.add(item)
         db.session.commit()
@@ -94,7 +108,18 @@ def _crud_routes(bp, url, model_class, name_field, display_field=None):
         if 'author' in data:
             item.author = _sanitize(data['author'])
         if hasattr(item, 'canonical_lib_url') and 'canonical_lib_url' in data:
-            item.canonical_lib_url = _sanitize(data['canonical_lib_url'])
+            from app.services.canonical_libs import (normalise_lib_url,
+                                                     url_conflict)
+            url = normalise_lib_url(_sanitize(data['canonical_lib_url']))
+            # exclude_guid, or the row conflicts with itself on every save
+            clash = url_conflict(url, exclude_guid=item.guid)
+            if clash is not None:
+                return jsonify({
+                    'error': f'canonical_lib_url already belongs to '
+                             f'{clash.canonical_lib_name!r}',
+                    'canonical_lib_url': url,
+                }), 409
+            item.canonical_lib_url = url
         item.vers_number = (item.vers_number or 1) + 1
         db.session.commit()
         return jsonify(item.to_dict()), 200

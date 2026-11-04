@@ -27,10 +27,23 @@ def create_canonical_lib():
         if CanonicalLib.query.filter_by(canonical_lib_name=name).first():
             flash('A canonical library with that name already exists.', 'error')
             return redirect(url_for('lookup_web.create_canonical_lib'))
+        # #875: the URL is UNIQUE now. This mirrors the name check just
+        # above, which existed from the start while the URL had none — the
+        # asymmetry that let `icd10` be saved with `snomed`'s URL through
+        # this very form.
+        from app.services.canonical_libs import (normalise_lib_url,
+                                                 url_conflict)
+        url = normalise_lib_url(request.form.get('canonical_lib_url'))
+        clash = url_conflict(url)
+        if clash is not None:
+            flash(f'That URL already belongs to "{clash.canonical_lib_name}". '
+                  f'Two libraries sharing a URL made the resolver answer with '
+                  f'the wrong one (#875).', 'error')
+            return redirect(url_for('lookup_web.create_canonical_lib'))
         item = CanonicalLib(
             canonical_lib_name=name,
             canonical_lib_display_text=request.form.get('canonical_lib_display_text'),
-            canonical_lib_url=request.form.get('canonical_lib_url'),
+            canonical_lib_url=url,
             author=request.form.get('author'),
         )
         db.session.add(item)
@@ -51,9 +64,18 @@ def view_canonical_lib(guid):
 def edit_canonical_lib(guid):
     item = CanonicalLib.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
+        from app.services.canonical_libs import (normalise_lib_url,
+                                                 url_conflict)
+        url = normalise_lib_url(request.form.get('canonical_lib_url'))
+        clash = url_conflict(url, exclude_guid=item.guid)
+        if clash is not None:
+            flash(f'That URL already belongs to "{clash.canonical_lib_name}". '
+                  f'Two libraries sharing a URL made the resolver answer with '
+                  f'the wrong one (#875).', 'error')
+            return redirect(url_for('lookup_web.edit_canonical_lib', guid=guid))
         item.canonical_lib_name = request.form.get('canonical_lib_name', item.canonical_lib_name).strip()
         item.canonical_lib_display_text = request.form.get('canonical_lib_display_text')
-        item.canonical_lib_url = request.form.get('canonical_lib_url')
+        item.canonical_lib_url = url
         item.author = request.form.get('author')
         item.vers_number = (item.vers_number or 1) + 1
         db.session.commit()

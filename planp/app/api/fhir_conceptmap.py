@@ -30,6 +30,8 @@ from datetime import datetime, timezone
 from flask import Blueprint, request
 
 from app import db
+from app.api.fhir_valueset import (AmbiguousCanonicalLib,
+                                   resolve_canonical_lib)
 from app.api.fhir_helpers import (
     RESOURCE_PUBLICATION_STATUS,
     fhir_json_response,
@@ -94,18 +96,16 @@ def _local_display(c: Concept) -> str:
     return c.concept_display_text or c.concept_name or c.guid
 
 
-def _resolve_lib_for_input(system_or_url: str) -> CanonicalLib | None:
-    """Find a CanonicalLib by URL (FHIR-canonical form) or by name
-    (cdr.pdhc/global form). Mirrors the lenience of
-    ``fhir_valueset.resolve_canonical_lib`` for consistency."""
-    if not system_or_url:
-        return None
-    lib = CanonicalLib.query.filter_by(canonical_lib_url=system_or_url).first()
-    if lib is not None:
-        return lib
-    return CanonicalLib.query.filter_by(
-        canonical_lib_name=system_or_url,
-    ).first()
+# This module used to carry a byte-identical COPY of
+# `fhir_valueset.resolve_canonical_lib`, whose docstring said it "mirrors
+# the lenience of" the original. It mirrored the defect too: #875's
+# `.first()`-on-a-non-unique-column bug existed here as well, and fixing
+# one copy would have left the other answering confidently with the wrong
+# library. Deleted in favour of the import above — `fhir_codesystem`
+# already consumed the original, so this module was the only duplicate.
+#
+# Two copies of a resolver is two places to fix and one to forget.
+_resolve_lib_for_input = resolve_canonical_lib
 
 
 def _build_match_parameter(*, relationship: str, system: str, code: str,
