@@ -2054,3 +2054,60 @@ none of production's rows, so "`loader.pdhc` is absent" was true before the fix
 and after — a vacuous assertion. The tests now seed the value they look for, and
 the same mutation fails **9**. A control that cannot fail is not a control, and
 nothing but mutating the guarded code would have surfaced it.
+
+## #923 — DEPLOYED AND DATA CHANGED 2026-11-04. Both halves done.
+
+The guard went first and the data second, deliberately: the guard affects
+WRITES only, so deploying it changed nothing a consumer sees, and it then
+policed the data change itself.
+
+### The ticket undercounted the exposure, measured in-process
+
+It said "122 SNOMED memberships and 8 ATC are live today". The real figure is
+**176 of 265 — 66%** — because `local` (43) and `loinc` (3) were emitted under
+non-identifier systems too. And the `$validate-code` sweep it cites as 219 has
+grown to **265**.
+
+| memberships | system emitted BEFORE | AFTER |
+|---|---|---|
+| 122 | `browser.ihtsdotools.org/?perspective=…` | `http://snomed.info/sct` |
+| 43 | `https://plan.pdhc.se` (plan's bare base) | `https://plan.pdhc.se/fhir/CodeSystem/plan-pdhc-local` |
+| 8 | `https://www.whocc.no/atc_ddd_index/` | `http://www.whocc.no/atc` |
+| 3 | `https://LOINC.org` | `http://loinc.org` |
+| 89 | `termbank.pdhc.se/CodeSystem/icd10` | unchanged |
+
+`$validate-code`: **265/265 before and 265/265 after**. All nine libraries now
+match the convention and not one url carries a query string or a fragment.
+
+### The sweep the ticket said to run, and the limit that made it possible
+
+`/api/v1/ValueSet` answers **401** unauthenticated, so an anonymous probe cannot
+do it. Run INSIDE the container it needs no HTTP at all: the script calls
+`scoped_validate_code` and `_build_expansion` directly — the same functions the
+route calls. That is how 265/265 was measured on both sides.
+
+The script also read its new values from the DEPLOYED `expected_lib_url` rather
+than carrying its own copy, so it could not disagree with the guard that will
+police every future edit. One transaction, with three abort conditions: a value
+the guard itself refuses, a row count other than 5, or a sweep that moved.
+
+### The cross-service consequence, measured rather than reasoned about
+
+snomed's url is now `http://snomed.info/sct` — the exact string cdr's #874 tests
+use as an example of a system that is NOT flagged. If plan had ever flagged
+snomed as a whole-system answer space, every SNOMED write to cdr1 would have
+started being refused. Verified in cdr1's own container:
+
+- `flagged_systems()` resolves `['icd10', 'icd11-mms']`; SNOMED's uri is **not**
+  in it
+- sim, gateway and analyse are all still permitted a SNOMED coding
+- and #874 still bites where it should: gateway REFUSED icd10, sim permitted
+
+Sibling smokes: plan 10/10, cdr1 18/18 "Created nothing". 603 tests pass.
+
+### What `kva` cost, and why it was still worth doing
+
+Zero concepts bind to it, so it never appeared in an expansion and no consumer
+could have been affected. It was changed anyway because its old value was a
+third-party browser tool — the same defect class as snomed's, and the one a
+query-string check cannot see.

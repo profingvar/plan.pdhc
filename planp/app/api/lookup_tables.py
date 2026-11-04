@@ -141,8 +141,16 @@ def _crud_routes(bp, url, model_class, name_field, display_field=None, *,
         # the wrong library.
         if hasattr(model_class, 'canonical_lib_url') and 'canonical_lib_url' in data:
             from app.services.canonical_libs import (normalise_lib_url,
-                                                     url_conflict)
+                                                     url_conflict,
+                                                     url_convention_error)
             url = normalise_lib_url(_sanitize(data['canonical_lib_url']))
+            # #923: UNIQUE said no two libraries may share a url; it never said
+            # what a url should BE. snomed's was a human browser address with a
+            # perspective, a concept id, an edition and a language list, served
+            # as `compose.include[].system` for every SNOMED value.
+            bad = url_convention_error(name_val, url)
+            if bad:
+                return jsonify({'error': bad, 'canonical_lib_url': url}), 400
             clash = url_conflict(url)
             if clash is not None:
                 return jsonify({
@@ -200,8 +208,15 @@ def _crud_routes(bp, url, model_class, name_field, display_field=None, *,
             item.author = _sanitize(data['author'])
         if hasattr(item, 'canonical_lib_url') and 'canonical_lib_url' in data:
             from app.services.canonical_libs import (normalise_lib_url,
-                                                     url_conflict)
+                                                     url_conflict,
+                                                     url_convention_error)
             url = normalise_lib_url(_sanitize(data['canonical_lib_url']))
+            # #923. The name here is the one the row will END UP with: a rename
+            # and a url change can arrive in the same PUT, and checking the old
+            # name would validate against the wrong convention.
+            bad = url_convention_error(getattr(item, name_field, None), url)
+            if bad:
+                return jsonify({'error': bad, 'canonical_lib_url': url}), 400
             # exclude_guid, or the row conflicts with itself on every save
             clash = url_conflict(url, exclude_guid=item.guid)
             if clash is not None:

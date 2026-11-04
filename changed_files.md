@@ -1018,3 +1018,86 @@ guards.
 
 **NOT DEPLOYED.** plan runs from a container (`pdhc_app`), so this needs a
 `--build`; see newtask.txt for the gate that must come first.
+
+## 2026-11-04 — #923: a canonical_lib_url must be an identifier, not a browser address
+
+- planp/app/services/canonical_libs.py — EDIT. `REGISTERED_SYSTEM_URLS`,
+  `TERMBANK_LIBS` (+`kva`), `expected_lib_url()`, `url_convention_error()`.
+  `LOCAL_LIB_URL` changed and is now DERIVED from `fhir_canonical_url`.
+- planp/app/api/lookup_tables.py — EDIT. The convention check on API create and
+  update; the update validates against the name the row will END UP with.
+- planp/app/routes/lookup_tables.py — EDIT. The same on the two HTML admin paths.
+- planp/tests/test_canonical_lib_url_convention_923.py — NEW. 44 tests.
+
+**#875 made the url UNIQUE; it never said what a url should BE.** The audit found
+the three code systems that HAVE a registered FHIR URI published under values
+that are not them. snomed's was a human BROWSER address carrying a perspective,
+a concept id, an edition and a language list — served as
+`compose.include[].system` for 21 concepts. A consumer resolving it gets a web
+page.
+
+The platform already used the registered forms overwhelmingly — `http://loinc.org`
+in 39 files, `http://snomed.info/sct` in 23 **including plan's own source and
+test suite** — so plan's terminology registry disagreed with plan's own code.
+Live confirmation the same day: the Device ips created from an alert implant
+assertion carries `system = "http://snomed.info/sct"`.
+
+`local` had the same shape for a different reason: the bare
+`https://plan.pdhc.se`, which is plan's BASE url, while plan publishes its local
+concept set as the CodeSystem `plan-pdhc-local` at its own canonical url
+(ADR D3, live, version 2, 99 concepts). 34 of 99 concepts bind to `local`.
+
+**Why a DERIVED rule and not a blocklist — the part worth keeping.** The obvious
+guard is "reject a url with a query string", because an identifier needs none.
+It catches snomed's and **nothing else**: `kva`'s old value,
+`https://verktyg.internetmedicin.se/koder/kva`, is a third-party browser tool
+with no query string at all. A blocklist of such hosts is always one host
+behind. So the rule is positive — for a library we have decided about there is
+exactly one acceptable url, derived from its name — with the query/fragment rule
+as a general floor that applies even to libraries nobody has reasoned about.
+
+| library | was | is (convention) |
+|---|---|---|
+| snomed | `browser.ihtsdotools.org/?perspective=…` | `http://snomed.info/sct` |
+| loinc | `https://LOINC.org` | `http://loinc.org` |
+| atc | `https://www.whocc.no/atc_ddd_index/` | `http://www.whocc.no/atc` |
+| kva | `verktyg.internetmedicin.se/koder/kva` | `https://termbank.pdhc.se/CodeSystem/kva` |
+| local | `https://plan.pdhc.se` | plan's own CodeSystem url, derived |
+| icd10, icd11-mms, icf, socialstyrelsen | termbank form | unchanged |
+
+`kva` joined the termbank set rather than getting a registered URI because KVÅ
+has none, and it is bound by **0 concepts**, so the change is free.
+
+**RISK CHECKED BEFORE ANY CHANGE, per repo and not tree-wide.** No production
+READER hardcodes an old value. The one production WRITER that would reinstate
+one — `sim.pdhc/concepts/load_to_plan.py:132`, which posts ATC with the old url —
+calls `/api/v1/canonical-libs` and `/api/v1/concept-types` **without the
+`/lookup` prefix**, both measured 404. It cannot reach plan at all, which is also
+where plan's `author: loader.pdhc` values came from. The remaining hits are two
+termbank test fixtures, one cdr test fixture representing the #875 duplicate,
+and a line of documentation.
+
+603 tests pass (was 559). Six mutations — shape rule dropped, convention half
+dropped, `kva` removed from the termbank set, `LOCAL_LIB_URL` hardcoded, the API
+update validating the OLD name, the HTML edit losing the check — fail 7, 7, 3,
+1, 1 and 1.
+
+**Two bugs in my own implementation, both found by my own tests:**
+
+- `url_convention_error('snomed', '   ')` was REFUSED. `if not url` is false for
+  whitespace, so it fell through to the convention check. The callers all pass
+  through `normalise_lib_url` first so it could not happen via a route — but a
+  helper that only holds when its caller is correct is not a helper.
+- `https://example.org/cs?` was ACCEPTED. `urlsplit` reports `query=''` for a
+  trailing bare `?`, which is falsy. The rule now reads the DELIMITER's
+  presence, not the parsed value's.
+
+**And the existing suite caught me once:** my first `LOCAL_LIB_URL` hardcoded
+plan's `/fhir/` url, and `test_no_other_file_hardcodes_plan_fhir_url` failed. It
+is right — there is one helper for plan's own canonical urls — and deriving it is
+better anyway, because it follows `PLAN_BASE` if that ever moves. A test now
+asserts the module does not spell the url out at all.
+
+**CODE NOT DEPLOYED; DATA NOT CHANGED.** They are deliberately separate — see
+newtask.txt. The guard affects WRITES only, so deploying it leaves every read
+answering exactly as before.

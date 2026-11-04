@@ -1,6 +1,39 @@
 Current focus
 =============
 
+#923 canonical_lib_url convention — DONE: guard DEPLOYED and data CHANGED
+(2026-11-04). Ticket closed. 603 tests pass (was 559).
+
+Read the #923 entry in changed_files.md for the why. The short version: #875
+made the url UNIQUE and never said what a url should BE, and snomed's was a
+human browser address with query parameters, served as
+`compose.include[].system` for 21 concepts.
+
+BOTH STEPS DONE AND VERIFIED
+  All nine libraries match the convention; no url carries a query or fragment.
+  $validate-code 265/265 before AND after. The emitted systems moved:
+    122 -> http://snomed.info/sct
+     43 -> https://plan.pdhc.se/fhir/CodeSystem/plan-pdhc-local
+      8 -> http://www.whocc.no/atc
+      3 -> http://loinc.org
+  176 of 265 memberships (66%) had been on a non-identifier system — the ticket
+  said 130, and the sweep it cites as 219 has grown to 265.
+
+  cdr1's #874 gate verified UNDISTURBED in its own container: snomed's uri is
+  not flagged, all three identities still write SNOMED codings, gateway is
+  still refused icd10 and sim still permitted. Smokes: plan 10/10, cdr1 18/18.
+
+  THE SWEEP'S TRICK, worth reusing: /api/v1/ValueSet answers 401
+  unauthenticated, so it cannot be done from an anonymous probe. Run INSIDE the
+  container it needs no HTTP — call `scoped_validate_code` and
+  `_build_expansion` directly, the same functions the route calls.
+
+NEXT ON THIS REPO
+  #931 — the machine-auth door. Until plan has one, four of its lookup reads
+  cannot be gated (#925), and the $validate-code sweep above cannot be
+  automated without a human session.
+
+
 #925 lookup read posture — DONE AND DEPLOYED (2026-11-04). Ticket closed.
 559 tests pass (was 527). #931 carries the blocker behind it.
 

@@ -66,8 +66,16 @@ def create_canonical_lib():
         # asymmetry that let `icd10` be saved with `snomed`'s URL through
         # this very form.
         from app.services.canonical_libs import (normalise_lib_url,
-                                                 url_conflict)
+                                                 url_conflict,
+                                                 url_convention_error)
         url = normalise_lib_url(request.form.get('canonical_lib_url'))
+        # #923: UNIQUE said no two libraries may share a url; it never said what
+        # a url should BE. This form is how a browser address gets in — it is a
+        # free text field, and snomed's value was one.
+        bad = url_convention_error(name, url)
+        if bad:
+            flash(bad, 'error')
+            return redirect(url_for('lookup_web.create_canonical_lib'))
         clash = url_conflict(url)
         if clash is not None:
             flash(f'That URL already belongs to "{clash.canonical_lib_name}". '
@@ -99,8 +107,19 @@ def edit_canonical_lib(guid):
     item = CanonicalLib.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
         from app.services.canonical_libs import (normalise_lib_url,
-                                                 url_conflict)
+                                                 url_conflict,
+                                                 url_convention_error)
         url = normalise_lib_url(request.form.get('canonical_lib_url'))
+        # #923. Validate against the name the row will END UP with: `new_name`
+        # is read further down, and a rename plus a url change can arrive in
+        # the same POST, so checking the stored name would use the wrong
+        # convention.
+        bad = url_convention_error(
+            request.form.get('canonical_lib_name', item.canonical_lib_name),
+            url)
+        if bad:
+            flash(bad, 'error')
+            return redirect(url_for('lookup_web.edit_canonical_lib', guid=guid))
         clash = url_conflict(url, exclude_guid=item.guid)
         if clash is not None:
             flash(f'That URL already belongs to "{clash.canonical_lib_name}". '
