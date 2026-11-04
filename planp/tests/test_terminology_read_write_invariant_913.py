@@ -162,7 +162,8 @@ class TestTheReadSurfaceIsPublicOnPurpose:
         assert len(fhir) == 6, 'route functions'
         assert (API / 'fhir_valueset.py').read_text().count(
             '@fhir_valueset_bp.route') == 10, 'URL patterns'
-        assert len(lookup) == 19
+        # 19 -> 20 with #935's narrow `whole-system-libs` read.
+        assert len(lookup) == 20
 
 
 class TestOptionThree:
@@ -208,13 +209,35 @@ class TestOptionThree:
         # One resource's metadata, no expansion — a name, not a list.
         'read_valueset',
         'read_value',
-        # The generic CRUD factory's reads: canonical-libs, concept-types,
-        # response-types, units, plandef-types, intended-uses. None carries
-        # the restricted selection, and cdr.pdhc calls
-        # /api/v1/lookup/canonical-libs on its whole-system gate — gating
-        # these would have broken it.
+        # The generic CRUD factory's reads. None carries the restricted
+        # selection.
+        #
+        # THIS COMMENT USED TO SAY the six tables were all public and that
+        # "gating these would have broken" cdr's whole-system gate. #925 gated
+        # TWO of them — `concept-types` and `intended-uses` — so that is no
+        # longer true of those two, and leaving the sentence would have it read
+        # as a reason not to.
+        #
+        # The classification cannot tell them apart, and that is a real limit
+        # worth naming rather than hiding: `_crud_routes` registers all six
+        # tables through ONE pair of function names, so this set is per
+        # FUNCTION and not per table. Which table is gated lives at the
+        # registration line, as `public_read=` (#925) — that is where the
+        # decision is, and this test cannot see it.
+        #
+        # Still true, and the reason the four open ones stay open: cdr.pdhc
+        # reads /api/v1/lookup/canonical-libs on its #874 whole-system gate
+        # with no credential, and request.pdhc reads response-types and units
+        # the same way.
         'list_items',
         'read_item',
+        # #935. The three fields cdr's #874 gate actually needs — library
+        # name, canonical url, the flag — and nothing else. It exists so that
+        # gate's dependency on an open read is EXPLICIT rather than
+        # accidental: today it reads the whole table because the table happens
+        # to be open, and gating that would silently degrade a deployed
+        # security control to its hard-coded floor.
+        'list_whole_system_libs',
     }
 
     def _all(self):

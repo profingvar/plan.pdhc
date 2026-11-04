@@ -167,6 +167,27 @@ def read_concept(guid):
 
     result = concept.to_dict()
 
+    # #935: the concept_type NAME, inline. `to_dict()` emits `concept_type` as
+    # a GUID plus a `concept_type_url` pointing at
+    # /api/v1/lookup/concept-types — and #925 GATED that lookup, so a consumer
+    # without a credential resolves nothing. sim.pdhc has no plan credential at
+    # all, and its `get_lookup_name` returns None on any non-200, so the
+    # failure would be SILENT.
+    #
+    # This is the same answer `valueset_values` below already gives, for the
+    # same reason its comment gives: serve what the consumer needs rather than
+    # make it call again. #917 part 2 needs this to decide whether a simulated
+    # term emits a Condition, a MedicationStatement or a Procedure instead of
+    # an Observation.
+    #
+    # The LIST route deliberately does NOT carry it: no working consumer needs
+    # it there, and resolving a name per row on a 200-row page is a cost nobody
+    # asked for. `concept_type_rel` is already declared on the model, so this
+    # adds no query of its own.
+    if concept.concept_type:
+        rel = concept.concept_type_rel
+        result['concept_type_name'] = rel.concept_type_name if rel else None
+
     # Include valueset values if bound
     if concept.valueset:
         links = ValueSetValue.query.filter_by(

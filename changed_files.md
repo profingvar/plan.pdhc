@@ -1101,3 +1101,94 @@ asserts the module does not spell the url out at all.
 **CODE NOT DEPLOYED; DATA NOT CHANGED.** They are deliberately separate — see
 newtask.txt. The guard affects WRITES only, so deploying it leaves every read
 answering exactly as before.
+
+## 2026-11-04 — #935: serve what the consumer needs inline
+
+- planp/app/api/concepts.py — EDIT. `concept_type_name` on the concept READ
+  route, resolved through the existing `concept_type_rel` relationship.
+- planp/app/api/lookup_tables.py — EDIT. `GET /api/v1/lookup/whole-system-libs`
+  — the three fields cdr1's #874 gate reads, public by decision.
+- planp/tests/test_inline_enrichment_935.py — NEW. 10 tests.
+- planp/tests/test_terminology_read_write_invariant_913.py — EDIT. The new
+  route classified as PUBLIC_BY_DESIGN with its reason, the route count 19 → 20,
+  and a stale comment corrected (see below).
+
+**The pattern I did not see when filing #931.** Both #917 part 2 and #931's
+cheap path are the same request: have plan serve what the consumer needs INLINE
+rather than force a second call to a gated lookup. plan already does this —
+`concepts.py:182` adds `valueset_values` precisely "so no extra call is needed".
+
+### 1. `concept_type_name`
+
+#917 part 2 needs a term's `concept_type` to decide whether it emits a
+Condition, a MedicationStatement or a Procedure. Measured: that field is a
+**GUID** whose name lives at `/api/v1/lookup/concept-types` — which **#925
+gated this morning**. sim has no plan credential at all, per #931 plan's
+service-key door admits nobody anyway, and sim's `get_lookup_name` returns
+`None` on any non-200, so the failure would be **silent**.
+
+My #925 reasoning for gating `concept-types` was that its only non-plan caller
+requests `/api/v1/concept-types` WITHOUT the `/lookup` prefix and therefore
+404s. That was true then. #917 creates a new caller, so the gate is wrong for
+it — and the answer is to stop needing the call, not to un-gate.
+
+The LIST route deliberately does NOT carry it: no working consumer needs it
+there, and resolving a name per row on a 200-row page is a cost nobody asked
+for. A test asserts that absence with its reason.
+
+### 2. The narrow `whole-system-libs` read
+
+cdr1's #874 gate reads the WHOLE `canonical-libs` table through a client
+sending only `X-Operator-Session-Id` — session propagation (#408), not
+authentication. So a **deployed security control depends on that endpoint
+happening to be open**, and gating it would silently degrade the gate to its
+hard-coded floor. This route makes the dependency explicit, serving the three
+fields the gate reads and nothing else.
+
+**A narrow view would not have been safe before #875.** cdr's client computes
+which urls are unambiguous, because `icd10` once carried `snomed`'s url — that
+needed sight of every library. #875 made `canonical_lib_url` UNIQUE; verified
+in production 2026-11-04, constraint `uq_canonical_libs_canonical_lib_url`, **0
+duplicates**. The ambiguity is unrepresentable, so a projection cannot mislead.
+
+A test asserts the field set as an **equality**, not a superset: the endpoint
+exists because it is narrower than the table, and if it grows it stops being
+that. Another asserts it does not carry `author` — #925 stopped serving that
+because it named the retired `loader.pdhc`, and a new public read must not
+reintroduce it.
+
+### What this does NOT unlock, stated so nobody expects more
+
+`canonical-libs` still cannot be gated. `sim.pdhc/sim/synthea_obs.py:138`
+(`load_concept_catalogue`, called from `cli.py:1054` on the
+`import-synthea --push-observations` path) reads it with an optional api key and
+calls `raise_for_status()` — a real working consumer. So this removes ONE of two
+blockers. #931 keeps the rest: `response-types`, `units`, `/api/v1/concepts` and
+`CodeSystem/$lookup` are read uncredentialed by request.pdhc and analyse.pdhc,
+and none of those can be inlined away.
+
+### A stale comment corrected while passing
+
+`test_terminology_read_write_invariant_913.py`'s `PUBLIC_BY_DESIGN` said the six
+factory tables were all public and that "gating these would have broken" cdr's
+gate. **#925 gated two of them**, so that sentence was no longer true of
+`concept-types` and `intended-uses` — and left alone it reads as a reason not to.
+
+The limit behind it is named rather than hidden: `_crud_routes` registers all six
+tables through ONE pair of function names, so that classification is per
+FUNCTION and cannot tell them apart. Which table is gated lives at the
+registration line as `public_read=` (#925). That is where the decision is, and
+the #913 test cannot see it.
+
+614 tests pass (was 603). Four mutations — the enrichment dropped, the narrow
+read returning all libraries, returning the whole row, and being gated — fail 2,
+1, 2 and 4.
+
+**DEPLOYED AND VERIFIED 2026-11-04.** Unauthenticated, in production: the narrow
+read returns the 2 flagged libraries (`icd10`, `icd11-mms`) with EXACTLY the
+three fields and no `author`; it agrees with the full table's flagged rows;
+`concept_type_name` resolves to `'Observation'` on a real concept WITHOUT the
+gated lookup — which is the whole point; the LIST route still omits it; #925's
+gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
+`PUT` on the narrow read is 405. Sibling smoke 10/10. Pre-deploy: 48 of 48
+`app/*.py` identical host-to-container, 16 of 16 requirements pinned.

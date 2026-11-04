@@ -288,6 +288,52 @@ _crud_routes(lookup_bp, '/intended-uses', IntendedUse, 'intended_use_name', 'int
 
 
 # ---------------------------------------------------------------------------
+# #935 — the narrow whole-system read
+# ---------------------------------------------------------------------------
+
+@lookup_bp.route('/whole-system-libs', methods=['GET'])
+def list_whole_system_libs():
+    """The flagged libraries, with the three fields a gate needs. PUBLIC.
+
+    DELIBERATELY UNDECORATED, and the reason is the point. cdr1's #874
+    whole-system assertion gate reads the full `/canonical-libs` table through
+    a client that sends only `X-Operator-Session-Id` — session propagation
+    (#408), not authentication. So a DEPLOYED SECURITY CONTROL depends on that
+    endpoint happening to be open, and gating it would silently degrade the
+    gate to its floor: it would keep refusing `icd11-mms` and `icd10` from its
+    hard-coded floor but stop following plan for anything flagged later.
+
+    This route exists so that dependency can be EXPLICIT instead of
+    accidental. It serves only what the gate reads — the library name, its
+    canonical url and the flag — and nothing else, so opening it costs less
+    than leaving the whole table open.
+
+    A NARROW ENDPOINT WOULD NOT HAVE BEEN SUFFICIENT BEFORE #875. cdr's client
+    computes which urls are unambiguous, because `icd10` once carried
+    `snomed`'s url and matching on url alone resolved a SNOMED coding to a
+    flagged library. That needed sight of EVERY library. #875 made
+    `canonical_lib_url` UNIQUE — verified in production 2026-11-04,
+    constraint `uq_canonical_libs_canonical_lib_url`, 0 duplicates — so the
+    ambiguity is unrepresentable and this view cannot mislead.
+
+    WHAT THIS DOES NOT UNLOCK, so nobody expects it to: `/canonical-libs`
+    still cannot be gated. `sim.pdhc/sim/synthea_obs.py:138` reads it from the
+    `import-synthea --push-observations` path with an optional api key and
+    calls `raise_for_status()`. That is a real working consumer. #931 carries
+    the rest.
+    """
+    libs = (CanonicalLib.query
+            .filter(CanonicalLib.whole_system_answer_space.is_(True))
+            .order_by(CanonicalLib.canonical_lib_name)
+            .all())
+    return jsonify([{
+        'canonical_lib_name': lib.canonical_lib_name,
+        'canonical_lib_url': lib.canonical_lib_url,
+        'whole_system_answer_space': True,
+    } for lib in libs]), 200
+
+
+# ---------------------------------------------------------------------------
 # Values CRUD
 # ---------------------------------------------------------------------------
 

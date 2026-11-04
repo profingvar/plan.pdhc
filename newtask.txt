@@ -1,6 +1,48 @@
 Current focus
 =============
 
+#935 inline enrichment — DEPLOYED AND VERIFIED (2026-11-04).
+614 tests pass (was 603).
+
+Verified in production, unauthenticated: the narrow read returns the 2 flagged
+libraries with EXACTLY the three fields and no `author`; it agrees with the full
+table; `concept_type_name` resolves to 'Observation' on a real concept WITHOUT
+the gated lookup; the LIST route still omits it; #925's gates all hold
+(concept-types 401, intended-uses 401, the four open ones 200); PUT on the
+narrow read is 405. Sibling smoke 10/10.
+
+TWO ADDITIONS, both following concepts.py:182's own precedent (`valueset_values`
+inline "so no extra call is needed"):
+
+  concept_type_name on GET /api/v1/concepts/<guid>
+      #917 part 2 needs it. The field is a GUID whose name lives behind
+      /api/v1/lookup/concept-types, which #925 GATED this morning — and sim has
+      no plan credential, with get_lookup_name returning None on any non-200, so
+      the failure would be SILENT. The LIST route deliberately omits it.
+
+  GET /api/v1/lookup/whole-system-libs
+      The three fields cdr1's #874 gate reads, public by decision. Today that
+      gate reads the WHOLE canonical-libs table with no credential, so a
+      deployed security control depends on an endpoint happening to be open.
+      Safe to narrow only because #875 made canonical_lib_url UNIQUE (verified
+      in production, 0 duplicates) — cdr's uniqueness guard now defends against
+      an unrepresentable state.
+
+AFTER THE DEPLOY, in order
+  1. Repoint cdr's plan_client at /whole-system-libs — a SEPARATE cdr deploy,
+     and it must come after plan is live or the gate falls to its floor.
+  2. #917 part 2 in sim: ConceptShape gains concept_type, then the three
+     builders (Condition / MedicationStatement / Procedure; NOT Encounter —
+     zero concepts have that type).
+
+WHAT #935 DOES NOT UNLOCK: canonical-libs still cannot be gated.
+sim/synthea_obs.py:138 reads it from the import-synthea path with an optional
+key and raise_for_status(). #931 keeps the rest — response-types, units,
+/api/v1/concepts and CodeSystem/$lookup, read uncredentialed by request.pdhc
+and analyse.pdhc, none of which can be inlined away.
+
+
+
 #923 canonical_lib_url convention — DONE: guard DEPLOYED and data CHANGED
 (2026-11-04). Ticket closed. 603 tests pass (was 559).
 
