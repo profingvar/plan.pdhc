@@ -7,7 +7,9 @@ from app.models.concept_models import (
     CanonicalLib, ConceptType, ResponseType, Unit, PlanDefType, IntendedUse,
     ValueCatalog, ValueSet, ValueSetValue,
 )
-from app.services.name_uniqueness import make_unique_value_name, make_unique_valueset_name
+from app.services.name_uniqueness import (NameUniquenessService,
+                                          make_unique_value_name,
+                                          make_unique_valueset_name)
 
 lookup_bp = Blueprint('lookup', __name__)
 # Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
@@ -102,7 +104,24 @@ def _crud_routes(bp, url, model_class, name_field, display_field=None):
             return jsonify({'error': 'Not found'}), 404
         data = request.get_json(silent=True) or {}
         if name_field in data:
-            setattr(item, name_field, _sanitize(data[name_field]))
+            # #922: the name column is UNIQUE on all six models this factory
+            # serves, and CREATE above has answered 409 for a taken name
+            # since it was written. UPDATE checked nothing, so the only thing
+            # standing here was the database constraint -- and it speaks SQL:
+            # renaming to a taken name raised an unhandled IntegrityError and
+            # the caller got a bare 500.
+            #
+            # Uses the service the rest of this codebase already uses
+            # (routes/concepts.py, routes/values.py, api/plandefinitions.py
+            # and three more) rather than a seventh inline query. `lookup_tables`
+            # was the exception on both paths, which is the whole finding.
+            new_name = _sanitize(data[name_field])
+            if new_name != getattr(item, name_field):
+                error = NameUniquenessService.validate_name_for_manual_entry(
+                    new_name, model_class, name_field, exclude_guid=item.guid)
+                if error:
+                    return jsonify({'error': error}), 409
+            setattr(item, name_field, new_name)
         if display_field and display_field in data:
             setattr(item, display_field, _sanitize(data[display_field]))
         if 'author' in data:

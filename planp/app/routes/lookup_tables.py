@@ -4,8 +4,42 @@ from app import db
 from app.models.concept_models import (
     CanonicalLib, ConceptType, ResponseType, Unit, PlanDefType, IntendedUse,
 )
+from app.services.name_uniqueness import NameUniquenessService
 
 lookup_web_bp = Blueprint('lookup_web', __name__)
+
+
+def _refuse_taken_name(new_name, model_class, name_field, item, endpoint):
+    """A redirect to send back, or None to carry on (#922).
+
+    Every CREATE route in this file has checked its name column for
+    uniqueness since it was written. No EDIT route did, and the name column
+    is UNIQUE on all four models here -- so the only thing standing on the
+    edit path was the database constraint, and it speaks SQL: renaming to a
+    taken name raised an unhandled IntegrityError and the admin got a bare
+    500 instead of a message.
+
+    Four routes needed the identical five lines, so the reasoning lives here
+    once rather than in four copies that can drift.
+
+    Uses `NameUniquenessService.validate_name_for_manual_entry`, which the
+    rest of this codebase already uses on six other paths (routes/concepts,
+    routes/values, routes/valuesets, api/plandefinitions). `lookup_tables`
+    was the exception, which is the whole of #922 -- the helper existed and
+    these routes rolled their own check on create and none on update.
+
+    The unchanged-name short-circuit matters: without it, saving a form you
+    did not rename would report the row conflicting with itself. That is the
+    same trap `exclude_guid` exists for, and both are belt and braces.
+    """
+    if new_name == getattr(item, name_field):
+        return None
+    error = NameUniquenessService.validate_name_for_manual_entry(
+        new_name, model_class, name_field, exclude_guid=item.guid)
+    if not error:
+        return None
+    flash(error, 'error')
+    return redirect(url_for(endpoint, guid=item.guid))
 
 
 # ─── Canonical Libraries ───────────────────────────────────────────────────────
@@ -73,7 +107,12 @@ def edit_canonical_lib(guid):
                   f'Two libraries sharing a URL made the resolver answer with '
                   f'the wrong one (#875).', 'error')
             return redirect(url_for('lookup_web.edit_canonical_lib', guid=guid))
-        item.canonical_lib_name = request.form.get('canonical_lib_name', item.canonical_lib_name).strip()
+        new_name = request.form.get('canonical_lib_name', item.canonical_lib_name).strip()
+        refusal = _refuse_taken_name(new_name, CanonicalLib, 'canonical_lib_name',
+                                     item, 'lookup_web.edit_canonical_lib')
+        if refusal is not None:
+            return refusal
+        item.canonical_lib_name = new_name
         item.canonical_lib_display_text = request.form.get('canonical_lib_display_text')
         item.canonical_lib_url = url
         item.author = request.form.get('author')
@@ -136,7 +175,12 @@ def view_unit(guid):
 def edit_unit(guid):
     item = Unit.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
-        item.unit_name = request.form.get('unit_name', item.unit_name).strip()
+        new_name = request.form.get('unit_name', item.unit_name).strip()
+        refusal = _refuse_taken_name(new_name, Unit, 'unit_name',
+                                     item, 'lookup_web.edit_unit')
+        if refusal is not None:
+            return refusal
+        item.unit_name = new_name
         item.unit_display_text = request.form.get('unit_display_text')
         item.author = request.form.get('author')
         item.vers_number = (item.vers_number or 1) + 1
@@ -198,7 +242,12 @@ def view_response_type(guid):
 def edit_response_type(guid):
     item = ResponseType.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
-        item.response_type_name = request.form.get('response_type_name', item.response_type_name).strip()
+        new_name = request.form.get('response_type_name', item.response_type_name).strip()
+        refusal = _refuse_taken_name(new_name, ResponseType, 'response_type_name',
+                                     item, 'lookup_web.edit_response_type')
+        if refusal is not None:
+            return refusal
+        item.response_type_name = new_name
         item.response_type_display_text = request.form.get('response_type_display_text')
         item.author = request.form.get('author')
         item.vers_number = (item.vers_number or 1) + 1
@@ -260,7 +309,12 @@ def view_concept_type(guid):
 def edit_concept_type(guid):
     item = ConceptType.query.filter_by(guid=guid).first_or_404()
     if request.method == 'POST':
-        item.concept_type_name = request.form.get('concept_type_name', item.concept_type_name).strip()
+        new_name = request.form.get('concept_type_name', item.concept_type_name).strip()
+        refusal = _refuse_taken_name(new_name, ConceptType, 'concept_type_name',
+                                     item, 'lookup_web.edit_concept_type')
+        if refusal is not None:
+            return refusal
+        item.concept_type_name = new_name
         item.concept_type_display_text = request.form.get('concept_type_display_text')
         item.author = request.form.get('author')
         item.vers_number = (item.vers_number or 1) + 1

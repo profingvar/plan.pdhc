@@ -837,3 +837,59 @@ shape one field over) and #923 (#875 step 3: snomed's URL is a BROWSER link
 with query parameters, not an identifier, and loinc/atc are not the registered
 URIs either — measured against 39/23/6 files platform-wide that do use the
 registered forms).
+
+## #922 — renaming a lookup row answers 409, not 500 (2026-11-04)
+
+The asymmetry #875 left visible, closed. After #875 `canonical_lib_url` was
+guarded on all four paths and answered 409 while `canonical_lib_name` was
+guarded on two and answered 500 — a reader of lookup_tables.py saw the URL
+check beside an unguarded name assignment and would reasonably assume the
+name was handled elsewhere.
+
+SCOPE WAS TEN PLACES, NOT ONE. The ticket reported it for CanonicalLib and
+noted the other lookup tables were unmeasured. Measured: seven models carry a
+UNIQUE name column, the JSON API is a generic factory serving SIX of them (one
+fix covers all six), and the HTML admin has create+edit for FOUR. Every one
+followed the same shape — an inline uniqueness check on CREATE, nothing on
+UPDATE.
+
+- planp/app/api/lookup_tables.py — the factory's `update_item` now checks.
+  Covers canonical-libs, concept-types, response-types, units, plandef-types
+  and intended-uses in one place.
+- planp/app/routes/lookup_tables.py — a module-level `_refuse_taken_name`
+  holding the reasoning once, called by all four edit routes. Four
+  near-identical five-line blocks would have drifted.
+
+THE FIX IS NOT A NEW HELPER, AND THAT IS THE POINT.
+`NameUniquenessService.validate_name_for_manual_entry` already existed, takes
+`exclude_guid`, returns a message, and is called on SIX other paths
+(routes/concepts ×2, routes/values, routes/valuesets, api/plandefinitions ×2).
+`lookup_tables` was the exception on both its paths — it rolled its own inline
+check on create and had none on update. So this is the exception being brought
+into line, not a seventh way of doing it. The CREATE paths keep their inline
+checks: replacing those is a refactor #922 did not ask for, and it is recorded
+here so the next reader knows the divergence was seen rather than missed.
+
+- planp/tests/test_lookup_name_conflict_922.py — NEW, 36 tests. Parametrised
+  over all six API endpoints and all four HTML edit routes, because the defect
+  was reported for one model and existed in ten places. Each refusal is paired
+  with an acceptance control, and each asserts `status_code != 500` explicitly
+  — that was the defect, and a 409 that half-applied the rename would be worse
+  than the 500, so the row is re-read after every refusal.
+
+MUTATION-TESTED, and one result corrected a prediction of mine. Removing the
+API check reproduces the ticket's exact `IntegrityError: UNIQUE constraint
+failed`; ignoring the HTML refusal does the same; dropping BOTH self-guards
+fails all six same-name controls. I expected dropping ONLY the unchanged-name
+short-circuit to go uncaught, since `exclude_guid` makes it redundant for
+correctness — it is caught, by the dedicated test that asserts the helper does
+not query the database for an unchanged name. The prediction was wrong and the
+suite was better than I credited it.
+
+One test of mine was wrong and is recorded rather than quietly fixed: it
+called `_refuse_taken_name` bare and raised "Working outside of request
+context", because the refusal path calls `flash()`. The helper was correct;
+the test needed `app.test_request_context()`. The two passing helper cases
+return before the flash, which is why only one failed.
+
+Suite: 527 passed. NOT DEPLOYED YET — two source files, no migration.
