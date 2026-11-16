@@ -2130,3 +2130,5 @@ and B-glucos 3-10 reviewed and kept. New CLI `flask plandef-set-range` changes
 the authoritative transactions row, the action JSON copy and fhir_data together,
 bumps the minor version and records reviewer + last_review_date; refuses an
 activity shared with another plan. pytest: 659 passed.
+
+## #942 (2026-11-16): the canonical URI format is owned by termbank.pdhc (app/canonical_uri.py + conformance/canonical_uri_cases.json); the concept URN by plan.pdhc (planp/app/concept_urn.py + conformance/concept_urn_cases.json). Consumers keep byte-identical corpus copies in their tests; tools/check_canonical_uri_conformance.py in the workspace fails on drift or on a literal that breaks the grammar.
