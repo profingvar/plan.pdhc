@@ -253,6 +253,10 @@ def _do_lookup(system: str, code: str):
     # Delegate to termbank — pass the canonical_lib NAME, which is what
     # the existing TermbankClient + the termbank service itself use.
     client = current_app.termbank_client
+    if not client.configured:
+        return operation_outcome(
+            'error', 'not-supported',
+            'TERMBANK_BASE_URL is not configured on plan.pdhc (#955)', 503)
     data = client.lookup(lib.canonical_lib_name, code)
     if data is None:
         return operation_outcome(

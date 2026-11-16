@@ -259,6 +259,10 @@ def termbank_concept_proxy(system: str, code: str):
     the TermbankClient's in-process TTL.
     """
     client = current_app.termbank_client
+    if not client.configured:
+        return _operation_outcome(
+            "error", "not-supported",
+            "TERMBANK_BASE_URL is not configured on plan.pdhc (#955).", 503)
     data = client.lookup(system, code)
     if data is None:
         return _operation_outcome(

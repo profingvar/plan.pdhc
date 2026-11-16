@@ -20,6 +20,9 @@ def app():
     os.environ['SSO_CLIENT_ID'] = 'test-client-id'
     os.environ['SSO_CLIENT_SECRET'] = 'test-client-secret'
     os.environ['SSO_CALLBACK_URL'] = 'http://localhost:9030/api/v1/auth/callback'
+    # #955: the client has no default URL any more; these tests relied on the
+    # fabricated one without knowing it. A non-resolving test name, never a real host.
+    os.environ['TERMBANK_BASE_URL'] = 'http://termbank-test:9012'
 
     application = create_app(testing=True)
     application.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'

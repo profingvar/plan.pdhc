@@ -1192,3 +1192,11 @@ gated lookup — which is the whole point; the LIST route still omits it; #925's
 gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
 `PUT` on the narrow read is 405. Sibling smoke 10/10. Pre-deploy: 48 of 48
 `app/*.py` identical host-to-container, 16 of 16 requirements pinned.
+
+## 2026-11-16 — #955: an unset TERMBANK_BASE_URL is refused by name, never a fabricated public URL
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/services/termbank_client.py — DEFAULT_BASE_URL removed; configured property; lookup/search/health refuse without a request
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/__init__.py — startup ERROR naming the variable when unset
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/terminology.py, /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_codesystem.py — lookup proxies answer 503 naming TERMBANK_BASE_URL
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/static/js/termbank_search_picker.js — widget message for termbank_not_configured
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/conftest.py — explicit test TERMBANK_BASE_URL (7 tests relied on the fabricated default)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_termbank_unset_955.py (NEW)

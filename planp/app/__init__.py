@@ -153,6 +153,11 @@ def create_app(testing=False):
     # Termbank HTTP client — one instance per app, with TTL cache
     from app.services.termbank_client import TermbankClient
     app.termbank_client = TermbankClient()
+    if not app.termbank_client.configured:
+        # #955: say it once, at startup, by name -- not as a widget that
+        # quietly finds nothing.
+        app.logger.error("TERMBANK_BASE_URL is not configured: termbank "
+                         "lookups and the New Concept search are disabled")
 
     # Register web UI blueprints
     from app.routes.main import main_bp

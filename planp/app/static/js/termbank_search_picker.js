@@ -142,6 +142,8 @@
       var msg;
       if (err === "timeout") {
         msg = "Termbank slow — try again.";
+      } else if (err === "termbank_not_configured") {
+        msg = "Termbank is not configured on this server (TERMBANK_BASE_URL).";
       } else if (err === "unreachable") {
         msg = "Termbank unavailable.";
       } else if (typeof err === "string" && err.indexOf("http_") === 0) {

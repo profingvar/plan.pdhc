@@ -28,7 +28,13 @@ from app.services.session_headers import outbound_session_headers
 log = logging.getLogger(__name__)
 
 
-DEFAULT_BASE_URL = "https://termbank.pdhc.se"
+# #955: there is NO default base URL. One used to read
+# "https://termbank.pdhc.se" -- a name with no vhost (termbank is a loopback
+# exception, CLAUDE.md section 7) -- so a lost TERMBANK_BASE_URL silently
+# became "the New Concept widget finds no codes" at the next cold start.
+# Unset now reads as unset: no call is made, and every answer names the
+# cause (#833's rule, which deleted xlate's fabricated default).
+NOT_CONFIGURED = "termbank_not_configured"
 # 10s, up from the original 5s. The /search ranking join on a 4.7M-row
 # concept_designations table can sit just under 1s P50 with pg_trgm
 # indexes, but cold-cache or contended queries occasionally cross the
@@ -51,13 +57,16 @@ class TermbankClient:
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
         cache_ttl: float = DEFAULT_CACHE_TTL_SECONDS,
     ) -> None:
-        self.base_url = (base_url or os.environ.get(
-            "TERMBANK_BASE_URL", DEFAULT_BASE_URL
-        )).rstrip("/")
+        raw = base_url or os.environ.get("TERMBANK_BASE_URL") or ""
+        self.base_url = raw.strip().rstrip("/") or None
         self.timeout = timeout
         self.cache_ttl = cache_ttl
         self._cache: dict[tuple, tuple[float, Any]] = {}
         self._lock = Lock()
+
+    @property
+    def configured(self) -> bool:
+        return self.base_url is not None
 
     # ----- public API ----------------------------------------------------
     def lookup(self, system: str, code: str) -> dict | None:
@@ -65,6 +74,9 @@ class TermbankClient:
 
         Cached per ``(system, code)`` for ``cache_ttl`` seconds.
         """
+        if not self.configured:
+            log.error("termbank lookup refused: TERMBANK_BASE_URL is not configured")
+            return None
         key = ("lookup", system, code)
         cached = self._get_cached(key)
         if cached is not self._MISS:
@@ -110,6 +122,9 @@ class TermbankClient:
         """
         if not q.strip():
             return {"query": "", "system": system, "count": 0, "results": []}
+        if not self.configured:
+            log.error("termbank search refused: TERMBANK_BASE_URL is not configured")
+            return {"error": NOT_CONFIGURED, "results": [], "query": q}
         key = ("search", q, system, int(limit))
         cached = self._get_cached(key)
         if cached is not self._MISS:
@@ -148,6 +163,8 @@ class TermbankClient:
 
     def health(self) -> dict | None:
         """Best-effort health probe — returns termbank's /health body or None."""
+        if not self.configured:
+            return None
         try:
             resp = requests.get(
                 f"{self.base_url}/health",
