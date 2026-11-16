@@ -26,6 +26,17 @@ def test_loader_is_not_a_known_service():
         # and not admin — which only became a meaningful distinction after
         # #912 made the key path compare the role at all.
         'alert.pdhc': ('ALERT_PDHC_SERVICE_KEY', 'read_write'),
+        # #931 (2026-11-16): the read consumers, read_only each, one identity
+        # per running instance. Still pinned exactly: a new caller must be
+        # added HERE too, visibly.
+        'request.pdhc': ('REQUEST_PDHC_SERVICE_KEY', 'read_only'),
+        'cdr.pdhc': ('CDR_PDHC_SERVICE_KEY', 'read_only'),
+        'cdr2.pdhc': ('CDR2_PDHC_SERVICE_KEY', 'read_only'),
+        'cdr3.pdhc': ('CDR3_PDHC_SERVICE_KEY', 'read_only'),
+        'dashboard.pdhc': ('DASHBOARD_PDHC_SERVICE_KEY', 'read_only'),
+        'onboard.pdhc': ('ONBOARD_PDHC_SERVICE_KEY', 'read_only'),
+        'contract.pdhc': ('CONTRACT_PDHC_SERVICE_KEY', 'read_only'),
+        'analyse.pdhc': ('ANALYSE_PDHC_SERVICE_KEY', 'read_only'),
     }
 
 

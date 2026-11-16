@@ -2111,3 +2111,14 @@ Zero concepts bind to it, so it never appeared in an expansion and no consumer
 could have been affected. It was changed anyway because its old value was a
 third-party browser tool — the same defect class as snomed's, and the one a
 query-string check cannot see.
+
+## #931 — plan's machine-auth door (2026-11-16)
+Stage 1 of 3. plan now admits eight READ consumers by service key (`read_only`,
+one identity per running instance; cdr1/2/3 separately). Reads stay OPEN: the
+new `plan.read_shadow` WARNING log records every API read that arrives with no
+credential or an invalid key, so the reads can be gated on evidence, not a guess
+(#902 pattern). Also fixed: the rate-limit bypass and per-service bucket trusted
+a header that merely NAMED a known service; both now require a verified key.
+Stage 2: each consumer sends X-Source-Service + X-Service-Key (PLAN_SERVICE_KEY).
+Stage 3 (new ticket): flip public_read once the shadow log is quiet.
+pytest: 650 passed.

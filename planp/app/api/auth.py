@@ -66,6 +66,21 @@ KNOWN_SERVICES = {
     # behind a public `$expand`). Either one would have made this line a
     # mistake; both are closed.
     'alert.pdhc': ('ALERT_PDHC_SERVICE_KEY', 'read_write'),
+    # #931: the READ consumers. Until these existed plan had no usable
+    # machine-auth door, so every sibling read it unauthenticated by
+    # necessity and the open reads were scaffolding for that absence.
+    # `read_only` each, and one identity per running instance — cdr1/2/3
+    # share a codebase but not a key, so a rotation or a log line names
+    # one CDR rather than three. Who reads what was measured from plan's
+    # nginx log and each client's code (2026-11-16), not assumed.
+    'request.pdhc': ('REQUEST_PDHC_SERVICE_KEY', 'read_only'),
+    'cdr.pdhc': ('CDR_PDHC_SERVICE_KEY', 'read_only'),
+    'cdr2.pdhc': ('CDR2_PDHC_SERVICE_KEY', 'read_only'),
+    'cdr3.pdhc': ('CDR3_PDHC_SERVICE_KEY', 'read_only'),
+    'dashboard.pdhc': ('DASHBOARD_PDHC_SERVICE_KEY', 'read_only'),
+    'onboard.pdhc': ('ONBOARD_PDHC_SERVICE_KEY', 'read_only'),
+    'contract.pdhc': ('CONTRACT_PDHC_SERVICE_KEY', 'read_only'),
+    'analyse.pdhc': ('ANALYSE_PDHC_SERVICE_KEY', 'read_only'),
 }
 
 #: Shared by both branches of `requires_role`, so the service path and the

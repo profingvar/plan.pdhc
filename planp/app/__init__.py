@@ -23,25 +23,26 @@ def _limiter_key():
     against each other through the shared Docker bridge IP). For SSO /
     anonymous requests we fall back to the remote address.
     """
-    from flask import request
-    from app.api.auth import KNOWN_SERVICES
-    src = request.headers.get('X-Source-Service', '').strip()
-    if src and src in KNOWN_SERVICES and request.headers.get('X-Service-Key'):
-        return f"service:{src}"
+    # #931: only a VERIFIED key earns a per-service bucket; a forged name
+    # used to buy a fresh bucket per name it guessed.
+    from flask import g
+    from app.api.auth import _service_key_outcome
+    if isinstance(_service_key_outcome(), str):
+        return f"service:{g.source_service}"
     return get_remote_address()
 
 
 def _service_caller():
-    """Return True when the caller looks like a trusted sibling service —
-    used by `exempt_when` on the burst-prone lookup blueprints to lift
-    the rate-limit for canonicaliser warmup. Validity of the key itself
-    is enforced later by `requires_role`'s service-key path; this only
-    decides whether to BYPASS the limiter, not whether the caller is
-    actually trusted."""
-    from flask import request
-    from app.api.auth import KNOWN_SERVICES
-    src = request.headers.get('X-Source-Service', '').strip()
-    return bool(src and src in KNOWN_SERVICES and request.headers.get('X-Service-Key'))
+    """Return True when the caller IS a trusted sibling service — its key
+    verified, not merely present.
+
+    #931: this used to check only that the headers NAMED a known service
+    and carried some key, so `X-Source-Service: sim.pdhc` plus any string
+    lifted the rate limit for anyone. Harmless-looking while the dict held
+    one unset entry; #931 adds eight read consumers, which would have made
+    the hole eight names wide. The compare is constant-time and cheap."""
+    from app.api.auth import _service_key_outcome
+    return isinstance(_service_key_outcome(), str)
 
 
 limiter = Limiter(key_func=_limiter_key, default_limits=['200/minute'])
@@ -76,6 +77,10 @@ def create_app(testing=False):
     def _service_caller_bypass():
         return _service_caller()
     CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+    # #931: record API reads that still arrive with no credential.
+    from app.api.read_shadow import init_read_shadow
+    init_read_shadow(app)
 
     # Session config for SSO token storage
     app.permanent_session_lifetime = timedelta(hours=24)

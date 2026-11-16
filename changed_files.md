@@ -1200,3 +1200,11 @@ gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/static/js/termbank_search_picker.js — widget message for termbank_not_configured
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/conftest.py — explicit test TERMBANK_BASE_URL (7 tests relied on the fabricated default)
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_termbank_unset_955.py (NEW)
+
+## #931 — machine-auth door for plan's read consumers + read shadow log (2026-11-16)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/auth.py — KNOWN_SERVICES: eight read_only identities (request, cdr, cdr2, cdr3, dashboard, onboard, contract, analyse)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/config.py — the eight *_PDHC_SERVICE_KEY variables mapped
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/read_shadow.py (NEW) — logs API reads with no credential / an invalid key; blocks nothing
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/__init__.py — rate-limit bypass and bucket require a VERIFIED key, not a named one; shadow hook registered
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/.env.example — the eight keys documented
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_machine_read_door_931.py (NEW); /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_loader_identity_retired.py — allowlist pin updated

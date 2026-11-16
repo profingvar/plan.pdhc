@@ -223,6 +223,16 @@ class Config:
     # variable that is only in `.env` resolves to '' and the caller is refused
     # with a correct-looking `.env`. Mapping it here is the whole wire.
     ALERT_PDHC_SERVICE_KEY = os.environ.get('ALERT_PDHC_SERVICE_KEY', '')
+    # #931: one key per read consumer; each must be mapped HERE as well as
+    # named in KNOWN_SERVICES (see the alert comment above for why).
+    REQUEST_PDHC_SERVICE_KEY = os.environ.get('REQUEST_PDHC_SERVICE_KEY', '')
+    CDR_PDHC_SERVICE_KEY = os.environ.get('CDR_PDHC_SERVICE_KEY', '')
+    CDR2_PDHC_SERVICE_KEY = os.environ.get('CDR2_PDHC_SERVICE_KEY', '')
+    CDR3_PDHC_SERVICE_KEY = os.environ.get('CDR3_PDHC_SERVICE_KEY', '')
+    DASHBOARD_PDHC_SERVICE_KEY = os.environ.get('DASHBOARD_PDHC_SERVICE_KEY', '')
+    ONBOARD_PDHC_SERVICE_KEY = os.environ.get('ONBOARD_PDHC_SERVICE_KEY', '')
+    CONTRACT_PDHC_SERVICE_KEY = os.environ.get('CONTRACT_PDHC_SERVICE_KEY', '')
+    ANALYSE_PDHC_SERVICE_KEY = os.environ.get('ANALYSE_PDHC_SERVICE_KEY', '')
 
     # Upstream services
     CONTRACT_BASE_URL = os.environ.get('CONTRACT_BASE_URL', 'http://localhost:9021')
