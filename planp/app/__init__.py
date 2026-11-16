@@ -271,6 +271,25 @@ def _register_cli(app):
     import json as _json
     import click
 
+    @app.cli.command('plandef-set-range')
+    @click.argument('plandef_guid')
+    @click.argument('concept_guid')
+    @click.option('--min', 'lo', type=float, required=True)
+    @click.option('--max', 'hi', type=float, required=True)
+    @click.option('--reviewer', required=True, help='The clinician who decided the limit.')
+    @click.option('--apply', 'do_apply', is_flag=True, help='Write. Omit for a dry run.')
+    def plandef_set_range_cmd(plandef_guid, concept_guid, lo, hi, reviewer, do_apply):
+        """Change one transaction's reference range, with review recorded (#987)."""
+        from app.services.plandef_range import set_range, RangeChangeRefused
+        try:
+            r = set_range(plandef_guid, concept_guid, lo, hi, reviewer=reviewer, apply=do_apply)
+        except RangeChangeRefused as e:
+            click.echo(f'REFUSED: {e}', err=True)
+            raise SystemExit(1)
+        click.echo(_json.dumps(r, default=str))
+        if not do_apply:
+            click.echo('dry run -- nothing written. Re-run with --apply.')
+
     @app.cli.command('import-concepts')
     @click.argument('path', type=click.Path(exists=True, dir_okay=False))
     @click.option('--operator', default=None,

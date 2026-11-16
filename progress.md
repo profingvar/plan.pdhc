@@ -2123,3 +2123,10 @@ Stage 2: each consumer sends X-Source-Service + X-Service-Key (PLAN_SERVICE_KEY)
 Stage 3 (new ticket): flip public_read once the shadow log is quiet.
 pytest: 650 passed.
 sim.pdhc narrowed to read_only (sim only GETs plan; the write grant was sized for the retired loader). pytest: 651 passed.
+
+## #987 — bp_diastolic 80-120 corrected to 60-90 (2026-11-16)
+Operator (responsible clinician) decided: diastolic 60-90 mmHg; systolic 100-160
+and B-glucos 3-10 reviewed and kept. New CLI `flask plandef-set-range` changes
+the authoritative transactions row, the action JSON copy and fhir_data together,
+bumps the minor version and records reviewer + last_review_date; refuses an
+activity shared with another plan. pytest: 659 passed.

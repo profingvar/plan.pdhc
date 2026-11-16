@@ -1209,3 +1209,8 @@ gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/.env.example — the eight keys documented
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_machine_read_door_931.py (NEW); /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_loader_identity_retired.py — allowlist pin updated
 - planp/app/api/auth.py — #931: sim.pdhc narrowed read_write -> read_only; planp/tests/test_service_key_role_912.py subject sim -> alert (read_write)
+
+## #987 — reviewed correction of a clinical limit (2026-11-16)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/services/plandef_range.py (NEW) — change one transaction's range in all three copies; review recorded; shared activity refused
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/__init__.py — NEW `flask plandef-set-range` (dry run default)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_plandef_set_range_987.py (NEW)
