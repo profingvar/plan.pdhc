@@ -37,20 +37,22 @@ import pytest
 
 from app.api.auth import KNOWN_SERVICES, ROLE_LEVELS, _service_key_outcome
 
-SOURCE = 'sim.pdhc'
-KEY = 'sim-key-for-912-tests'
+# #931 narrowed sim.pdhc to read_only; alert.pdhc is the read_write identity
+# these tests need, so it is the subject now. The assertions are unchanged.
+SOURCE = 'alert.pdhc'
+KEY = 'alert-key-for-912-tests'
 
 
 @pytest.fixture
 def keyed(app):
-    """The sim key configured, so the key path is live."""
-    old = app.config.get('SIM_PDHC_SERVICE_KEY')
-    app.config['SIM_PDHC_SERVICE_KEY'] = KEY
+    """The alert key configured, so the key path is live."""
+    old = app.config.get('ALERT_PDHC_SERVICE_KEY')
+    app.config['ALERT_PDHC_SERVICE_KEY'] = KEY
     yield app
     if old is None:
-        app.config.pop('SIM_PDHC_SERVICE_KEY', None)
+        app.config.pop('ALERT_PDHC_SERVICE_KEY', None)
     else:
-        app.config['SIM_PDHC_SERVICE_KEY'] = old
+        app.config['ALERT_PDHC_SERVICE_KEY'] = old
 
 
 def _hdr(key=KEY, source=SOURCE):
@@ -95,8 +97,8 @@ class TestTheOutcomeResolvesARole:
     def test_an_UNSET_configured_key_admits_nobody(self, app):
         """Even when the caller sends an empty key, which is what a
         half-configured sibling sends."""
-        old = app.config.get('SIM_PDHC_SERVICE_KEY')
-        app.config['SIM_PDHC_SERVICE_KEY'] = ''
+        old = app.config.get('ALERT_PDHC_SERVICE_KEY')
+        app.config['ALERT_PDHC_SERVICE_KEY'] = ''
         try:
             with app.test_request_context('/', headers=_hdr(key='')):
                 assert _service_key_outcome() is False
@@ -104,9 +106,9 @@ class TestTheOutcomeResolvesARole:
                 assert _service_key_outcome() is False
         finally:
             if old is None:
-                app.config.pop('SIM_PDHC_SERVICE_KEY', None)
+                app.config.pop('ALERT_PDHC_SERVICE_KEY', None)
             else:
-                app.config['SIM_PDHC_SERVICE_KEY'] = old
+                app.config['ALERT_PDHC_SERVICE_KEY'] = old
 
 
 class TestNothingGrantsAdmin:

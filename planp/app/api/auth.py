@@ -51,7 +51,10 @@ def _phases(blob):
 #: granted it visibly, which is the point of naming a role rather than
 #: returning a boolean.
 KNOWN_SERVICES = {
-    'sim.pdhc': ('SIM_PDHC_SERVICE_KEY', 'read_write'),
+    # #931: narrowed read_write -> read_only. Every sim call to plan is a GET
+    # (plandef_client, synthea_obs); the writes this grant was sized for came
+    # from load_to_plan.py, dead since loader.pdhc was retired (#736).
+    'sim.pdhc': ('SIM_PDHC_SERVICE_KEY', 'read_only'),
     # alert.pdhc's step 2.b-ii: registers the nineteen UMI selections — 19
     # ValueSets, 219 memberships, 218 distinct codes — and then asks
     # `$validate-code` per candidate on its own inflow gate.

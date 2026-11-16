@@ -1208,3 +1208,4 @@ gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/__init__.py — rate-limit bypass and bucket require a VERIFIED key, not a named one; shadow hook registered
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/.env.example — the eight keys documented
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_machine_read_door_931.py (NEW); /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_loader_identity_retired.py — allowlist pin updated
+- planp/app/api/auth.py — #931: sim.pdhc narrowed read_write -> read_only; planp/tests/test_service_key_role_912.py subject sim -> alert (read_write)

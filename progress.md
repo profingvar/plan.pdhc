@@ -2122,3 +2122,4 @@ a header that merely NAMED a known service; both now require a verified key.
 Stage 2: each consumer sends X-Source-Service + X-Service-Key (PLAN_SERVICE_KEY).
 Stage 3 (new ticket): flip public_read once the shadow log is quiet.
 pytest: 650 passed.
+sim.pdhc narrowed to read_only (sim only GETs plan; the write grant was sized for the retired loader). pytest: 651 passed.

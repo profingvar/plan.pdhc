@@ -21,7 +21,8 @@ def test_loader_is_not_a_known_service():
     # returned before `min_role` was ever compared. The ALLOWLIST is what this
     # test is about and is unchanged: one entry, and it is not loader.
     assert KNOWN_SERVICES == {
-        'sim.pdhc': ('SIM_PDHC_SERVICE_KEY', 'read_write'),
+        # #931: read_only — sim only reads plan.
+        'sim.pdhc': ('SIM_PDHC_SERVICE_KEY', 'read_only'),
         # alert.pdhc added 2026-11-03 for its step 2.b-ii, with read_write
         # and not admin — which only became a meaningful distinction after
         # #912 made the key path compare the role at all.

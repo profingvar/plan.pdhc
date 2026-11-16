@@ -125,3 +125,8 @@ def test_a_FORGED_service_name_does_not_lift_the_rate_limit(app, keys):
     with app.test_request_context('/api/v1/concepts', headers=_h('request.pdhc')):
         assert _service_caller() is True
         assert _limiter_key() == 'service:request.pdhc'
+
+
+def test_sim_is_narrowed_to_read_only():
+    """sim only reads plan; its read_write grant was sized for the retired loader."""
+    assert KNOWN_SERVICES['sim.pdhc'][1] == 'read_only'
