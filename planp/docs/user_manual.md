@@ -120,6 +120,33 @@ blank is a decision, while `snomd` is a typo, and quietly turning a typo into a
 local binding would attach a wrong terminology claim to clinical data. So the
 importer accepts silence and refuses nonsense.
 
+#### Categories, export, and what an import left behind (#951)
+
+A concept can belong to **several categories**, for example the guideline its
+terms came from. Create a category first (Lookup → Concept categories); an
+import never invents one, so a typo cannot become a category.
+
+- **Tag a whole file:** give the category on the import page (or
+  `--category` on the command line). Every row without its own value gets it.
+  If the category does not exist, the whole file is refused.
+- **Tag per row:** add a `category` column; several names are separated by
+  `;`. A row's own value wins over the file's. An unknown name rejects just
+  that row.
+- An import only **adds** categories. To remove one, edit the concept.
+- `concept_explain` can now be imported too. Use it for where the term came
+  from, such as a guideline section.
+- **Find by category:** `?category=<name>` on the concept list.
+- **Export:** `GET /api/v1/concepts/export.xlsx` (login required) or `flask
+  export-concepts out.xlsx`. The file has the import format, so you can edit it
+  and import it again. Re-importing it unchanged changes nothing: no row is
+  counted as updated and no version moves.
+- **What did a file do?** Every real import is recorded permanently: who ran
+  it, the file and its checksum, and the counts. `GET /api/v1/concept-imports`
+  lists the imports; a single import also lists the concepts it created.
+
+Since 2026-11-17 the concept type `Diagnsosis ICD10` is called **Diagnosis**.
+It is the same type with the same GUID.
+
 #### Loading a whole catalogue in one file
 
 For a full instrument — all its concepts, value sets and values together —

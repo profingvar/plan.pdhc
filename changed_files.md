@@ -1226,4 +1226,4 @@ gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/routes/concepts.py; app/templates/concepts/{import,create,edit,view}.html — category on the forms
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/__init__.py — `--category` on import-concepts; NEW `flask export-concepts`
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_concept_categories_951.py (NEW); tests/test_concept_import.py, tests/test_lookup_read_posture_925.py — updated
-- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/concept_import.md, docs/technical.md
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/concept_import.md, docs/technical.md, docs/user_manual.md
