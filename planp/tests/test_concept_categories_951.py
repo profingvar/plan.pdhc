@@ -309,3 +309,17 @@ def test_web_CREATE_and_EDIT_set_categories_and_an_empty_selection_clears(app, c
     with app.app_context():
         assert _cats('web-951') == []
     assert 'Categories' in client.get(f'/concepts/{guid}').get_data(as_text=True)
+
+
+def test_a_LEGACY_name_round_trips_but_a_new_one_must_follow_the_grammar(app):
+    """Production 2026-11-17: 58 of 107 concepts have pre-rule names; the
+    round trip rejected all of them. An existing name is a key, a new one is not."""
+    with app.app_context():
+        lib = CanonicalLib.query.filter_by(canonical_lib_name='local').one().guid
+        db.session.add(Concept(concept_name='bp_systolic', canonical_lib=lib, concept_display_text='Systolic'))
+        db.session.commit()
+        buf = build_xlsx(Concept.query.filter_by(concept_name='bp_systolic').all())
+        r = validate_and_import(parse_xlsx(buf), operator='t', filename='rt.xlsx', sha256='y')
+        assert (r['summary']['n_rejected'], r['summary']['n_created']) == (0, 0), r['rejected']
+        r2 = _imp(f"{HDR}\nbp_diastolic,Diastolic,,,measurement,numeric,L/min,,\n")
+        assert r2['summary']['n_rejected'] == 1 and 'lowercase' in r2['rejected'][0]['reason']

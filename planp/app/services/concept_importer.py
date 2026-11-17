@@ -323,7 +323,12 @@ def _apply_row(raw, row_idx, *, import_guid=None):
     name = _clean(raw.get('concept_name'))
     if not name:
         raise ValueError('concept_name is required')
-    if not CONCEPT_NAME_RE.match(name):
+    # The grammar governs names an import CREATES. A row naming an existing
+    # concept exactly is that concept's key, not a new name: 58 of the 107
+    # live concepts (measured 2026-11-17) predate the rule ('bp_systolic',
+    # 'Asthma finding'), and holding them to it made the #951 export ->
+    # re-import round trip reject over half the catalogue.
+    if not CONCEPT_NAME_RE.match(name) and Concept.query.filter_by(concept_name=name).first() is None:
         raise ValueError(
             f'concept_name must be lowercase letters, digits, and hyphens '
             f'(got {name!r})'
