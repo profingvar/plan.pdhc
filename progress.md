@@ -2132,3 +2132,39 @@ bumps the minor version and records reviewer + last_review_date; refuses an
 activity shared with another plan. pytest: 659 passed.
 
 ## #942 (2026-11-16): the canonical URI format is owned by termbank.pdhc (app/canonical_uri.py + conformance/canonical_uri_cases.json); the concept URN by plan.pdhc (planp/app/concept_urn.py + conformance/concept_urn_cases.json). Consumers keep byte-identical corpus copies in their tests; tools/check_canonical_uri_conformance.py in the workspace fails on drift or on a literal that breaks the grammar.
+
+## #984 §1 — diagnosis-review PlanDefinition step (2026-11-17)
+Contract: `~/T7_sidewinder/plans/984_diagnosis_review_contract.md` §1 (shapes
+unchanged). New action kind `is_diagnosis_review` next to form actions:
+`code_scope` (1..n ICD-11 MMS stem-code prefixes) is validated on all four save
+paths (web create/edit, API POST/PUT) before anything is mutated and refused by
+name (flash / HTTP 422 `diagnosis_review_invalid`, not admin-overridable). A
+review step may not be a form, may not carry transactions, and may not name a
+non-Practitioner performer; a `code_scope` on any other action is refused rather
+than ignored. FHIR export exactly as the contract (type `update`, icd11
+ActivityDefinition canonical, participant practitioner, one
+`diagnosis-code-scope` extension per prefix, timingTiming from the same helper
+as forms). Builder: "Diagnosgenomgång (ICD-11)" step with a Kodområde input and
+an in-browser check whose regex is pinned to the Python one.
+
+Interpretation: the contract's regex admits a leading `X`, its prose excludes
+extension codes `X…`, so `X`-prefixes are refused explicitly in addition to
+the regex.
+
+Tests (`planp/tests/test_diagnosis_review_984.py`, 51): grammar good/bad
+(incl. `&`, `/`, `X…`, wildcards, lower case, spaces, I/O, empty list, missing,
+non-list, non-string), form/performer/transaction/flag/stray-scope refusals,
+FHIR shape (exact dict), timing parity with forms (count, duration, once),
+form export unchanged by the refactor, builder offers the step, editor save →
+reload → re-save keeps the step, editor refuses bad/empty scope and changes
+nothing, API create/read/update round-trip, API 422, reload keeps the step
+even when the action carries its Activity id.
+
+Mutation controls (each restored, sha256 verified identical afterwards):
+- accept empty scope → 2 tests fail;
+- drop the extension → 3 tests fail;
+- enrich review actions from Activity on builder load → first survived (no
+  test stored an `id`); added the id round-trip test, now 1 fails.
+
+pytest: 699 → 750 passed. Results: `results/2026-11-17T12-28-10Z_results/`.
+Not committed, not deployed.

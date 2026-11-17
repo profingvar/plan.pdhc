@@ -15,6 +15,7 @@ from app.models.concept_models import (
 from app.models.forms_models import FormDefinition, Questionnaire
 from app.services.save_guard import guard_plandef, SaveBlocked  # #521 GA-5
 from app.services.fhir_service import FHIRService
+from app.services import diagnosis_review  # #984
 from app.services.name_uniqueness import NameUniquenessService
 
 plandef_web_bp = Blueprint('plandefinitions_web', __name__, url_prefix='/plandefinitions')
@@ -61,7 +62,9 @@ def _build_existing_data(plandef):
     # For regular (non-form) actions, enrich with relational Activity data
     enriched = []
     for act_data in actions:
-        if act_data.get('is_form'):
+        if act_data.get('is_form') or diagnosis_review.is_diagnosis_review(act_data):
+            # Form and diagnosis-review (#984) actions are stored whole in the
+            # action JSON; enriching from Activity would drop their own keys.
             enriched.append(act_data)
         else:
             # Try to match with relational Activity by id/guid
@@ -149,6 +152,14 @@ def create_plandef():
         actions_data = json.loads(action_json)
     except json.JSONDecodeError:
         flash('Invalid JSON in goals or actions.', 'error')
+        return redirect(url_for('plandefinitions_web.builder'))
+
+    # #984 — diagnosis-review steps: refused by name, never dropped. Not
+    # overridable (unlike GA-5): a bad code scope would widen icd11's writes.
+    _dr_issues = diagnosis_review.validate_actions(actions_data)
+    if _dr_issues:
+        for m in diagnosis_review.issue_messages(_dr_issues):
+            flash(m, 'error')
         return redirect(url_for('plandefinitions_web.builder'))
 
     # #521 GA-5 — fail-closed validation of the plan structure
@@ -319,6 +330,14 @@ def edit_plandef(fhir_id):
         actions_data = json.loads(action_json)
     except json.JSONDecodeError:
         flash('Invalid JSON.', 'error')
+        return redirect(url_for('plandefinitions_web.builder', plandef_id=fhir_id))
+
+    # #984 — validate diagnosis-review steps before anything is mutated.
+    _dr_issues = diagnosis_review.validate_actions(actions_data)
+    if _dr_issues:
+        db.session.rollback()
+        for m in diagnosis_review.issue_messages(_dr_issues):
+            flash(m, 'error')
         return redirect(url_for('plandefinitions_web.builder', plandef_id=fhir_id))
 
     plandef.goal = goal_json

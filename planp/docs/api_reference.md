@@ -639,6 +639,46 @@ Content-Type: application/json
 
 Partial updates are supported. If `goals` or `actions` are provided, existing relational rows are replaced. Orphaned activities (not referenced by any PlanDefinition) are cleaned up.
 
+### Diagnosis-review actions (#984)
+
+An entry in `actions` may be a **diagnosis-review step** — a clinician opens an
+icd11.pdhc diagnosis session limited to a code area. Stored shape (contract
+`plans/984_diagnosis_review_contract.md` §1):
+
+```json
+{"is_diagnosis_review": true,
+ "title": "Diagnosgenomgång diabetes",
+ "description": "…",
+ "code_scope": ["5A1"],
+ "timing_type": "repeat", "timing_frequency": 1, "timing_period": 1,
+ "timing_period_unit": "a", "timing_bounds_mode": null}
+```
+
+`code_scope` is required: 1..n ICD-11 MMS stem-code prefixes matching
+`^[0-9A-HJ-NP-Z][A-HJ-NP-Z0-9]{0,3}(\.[A-Z0-9]{1,2})?$`, and not starting with
+`X` (extension codes). No `&`, `/`, wildcards, spaces or lower case; nothing is
+trimmed or dropped server-side. Timing fields are the same as for form actions.
+
+On POST/PUT, an invalid step is refused **before anything is saved** with
+**HTTP 422** (not overridable — unlike GA-5's `override_validation`):
+
+```json
+{"error": "diagnosis_review_invalid", "error_count": 1,
+ "issues": [{"code": "E-DIAGREVIEW-SCOPE-INVALID", "action_index": 0,
+             "message": "action 1 ('…'): code_scope 'XS25' is an ICD-11 extension code (X...), not a stem code"}]}
+```
+
+| code | refused when |
+|---|---|
+| `E-DIAGREVIEW-SCOPE-MISSING` | `code_scope` absent or not a list |
+| `E-DIAGREVIEW-SCOPE-EMPTY` | `code_scope` is `[]` |
+| `E-DIAGREVIEW-SCOPE-INVALID` | an entry breaks the grammar (each bad entry named) |
+| `E-DIAGREVIEW-IS-FORM` | the step also has `is_form` or `form_guid` |
+| `E-DIAGREVIEW-PERFORMER` | `performer_type` is set to anything but `Practitioner` |
+| `E-DIAGREVIEW-TRANSACTIONS` | the step carries transactions |
+| `E-DIAGREVIEW-FLAG` | `is_diagnosis_review` is not a boolean |
+| `E-DIAGREVIEW-SCOPE-WITHOUT-REVIEW` | `code_scope` on an action that is not a diagnosis review |
+
 ### Delete
 
 ```
@@ -679,6 +719,26 @@ When a Questionnaire has been produced from a PlanDefinition (via `/api/v1/forms
 ```
 
 This allows downstream consumers (request.pdhc, 1177.pdhc) to discover which Questionnaires to issue to a patient as part of a care plan. Only the latest active version of each linked Questionnaire is included. These actions are appended after any manually authored actions.
+
+### Diagnosis-review steps (#984)
+
+A diagnosis-review action is exported as:
+
+```json
+{"title": "Diagnosgenomgång diabetes", "description": "…",
+ "type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/action-type",
+                      "code": "update", "display": "Update"}]},
+ "definitionCanonical": "https://icd11.pdhc.se/fhir/ActivityDefinition/diagnosis-review",
+ "participant": [{"type": "practitioner"}],
+ "extension": [{"url": "https://plan.pdhc.se/fhir/StructureDefinition/diagnosis-code-scope",
+                "valueString": "5A1"}],
+ "timingTiming": {"repeat": {"frequency": 1, "period": 1, "periodUnit": "a"}}}
+```
+
+One `diagnosis-code-scope` extension per prefix, in stored order.
+`timingTiming` is built by the same code as for form actions (absent for
+`once`/no timing). request.pdhc turns a step with this `definitionCanonical`
+into a clinician ServiceRequest (contract §2).
 
 ### Search (FHIR Bundle)
 

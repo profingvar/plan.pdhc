@@ -164,6 +164,7 @@
           <div class="button-group-sm">
             <button type="button" class="btn btn-primary btn-sm" onclick="addAction()"><i data-lucide="plus"></i> Add Action</button>
             <button type="button" class="btn btn-secondary btn-sm" onclick="addFormAction()"><i data-lucide="file-plus"></i> Add Form</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addDiagnosisReviewAction()"><i data-lucide="stethoscope"></i> Diagnosgenomgång (ICD-11)</button>
           </div>
         </div>
         <div id="actionsContainer"></div>
@@ -554,6 +555,124 @@ function addFormAction(data) {
   updatePreview();
 }
 
+// --- #984 Diagnosis review (ICD-11) step -------------------------------
+// Contract: plans/984_diagnosis_review_contract.md section 1. The server
+// validates authoritatively (app/services/diagnosis_review.py); this check
+// only gives the clinician the refusal before the round-trip.
+const DIAG_REVIEW_CANONICAL = 'https://icd11.pdhc.se/fhir/ActivityDefinition/diagnosis-review';
+const DIAG_SCOPE_EXT_URL = 'https://plan.pdhc.se/fhir/StructureDefinition/diagnosis-code-scope';
+const DIAG_STEM_PREFIX_RE = /^[0-9A-HJ-NP-Z][A-HJ-NP-Z0-9]{0,3}(\.[A-Z0-9]{1,2})?$/;
+
+function escAttr(v) {
+  return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function parseCodeScope(text) {
+  // Comma-separated; whitespace around entries is trimmed, empty entries
+  // (e.g. a trailing comma) are skipped. Nothing else is altered.
+  return (text || '').split(',').map(x => x.trim()).filter(x => x.length > 0);
+}
+
+function codeScopeErrors(scope) {
+  if (scope.length === 0) return ['Ange minst ett kodområde (ICD-11 stamkodsprefix, t.ex. 5A1).'];
+  const errs = [];
+  for (const p of scope) {
+    if (p.startsWith('X')) errs.push(`"${p}" är en tilläggskod (X…), inte en stamkod.`);
+    else if (!DIAG_STEM_PREFIX_RE.test(p)) errs.push(`"${p}" är inte ett ICD-11-stamkodsprefix (inga &, /, jokertecken eller gemener).`);
+  }
+  return errs;
+}
+
+function addDiagnosisReviewAction(data) {
+  data = data || {};
+  const idx = actionCounter++;
+  const container = document.getElementById('actionsContainer');
+  const div = document.createElement('div');
+  div.className = 'item-row';
+  div.dataset.actionIdx = idx;
+  div.dataset.actGuid = data.id || data.guid || '';
+  div.dataset.isDiagnosisReview = '1';
+
+  const timingType = data.timing_type || '';
+  const scopeText = Array.isArray(data.code_scope) ? data.code_scope.join(', ') : '';
+  const u = data.timing_period_unit;
+
+  div.innerHTML = `
+    <button type="button" class="remove-btn" onclick="this.parentElement.remove(); updatePreview();">&times;</button>
+    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+      <span class="badge badge-warning" style="font-size:0.7rem;">Diagnosgenomgång (ICD-11)</span>
+      <span style="font-size:0.75rem; color:var(--text-muted);">utförs av kliniker, aldrig av patienten</span>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Rubrik *</label>
+        <input type="text" class="form-control action-title" value="${escAttr(data.title)}" placeholder="t.ex. Diagnosgenomgång diabetes" oninput="updatePreview()" required>
+      </div>
+      <div class="form-group">
+        <label>Kodområde (ICD-11) *</label>
+        <input type="text" class="form-control action-code-scope" value="${escAttr(scopeText)}" placeholder="t.ex. 5A1, 5A2" oninput="validateCodeScopeInput(this); updatePreview()">
+        <div class="form-hint">Kommaseparerade ICD-11 MMS-stamkodsprefix. Sessionen får bara ändra diagnoser inom dessa.</div>
+        <div class="form-hint action-code-scope-error" style="color:var(--danger); display:none;"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Beskrivning</label>
+      <textarea class="form-control action-desc" rows="2" oninput="updatePreview()">${escAttr(data.description)}</textarea>
+    </div>
+    <div class="form-row-3">
+      <div class="form-group">
+        <label>Tidpunkt</label>
+        <select class="form-control action-timing-type" onchange="onTimingTypeChange(this); updatePreview();">
+          <option value="">Ingen</option>
+          <option value="once" ${timingType === 'once' ? 'selected' : ''}>En gång</option>
+          <option value="repeat" ${timingType === 'repeat' ? 'selected' : ''}>Upprepas</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Gånger per cykel</label>
+        <input type="number" class="form-control action-timing-freq" value="${data.timing_frequency || ''}" min="1" oninput="updatePreview()">
+      </div>
+      <div class="form-group">
+        <label>Cykel</label>
+        <div style="display:flex; gap:0.5rem;">
+          <input type="number" step="any" class="form-control action-timing-period" value="${data.timing_period || ''}" min="1" oninput="updatePreview()" style="flex:1;">
+          <select class="form-control action-timing-unit" onchange="updatePreview()" style="flex:1;">
+            <option value="">—</option>
+            <option value="d" ${u === 'd' ? 'selected' : ''}>dagar</option>
+            <option value="wk" ${u === 'wk' ? 'selected' : ''}>veckor</option>
+            <option value="mo" ${u === 'mo' ? 'selected' : ''}>månader</option>
+            <option value="a" ${u === 'a' ? 'selected' : ''}>år</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    ${boundsRowHtml(data, timingType)}
+  `;
+  container.appendChild(div);
+  lucide.createIcons();
+  updatePreview();
+}
+
+function validateCodeScopeInput(input) {
+  const box = input.closest('.form-group').querySelector('.action-code-scope-error');
+  const errs = codeScopeErrors(parseCodeScope(input.value));
+  box.textContent = errs.join(' ');
+  box.style.display = errs.length ? '' : 'none';
+  return errs;
+}
+
+// Refuse the save in the browser too; the server refuses by name regardless.
+document.getElementById('builderForm').addEventListener('submit', function(e) {
+  let errs = [];
+  document.querySelectorAll('#actionsContainer .action-code-scope').forEach(inp => {
+    errs = errs.concat(validateCodeScopeInput(inp));
+  });
+  if (errs.length) {
+    e.preventDefault();
+    alert('Diagnosgenomgång: ' + errs.join(' '));
+  }
+});
+
 function onFormSelect(sel) {
   const row = sel.closest('.item-row');
   const titleInput = row.querySelector('.action-title');
@@ -670,6 +789,7 @@ function collectActions() {
   const actions = [];
   document.querySelectorAll('#actionsContainer .item-row').forEach(row => {
     const isForm = row.dataset.isForm === '1';
+    const isDiagReview = row.dataset.isDiagnosisReview === '1';
     const boundsMode = row.querySelector('.action-bounds-mode')?.value || null;
     const act = {
       id: row.dataset.actGuid || undefined,
@@ -689,7 +809,11 @@ function collectActions() {
       transactions: [],
     };
 
-    if (isForm) {
+    if (isDiagReview) {
+      // #984 — stored shape per contract section 1; never a form.
+      act.is_diagnosis_review = true;
+      act.code_scope = parseCodeScope(row.querySelector('.action-code-scope')?.value);
+    } else if (isForm) {
       act.is_form = true;
       act.form_guid = row.querySelector('.action-form-guid')?.value || null;
     } else {
@@ -835,7 +959,22 @@ function buildFhirPreview() {
         fhirAction.definitionCanonical = `${PLAN_BASE}/api/v1/forms/${act.form_guid}`;
       }
 
-      if (!act.is_form && act.performer_type) {
+      // #984 diagnosis review → update + icd11 ActivityDefinition, clinician,
+      // one diagnosis-code-scope extension per prefix.
+      if (act.is_diagnosis_review) {
+        fhirAction.type = {
+          coding: [{
+            system: 'http://terminology.hl7.org/CodeSystem/action-type',
+            code: 'update',
+            display: 'Update',
+          }]
+        };
+        fhirAction.definitionCanonical = DIAG_REVIEW_CANONICAL;
+        fhirAction.participant = [{ type: 'practitioner' }];
+        fhirAction.extension = (act.code_scope || []).map(p => ({ url: DIAG_SCOPE_EXT_URL, valueString: p }));
+      }
+
+      if (!act.is_form && !act.is_diagnosis_review && act.performer_type) {
         fhirAction.participant = [{ type: 'practitioner', role: { text: act.performer_type } }];
       }
 
@@ -868,7 +1007,7 @@ function buildFhirPreview() {
       }
 
       // Transactions as sub-actions (regular actions only)
-      if (!act.is_form && act.transactions.length > 0) {
+      if (!act.is_form && !act.is_diagnosis_review && act.transactions.length > 0) {
         fhirAction.action = act.transactions.map(txn => {
           const concept = CONCEPTS.find(c => c.guid === txn.concept_guid);
           const subAction = {
@@ -980,7 +1119,9 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   if (EXISTING_ACTIONS.length > 0) {
     EXISTING_ACTIONS.forEach(a => {
-      if (a.is_form) {
+      if (a.is_diagnosis_review) {
+        addDiagnosisReviewAction(a);
+      } else if (a.is_form) {
         addFormAction(a);
       } else {
         addAction(a);

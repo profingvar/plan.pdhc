@@ -1227,3 +1227,13 @@ gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/__init__.py — `--category` on import-concepts; NEW `flask export-concepts`
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_concept_categories_951.py (NEW); tests/test_concept_import.py, tests/test_lookup_read_posture_925.py — updated
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/concept_import.md, docs/technical.md, docs/user_manual.md
+
+## #984 §1 — diagnosis-review PlanDefinition step (2026-11-17)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/services/diagnosis_review.py (NEW) — code_scope grammar validation (refused by name) + FHIR action shape
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/services/fhir_service.py — form timing extracted to FHIRService.form_timing_timing; diagnosis-review export branch
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/routes/plandefinitions.py — validation on web create/edit; review actions returned whole by _build_existing_data
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/plandefinitions.py — validation on API POST/PUT (HTTP 422 diagnosis_review_invalid)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/templates/plandefinitions/builder.html — "Diagnosgenomgång (ICD-11)" step, Kodområde input, in-browser check, preview
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_diagnosis_review_984.py (NEW)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/api_reference.md, /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/technical.md, /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/user_manual.md
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/changed_files.md, /Users/martiningvar/T7_sidewinder/plan.pdhc/progress.md

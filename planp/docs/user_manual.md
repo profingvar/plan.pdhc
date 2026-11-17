@@ -90,6 +90,13 @@ A typical authoring flow:
      (frequency/period/duration).
    - **Transactions** — the concrete data points an activity collects, each
      pointing at a concept.
+   - **Diagnosgenomgång (ICD-11)** — a step for the clinician (never the
+     patient) to review the patient's diagnoses in icd11.pdhc. Enter the
+     **Kodområde** as comma-separated ICD-11 stem-code prefixes, e.g.
+     `5A1, 5A2`; the session may change diagnoses only inside that area.
+     Clusters (`&`, `/`), extension codes (`X…`), wildcards and lower case
+     are refused by name, and a step without a code area cannot be saved.
+     Timing works as for forms (e.g. once a year: repeat, 1 per 1 år).
 4. **Author a Form / Questionnaire** over your concepts when you need a capture
    form, then **publish** it (published questionnaires become immutable).
 5. **Save.** On save the platform runs the deterministic validators; if

@@ -13,6 +13,7 @@ from app.models.activity_models import (
 from app.models.concept_models import Concept, Unit
 from app.models.forms_models import FormDefinition
 from app.services.fhir_service import FHIRService
+from app.services import diagnosis_review  # #984
 from app.services.name_uniqueness import NameUniquenessService
 from app.services.save_guard import guard_plandef, SaveBlocked  # #521 GA-5
 
@@ -26,6 +27,15 @@ def _plandef_validate_payload(goals_data, actions_data):
     return {"goals": goals_data or [], "activities": activities}
 
 PLAN_BASE = "https://plan.pdhc.se"
+
+
+def _diagnosis_review_refusal(actions_data):
+    """#984: a 422 response refusing invalid diagnosis-review steps, or None."""
+    issues = diagnosis_review.validate_actions(actions_data)
+    if not issues:
+        return None
+    return jsonify({"error": "diagnosis_review_invalid",
+                    "error_count": len(issues), "issues": issues}), 422
 
 plandefinitions_bp = Blueprint('plandefinitions_api', __name__)
 # Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
@@ -183,6 +193,10 @@ def create_plandefinition():
     goals_data = data.get('goals', [])
     actions_data = data.get('actions', [])
 
+    refusal = _diagnosis_review_refusal(actions_data)
+    if refusal:
+        return refusal
+
     try:  # #521 GA-5 — fail-closed validation of the plan's structure
         guard_plandef(_plandef_validate_payload(goals_data, actions_data))
     except SaveBlocked as e:
@@ -312,6 +326,10 @@ def update_plandefinition(guid):
             return []
     _goals = data['goals'] if 'goals' in data else _existing(pd.goal)
     _actions = data['actions'] if 'actions' in data else _existing(pd.action)
+    if 'actions' in data:
+        refusal = _diagnosis_review_refusal(_actions)
+        if refusal:
+            return refusal
     try:
         guard_plandef(_plandef_validate_payload(_goals, _actions))
     except SaveBlocked as e:

@@ -107,6 +107,23 @@ integrators use.
 - **Form definitions** (`app/api/form_definitions.py`): CRUD under
   `/form-definitions` and `/form-definitions/<guid>/items`.
 
+### Diagnosis-review steps — #984 (`app/services/diagnosis_review.py`)
+
+A PlanDefinition action with `is_diagnosis_review: true` and a `code_scope`
+(ICD-11 MMS stem-code prefixes) is a clinician step that opens an icd11.pdhc
+diagnosis session; contract `~/T7_sidewinder/plans/984_diagnosis_review_contract.md`.
+`validate_actions()` runs on all four save paths (web create/edit, API
+POST/PUT) before anything is mutated; a bad step is refused by name (flash /
+HTTP 422 `diagnosis_review_invalid`) and is **not** overridable by an admin,
+because the scope bounds what icd11 may write. `to_fhir_action()` emits
+type `update`, the icd11 ActivityDefinition canonical, participant
+practitioner, one `diagnosis-code-scope` extension per prefix, and the same
+`timingTiming` as forms (`FHIRService.form_timing_timing`). Like form actions,
+the step is stored whole in the `action` JSON and also gets an `activities`
+row; `_build_existing_data` returns it unenriched so the builder round-trip
+keeps `code_scope`. The builder has a matching "Diagnosgenomgång (ICD-11)"
+step whose JS regex is pinned to the Python one by a test.
+
 ### Save enforcement — GA-5 fail-closed (`app/services/save_guard.py`)
 
 Concept/plandef saves run the deterministic validators and **block** on

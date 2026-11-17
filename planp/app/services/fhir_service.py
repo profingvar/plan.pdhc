@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from app.models.concept_models import fhir_canonical_url
 from app.models.forms_models import Questionnaire
+from app.services import diagnosis_review
 
 PLAN_BASE = "https://plan.pdhc.se"
 
@@ -12,6 +13,29 @@ class FHIRService:
     """Builds FHIR R5 PlanDefinition JSON from a PlanDefinition model instance."""
 
     HL7_PLAN_DEF_TYPE_SYSTEM = 'http://terminology.hl7.org/CodeSystem/plan-definition-type'
+
+    @staticmethod
+    def form_timing_timing(act):
+        """timingTiming for a form (or diagnosis-review) action, or None."""
+        if act.get('timing_type') == 'repeat' and act.get('timing_frequency'):
+            repeat = {
+                'frequency': act['timing_frequency'],
+                'period': act.get('timing_period', 1),
+                'periodUnit': act.get('timing_period_unit', 'd'),
+            }
+            bounds_mode = act.get('timing_bounds_mode')
+            if bounds_mode == 'count' and act.get('timing_bounds_count'):
+                repeat['count'] = act['timing_bounds_count']
+            elif bounds_mode == 'duration' and act.get('timing_bounds_duration_value'):
+                unit = act.get('timing_bounds_duration_unit') or 'mo'
+                repeat['boundsDuration'] = {
+                    'value': act['timing_bounds_duration_value'],
+                    'unit': unit,
+                    'system': 'http://unitsofmeasure.org',
+                    'code': unit,
+                }
+            return {'repeat': repeat}
+        return None
 
     @staticmethod
     def create_fhir_plandefinition(plandef):
@@ -129,26 +153,15 @@ class FHIRService:
                             }
                             if act.get('description'):
                                 fhir_act['description'] = act['description']
-                            # Timing
-                            if act.get('timing_type') == 'repeat' and act.get('timing_frequency'):
-                                repeat = {
-                                    'frequency': act['timing_frequency'],
-                                    'period': act.get('timing_period', 1),
-                                    'periodUnit': act.get('timing_period_unit', 'd'),
-                                }
-                                bounds_mode = act.get('timing_bounds_mode')
-                                if bounds_mode == 'count' and act.get('timing_bounds_count'):
-                                    repeat['count'] = act['timing_bounds_count']
-                                elif bounds_mode == 'duration' and act.get('timing_bounds_duration_value'):
-                                    unit = act.get('timing_bounds_duration_unit') or 'mo'
-                                    repeat['boundsDuration'] = {
-                                        'value': act['timing_bounds_duration_value'],
-                                        'unit': unit,
-                                        'system': 'http://unitsofmeasure.org',
-                                        'code': unit,
-                                    }
-                                fhir_act['timingTiming'] = {'repeat': repeat}
+                            timing = FHIRService.form_timing_timing(act)
+                            if timing:
+                                fhir_act['timingTiming'] = timing
                             fhir_actions.append(fhir_act)
+                        elif diagnosis_review.is_diagnosis_review(act):
+                            # #984: clinician step opening an icd11 diagnosis
+                            # session; timing exactly as for forms.
+                            fhir_actions.append(diagnosis_review.to_fhir_action(
+                                act, FHIRService.form_timing_timing(act)))
                         else:
                             fhir_actions.append(act)
                     if fhir_actions:
