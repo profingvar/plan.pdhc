@@ -20,12 +20,14 @@ import hashlib
 import io
 import logging
 import re
+import uuid
 
 from app import db
 from app.models.concept_models import (
-    Concept, CanonicalLib, ConceptType, ResponseType, Unit,
+    Concept, ConceptImport, CanonicalLib, ConceptType, ResponseType, Unit,
 )
 from app.services.canonical_libs import ensure_local_lib
+from app.services import concept_categories as cat_svc
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,10 @@ REQUIRED_COLUMNS = [
 OPTIONAL_COLUMNS = [
     'range_low',
     'range_high',
+    # #951: categories (';'-separated names), and the explanation -- which is
+    # where a term's guideline citation travels (D4).
+    'category',
+    'concept_explain',
 ]
 ALL_COLUMNS = REQUIRED_COLUMNS + OPTIONAL_COLUMNS
 
@@ -171,7 +177,8 @@ def _resolve_lookup(model, name_field, value):
     ).first()
 
 
-def validate_and_import(rows, *, operator, filename, sha256, dry_run=False):
+def validate_and_import(rows, *, operator, filename, sha256, dry_run=False,
+                        category=None, entry_point='cli'):
     """Validate and upsert each row. Returns a report dict.
 
     Args:
@@ -197,12 +204,27 @@ def validate_and_import(rows, *, operator, filename, sha256, dry_run=False):
     rejected = []
     n_created = 0
     n_updated = 0
+    n_unchanged = 0
+    n_links = 0
+
+    # #951 B.4: the batch default is resolved ONCE, up front. An unknown one
+    # refuses the whole file before any row is touched -- every row would
+    # otherwise be rejected for the same reason, or worse, half of them
+    # imported without the category the operator asked for.
+    try:
+        default_cats = cat_svc.resolve_all(category)
+    except cat_svc.UnknownCategory as e:
+        return _refused_report(rows, operator, filename, sha256, dry_run,
+                               f'batch category: {e}')
+    import_guid = None if dry_run else str(uuid.uuid4())
 
     for idx, raw in enumerate(rows, start=2):  # row 1 is header
         name = _clean(raw.get('concept_name'))
         try:
-            self_changed = _apply_row(raw, idx)
-        except ValueError as e:
+            # Per-row categories BEAT the batch default when both are given (B.2).
+            row_cats = cat_svc.resolve_all(raw.get('category')) if _clean(raw.get('category')) else default_cats
+            outcome, concept = _apply_row(raw, idx, import_guid=import_guid)
+        except ValueError as e:   # UnknownCategory is a ValueError: a named, rejected row
             rejected.append({'row': idx, 'concept_name': name, 'reason': str(e)})
             continue
         except _ConflictError as e:
@@ -210,10 +232,22 @@ def validate_and_import(rows, *, operator, filename, sha256, dry_run=False):
             continue
 
         accepted.append(name)
-        if self_changed == 'created':
+        if outcome == 'created':
             n_created += 1
-        else:
+        elif outcome == 'updated':
             n_updated += 1
+        else:
+            n_unchanged += 1
+        n_links += cat_svc.add(concept.guid, row_cats, import_guid=import_guid)
+
+    if not dry_run:
+        # #951 stage C: persist what was always computed and then discarded.
+        db.session.add(ConceptImport(
+            guid=import_guid, operator=operator or 'unknown', filename=filename, sha256=sha256,
+            entry_point=entry_point,
+            default_categories='; '.join(c.category_name for c in default_cats) or None,
+            n_in=len(rows), n_created=n_created, n_updated=n_updated,
+            n_unchanged=n_unchanged, n_rejected=len(rejected)))
 
     if dry_run:
         db.session.rollback()
@@ -249,11 +283,15 @@ def validate_and_import(rows, *, operator, filename, sha256, dry_run=False):
             'n_rejected': len(rejected),
             'n_created': n_created,
             'n_updated': n_updated,
+            'n_unchanged': n_unchanged,
+            'n_category_links': n_links,
             'dry_run': dry_run,
         },
         'operator': operator,
         'filename': filename,
         'sha256': sha256,
+        'import_guid': import_guid,
+        'categories': [c.category_name for c in default_cats],
     }
 
     logger.info(
@@ -274,8 +312,14 @@ class _ConflictError(Exception):
     """Identity-field conflict on an existing concept."""
 
 
-def _apply_row(raw, row_idx):
-    """Validate + upsert a single row. Returns 'created' or 'updated'."""
+def _apply_row(raw, row_idx, *, import_guid=None):
+    """Validate + upsert a single row.
+
+    Returns (outcome, concept): outcome is 'created', 'updated' or -- since
+    #951 D.3 -- 'unchanged', when the row repeats what is stored. An unchanged
+    row no longer bumps `vers_number`, so an export -> re-import round trip is
+    a true no-op rather than a new version of every concept.
+    """
     name = _clean(raw.get('concept_name'))
     if not name:
         raise ValueError('concept_name is required')
@@ -331,6 +375,7 @@ def _apply_row(raw, row_idx):
         if not unit_row:
             raise ValueError(f'unit not found: {unit_val!r}')
 
+    explain = _clean(raw.get('concept_explain'))
     range_low = _to_float(raw.get('range_low'), 'range_low')
     range_high = _to_float(raw.get('range_high'), 'range_high')
     if range_low is not None and range_high is not None and range_low > range_high:
@@ -353,26 +398,30 @@ def _apply_row(raw, row_idx):
                 f'canonical_ref conflict for {name!r}: '
                 f'existing {existing.canonical_refnumber!r} vs new {canon_ref!r}'
             )
-        # Update non-identity fields
-        if canon_ref is not None:
-            existing.canonical_refnumber = canon_ref
-        if display_text is not None:
-            existing.concept_display_text = display_text
-        if concept_type_row:
-            existing.concept_type = concept_type_row.guid
-        if response_type_row:
-            existing.response_type = response_type_row.guid
-        if unit_row:
-            existing.unit = unit_row.guid
-        if range_low is not None:
-            existing.range_low = range_low
-        if range_high is not None:
-            existing.range_high = range_high
+        # Update non-identity fields -- only those that actually differ.
+        changes = {}
+        for attr, new in (('canonical_refnumber', canon_ref),
+                          ('concept_display_text', display_text),
+                          ('concept_explain', explain),
+                          ('concept_type', concept_type_row.guid if concept_type_row else None),
+                          ('response_type', response_type_row.guid if response_type_row else None),
+                          ('unit', unit_row.guid if unit_row else None),
+                          ('range_low', range_low),
+                          ('range_high', range_high)):
+            if new is not None and getattr(existing, attr) != new:
+                changes[attr] = new
+        if not changes:
+            return 'unchanged', existing
+        for attr, new in changes.items():
+            setattr(existing, attr, new)
         existing.vers_number = (existing.vers_number or 1) + 1
-        return 'updated'
+        return 'updated', existing
 
     # Create new
     concept = Concept(
+        guid=str(uuid.uuid4()),
+        import_guid=import_guid,
+        concept_explain=explain,
         concept_name=name,
         canonical_lib=canon_lib_row.guid,
         canonical_refnumber=canon_ref,
@@ -385,4 +434,18 @@ def _apply_row(raw, row_idx):
         status='draft',
     )
     db.session.add(concept)
-    return 'created'
+    return 'created', concept
+
+
+def _refused_report(rows, operator, filename, sha256, dry_run, reason):
+    """A whole-file refusal, in the report's own shape. Nothing was written."""
+    db.session.rollback()
+    return {
+        'accepted': [],
+        'rejected': [{'row': 'file', 'concept_name': None, 'reason': reason}],
+        'summary': {'n_in': len(rows), 'n_accepted': 0, 'n_rejected': len(rows),
+                    'n_created': 0, 'n_updated': 0, 'n_unchanged': 0,
+                    'n_category_links': 0, 'dry_run': dry_run},
+        'operator': operator, 'filename': filename, 'sha256': sha256,
+        'import_guid': None, 'categories': [],
+    }

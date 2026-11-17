@@ -16,6 +16,8 @@ from app.services.concept_importer import (
 )
 from app.services.save_guard import guard_concept, SaveBlocked  # #521 GA-5
 from app.services.canonical_libs import resolve_or_local
+from app.services import concept_categories as cat_svc
+from app.models.concept_models import ConceptCategoryLink, ConceptImport
 
 concepts_bp = Blueprint('concepts', __name__)
 # Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
@@ -44,12 +46,17 @@ def _sanitize(val):
 # Concept CRUD
 # ---------------------------------------------------------------------------
 
-@concepts_bp.route('/concepts', methods=['GET'])
-def list_concepts():
+def filtered_concepts(args):
+    """The concept query for `list_concepts` AND the export (#951 D.2).
+
+    One function so the export can be narrowed by exactly what the list can.
+    Raises `UnknownCategory` for a category the filter names but plan lacks:
+    an empty list would read as "no concepts in that category".
+    """
     query = Concept.query
 
     # Text search
-    search = request.args.get('search', '').strip()
+    search = (args.get('search') or '').strip()
     if search:
         like = f'%{search}%'
         query = query.filter(or_(
@@ -64,15 +71,32 @@ def list_concepts():
         ('response_type', Concept.response_type),
         ('canonical_lib', Concept.canonical_lib),
     ]:
-        val = request.args.get(filt)
+        val = args.get(filt)
         if val:
             query = query.filter(field == val)
 
-    if request.args.get('has_values') == 'true':
+    # #951 A.5: category, by NAME or guid, through the one resolver. Several
+    # (';'-separated) means ANY of them.
+    cat = args.get('category')
+    if cat:
+        cats = cat_svc.resolve_all(cat)
+        query = query.filter(Concept.guid.in_(
+            db.session.query(ConceptCategoryLink.concept_guid)
+            .filter(ConceptCategoryLink.category_guid.in_([c.guid for c in cats]))))
+
+    if args.get('has_values') == 'true':
         query = query.filter(Concept.no_of_values_connected > 0)
 
     # Deterministic sort
-    query = query.order_by(Concept.concept_name, Concept.guid)
+    return query.order_by(Concept.concept_name, Concept.guid)
+
+
+@concepts_bp.route('/concepts', methods=['GET'])
+def list_concepts():
+    try:
+        query = filtered_concepts(request.args)
+    except cat_svc.UnknownCategory as e:
+        return jsonify({'error': str(e)}), 400
 
     # Pagination. `per_page` is the canonical param (server-capped at 200);
     # accept `limit` as an alias so consumers using the common `limit`
@@ -121,6 +145,12 @@ def create_concept():
         if val and not _is_valid_uuid(val):
             return jsonify({'error': f'Invalid UUID for {fk_field}'}), 400
 
+    # #951 A.6: categories by name or guid; unknown -> 400, never created.
+    try:
+        new_cats = cat_svc.resolve_all(data.get('categories') or [])
+    except cat_svc.UnknownCategory as e:
+        return jsonify({'error': str(e)}), 400
+
     name = make_unique_concept_name(name)
 
     try:  # #521 GA-5 — fail-closed validation (errors block; admin override audited)
@@ -153,7 +183,10 @@ def create_concept():
         author=_sanitize(data.get('author')),
     )
     db.session.add(concept)
+    db.session.flush()
+    cat_svc.add(concept.guid, new_cats)
     db.session.commit()
+    db.session.refresh(concept)
     return jsonify(concept.to_dict()), 201
 
 
@@ -244,9 +277,18 @@ def update_concept(guid):
         if f in data:
             setattr(concept, f, data[f])
 
+    if 'categories' in data:
+        # A hand edit REPLACES the set (unlike an import, which only adds).
+        try:
+            cat_svc.replace(concept.guid, cat_svc.resolve_all(data.get('categories') or []))
+        except cat_svc.UnknownCategory as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 400
+
     concept.vers_number = (concept.vers_number or 1) + 1
     concept.date_valid = datetime.now(timezone.utc)
     db.session.commit()
+    db.session.refresh(concept)
     return jsonify(concept.to_dict()), 200
 
 
@@ -296,6 +338,7 @@ def import_concepts():
 
     report = validate_and_import(
         rows, operator=operator, filename=filename, sha256=sha, dry_run=dry_run,
+        category=(request.form.get('category') or '').strip() or None, entry_point='api',
     )
     status = 200 if not report['rejected'] else 207  # 207 Multi-Status when partial
     return jsonify(report), status
@@ -410,3 +453,50 @@ def remove_concept_value(concept_guid, value_guid):
     )
     db.session.commit()
     return jsonify({'message': 'Removed'}), 200
+
+
+
+# ---------------------------------------------------------------------------
+# #951 stage D -- export, and stage C -- the import records
+# ---------------------------------------------------------------------------
+
+@concepts_bp.route('/concepts/export.xlsx', methods=['GET'])
+@requires_role('read_only')
+def export_concepts():
+    """The catalogue as .xlsx in the import template's column order (D.1).
+
+    Takes the list's own filters (D.2). GATED, unlike the paged list: a bulk
+    export of the whole catalogue is a different exposure from a search, and
+    the decision is visible here (D.5).
+    """
+    from flask import send_file
+    from app.services.concept_export import build_xlsx
+    try:
+        concepts = filtered_concepts(request.args).all()
+    except cat_svc.UnknownCategory as e:
+        return jsonify({'error': str(e)}), 400
+    buf = build_xlsx(concepts)
+    return send_file(buf, as_attachment=True, download_name='plan_concepts.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@concepts_bp.route('/concept-imports', methods=['GET'])
+@requires_role('read_only')
+def list_concept_imports():
+    rows = ConceptImport.query.order_by(ConceptImport.created_at.desc()).limit(200).all()
+    return jsonify({'items': [r.to_dict() for r in rows], 'total': len(rows)}), 200
+
+
+@concepts_bp.route('/concept-imports/<guid>', methods=['GET'])
+@requires_role('read_only')
+def read_concept_import(guid):
+    """One import, with exactly what it produced (C.3): the concepts it
+    CREATED and the category links it added."""
+    rec = ConceptImport.query.filter_by(guid=guid).first()
+    if rec is None:
+        return jsonify({'error': 'Not found'}), 404
+    d = rec.to_dict()
+    d['created_concepts'] = [c.guid for c in Concept.query.filter_by(import_guid=guid).order_by(Concept.concept_name)]
+    d['category_links'] = [{'concept_guid': l.concept_guid, 'category_guid': l.category_guid}
+                           for l in ConceptCategoryLink.query.filter_by(import_guid=guid)]
+    return jsonify(d), 200

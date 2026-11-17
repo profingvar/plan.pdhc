@@ -101,6 +101,8 @@ class TestTheParameterIsRequired:
             'plandef-types': True,
             'concept-types': False,
             'intended-uses': False,
+        # #951: a category name can name a guideline; closed by default.
+        'concept-categories': False,
         }, seen
 
 

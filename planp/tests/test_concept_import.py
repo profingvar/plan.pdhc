@@ -70,14 +70,19 @@ def test_happy_path(app):
 
 
 def test_idempotent_reimport_updates_not_duplicates(app):
-    """Re-running the same file updates in place (n_updated > 0, no dupes)."""
+    """Re-running the same file is a NO-OP: accepted, but every row unchanged
+    and no version bumped (#951 D.3 -- it used to report 3 'updated' and bump
+    every vers_number for a file that changed nothing)."""
     with app.app_context():
         _import_csv(os.path.join(FIXTURE_DIR, 'concepts_sample.csv'))
+        before = {c.concept_name: c.vers_number for c in Concept.query.all()}
         report = _import_csv(os.path.join(FIXTURE_DIR, 'concepts_sample.csv'))
 
         assert report['summary']['n_accepted'] == 3
-        assert report['summary']['n_updated'] == 3
+        assert report['summary']['n_unchanged'] == 3
+        assert report['summary']['n_updated'] == 0
         assert report['summary']['n_created'] == 0
+        assert {c.concept_name: c.vers_number for c in Concept.query.all()} == before
         # Exactly one row per concept_name (no auto-suffixing on re-import)
         for name in ('peak-flow-am', 'peak-flow-pm', 'asthma-symptom-cough'):
             assert Concept.query.filter_by(concept_name=name).count() == 1

@@ -34,6 +34,9 @@
     <span class="detail-label">Concept Type</span>
     <span class="detail-value">{{ concept.concept_type_rel.concept_type_name if concept.concept_type_rel else '—' }}</span>
 
+    <span class="detail-label">Categories</span>
+    <span class="detail-value">{% for cat in concept.categories %}<code>{{ cat.category_name }}</code>{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</span>
+
     <span class="detail-label">Response Type</span>
     <span class="detail-value">{{ concept.response_type_rel.response_type_name if concept.response_type_rel else '—' }}</span>
 

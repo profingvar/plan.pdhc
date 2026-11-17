@@ -320,6 +320,12 @@ Key env vars (see `.env.example`):
   [--operator NAME] [--dry-run] [--json-out]`. Parses, validates, and imports
   concepts; reports created/updated/rejected with per-row reasons; exit code 1 if
   any row is rejected.
+  #951: `--category` (batch default), optional columns `category` and
+  `concept_explain`, an immutable `concept_imports` record per real run,
+  `n_unchanged` (no version bump), and `flask export-concepts` for the round
+  trip. Categories: `concept_categories` + join table `concept_category_links`
+  (many per concept), resolved only through `app/services/concept_categories.py`.
+  See `docs/concept_import.md`.
 
     **Blank `canonical_lib` = LOCAL (#786 item 2).** An empty cell is read as
     *"this term is ours"* and binds the concept to the local library via

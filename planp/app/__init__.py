@@ -290,6 +290,18 @@ def _register_cli(app):
         if not do_apply:
             click.echo('dry run -- nothing written. Re-run with --apply.')
 
+    @app.cli.command('export-concepts')
+    @click.argument('path', type=click.Path(dir_okay=False))
+    @click.option('--category', default=None, help="Only concepts in this category (name or guid; ';' = any of).")
+    def export_concepts_cmd(path, category):
+        """Write the concept catalogue as .xlsx in the import format (#951 D)."""
+        from app.api.concepts import filtered_concepts
+        from app.services.concept_export import build_xlsx
+        concepts = filtered_concepts({'category': category} if category else {}).all()
+        with open(path, 'wb') as fh:
+            fh.write(build_xlsx(concepts).read())
+        click.echo(f'{len(concepts)} concept(s) -> {path}')
+
     @app.cli.command('import-concepts')
     @click.argument('path', type=click.Path(exists=True, dir_okay=False))
     @click.option('--operator', default=None,
@@ -298,7 +310,10 @@ def _register_cli(app):
                   help='Validate only; do not commit changes.')
     @click.option('--json-out', 'json_out', is_flag=True,
                   help='Emit the report as JSON instead of a human summary.')
-    def import_concepts_cmd(path, operator, dry_run, json_out):
+    @click.option('--category', default=None,
+                  help="Category name(s), ';'-separated, applied to every row "
+                       "without its own `category` cell (#951).")
+    def import_concepts_cmd(path, operator, dry_run, json_out, category):
         """Bulk-import concepts from a .xlsx or .csv file (ticket #134)."""
         from app.services.concept_importer import (
             parse_xlsx, parse_csv, validate_and_import,
@@ -325,7 +340,7 @@ def _register_cli(app):
         op = operator or f'cli:{_os.environ.get("USER", "unknown")}'
         report = validate_and_import(
             rows, operator=op, filename=_os.path.basename(path),
-            sha256=sha, dry_run=dry_run,
+            sha256=sha, dry_run=dry_run, category=category, entry_point='cli',
         )
 
         if json_out:

@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 from app import db  # limiter exemption handled globally via request_filter in app/__init__.py
 from app.api.auth import requires_role
 from app.models.concept_models import (
-    CanonicalLib, ConceptType, ResponseType, Unit, PlanDefType, IntendedUse,
+    CanonicalLib, ConceptType, ResponseType, Unit, PlanDefType, IntendedUse, ConceptCategory,
     ValueCatalog, ValueSet, ValueSetValue,
 )
 from app.services.name_uniqueness import (NameUniquenessService,
@@ -285,6 +285,10 @@ _crud_routes(lookup_bp, '/plandef-types', PlanDefType, 'plandef_type_name', 'pla
 
 # GATED. No consumer in any of the 26 repos, in Python, JS, HTML or shell.
 _crud_routes(lookup_bp, '/intended-uses', IntendedUse, 'intended_use_name', 'intended_use_display_text', public_read=False)
+# #951 A.2: GATED. A category name can encode a clinical domain or name a
+# guideline, so a public list would publish which guidelines plan has
+# ingested. The operator may widen this; the default is closed.
+_crud_routes(lookup_bp, '/concept-categories', ConceptCategory, 'category_name', 'category_display_text', public_read=False)
 
 
 # ---------------------------------------------------------------------------

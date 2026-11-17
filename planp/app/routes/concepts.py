@@ -14,6 +14,9 @@ from app.services.concept_importer import (
 from app.services.save_guard import guard_concept, SaveBlocked  # #521 GA-5
 from app.services.canonical_libs import resolve_or_local
 
+from app.models.concept_models import ConceptCategory
+from app.services import concept_categories as cat_svc
+
 concepts_web_bp = Blueprint('concepts_web', __name__, url_prefix='/concepts')
 
 
@@ -78,6 +81,9 @@ def create_concept():
             anchor_high_text=request.form.get('anchor_high_text') or None,
         )
         db.session.add(concept)
+        db.session.flush()
+        # #951 A.6: categories chosen in the form (guids; the one resolver).
+        cat_svc.add(concept.guid, cat_svc.resolve_all(request.form.getlist('categories')))
         db.session.commit()
         flash('Concept created.', 'success')
         return redirect(url_for('concepts_web.list_concepts'))
@@ -87,7 +93,8 @@ def create_concept():
                            concept_types=ConceptType.query.all(),
                            response_types=ResponseType.query.all(),
                            units=Unit.query.all(),
-                           valuesets=ValueSet.query.all())
+                           valuesets=ValueSet.query.all(),
+                           categories=ConceptCategory.query.order_by(ConceptCategory.category_name).all())
 
 
 @concepts_web_bp.route('/<guid>')
@@ -147,6 +154,10 @@ def edit_concept(guid):
         concept.range_high = request.form.get('range_high', type=float)
         concept.anchor_low_text = request.form.get('anchor_low_text') or None
         concept.anchor_high_text = request.form.get('anchor_high_text') or None
+        # #951 A.6: the hidden marker says the form HAD the field, so an empty
+        # selection means "no categories" rather than "not on this form".
+        if request.form.get('categories_present'):
+            cat_svc.replace(concept.guid, cat_svc.resolve_all(request.form.getlist('categories')))
 
         db.session.commit()
         flash('Concept updated.', 'success')
@@ -158,7 +169,8 @@ def edit_concept(guid):
                            concept_types=ConceptType.query.all(),
                            response_types=ResponseType.query.all(),
                            units=Unit.query.all(),
-                           valuesets=ValueSet.query.all())
+                           valuesets=ValueSet.query.all(),
+                           categories=ConceptCategory.query.order_by(ConceptCategory.category_name).all())
 
 
 @concepts_web_bp.route('/<guid>/delete', methods=['POST'])
@@ -217,6 +229,7 @@ def import_concepts_page():
         report = validate_and_import(
             rows, operator=operator, filename=f.filename,
             sha256=sha, dry_run=dry_run,
+            category=(request.form.get('category') or '').strip() or None, entry_point='web',
         )
         if report['rejected']:
             flash(
@@ -231,4 +244,6 @@ def import_concepts_page():
                 'success',
             )
 
-    return render_template('concepts/import.html', report=report)
+    from app.models.concept_models import ConceptCategory
+    return render_template('concepts/import.html', report=report,
+                           categories=ConceptCategory.query.order_by(ConceptCategory.category_name).all())

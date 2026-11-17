@@ -32,6 +32,15 @@
       <input type="file" id="file" name="file" accept=".xlsx,.csv" required>
     </div>
     <div class="form-group">
+      <label for="category">Category (optional)</label>
+      <input type="text" id="category" name="category" list="category-names"
+             placeholder="e.g. diabetes-guideline-2026; separate several with ;">
+      <datalist id="category-names">
+        {% for c in categories %}<option value="{{ c.category_name }}">{{ c.category_display_text or '' }}</option>{% endfor %}
+      </datalist>
+      <small>Applied to every row without its own <code>category</code> cell. An unknown category refuses the file; create it first under Lookup &rarr; Concept categories.</small>
+    </div>
+    <div class="form-group">
       <label>
         <input type="checkbox" name="dry_run" value="true">
         Dry-run (validate only; do not write)
@@ -45,11 +54,13 @@
   <h2>Import report</h2>
   <p>
     <strong>{{ report.summary.n_accepted }}</strong> accepted
-    (created {{ report.summary.n_created }} / updated {{ report.summary.n_updated }}),
+    (created {{ report.summary.n_created }} / updated {{ report.summary.n_updated }} / unchanged {{ report.summary.n_unchanged }}),
     <strong>{{ report.summary.n_rejected }}</strong> rejected,
     out of <strong>{{ report.summary.n_in }}</strong> rows.
     {% if report.summary.dry_run %}<em>(dry-run — nothing was saved)</em>{% endif %}
   </p>
+  {% if report.categories %}<p>Category: {% for c in report.categories %}<code>{{ c }}</code>{% if not loop.last %}, {% endif %}{% endfor %} &middot; {{ report.summary.n_category_links }} new link(s)</p>{% endif %}
+  {% if report.import_guid %}<p>Import record: <code>{{ report.import_guid }}</code></p>{% endif %}
   <p>File: <code>{{ report.filename }}</code> &middot; sha256: <code>{{ report.sha256 }}</code> &middot; operator: <code>{{ report.operator }}</code></p>
 
   {% if report.rejected %}

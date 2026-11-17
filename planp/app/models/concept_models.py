@@ -367,6 +367,18 @@ class Concept(db.Model):
     date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     date_valid = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
+    # #951 D4: the import that CREATED this concept, if one did. NULL for every
+    # concept made before #951 or by hand -- not knowing is not invented.
+    import_guid = db.Column(db.String(36), db.ForeignKey('concept_imports.guid'), nullable=True)
+
+    # #951 D1: MANY categories per concept (a diabetes-guideline term may also
+    # belong to a cardiovascular one). Read through the link table.
+    categories = db.relationship(
+        'ConceptCategory', secondary='concept_category_links',
+        primaryjoin='Concept.guid == ConceptCategoryLink.concept_guid',
+        secondaryjoin='ConceptCategoryLink.category_guid == ConceptCategory.guid',
+        lazy='selectin', viewonly=True, order_by='ConceptCategory.category_name')
+
     __table_args__ = (
         db.CheckConstraint(
             '(range_low IS NULL OR range_high IS NULL OR range_low <= range_high)',
@@ -421,4 +433,113 @@ class Concept(db.Model):
             d['valueset_url'] = f"{PLAN_BASE}/api/v1/lookup/valuesets/{self.valueset}"
         if self.canonical_lib:
             d['canonical_lib_url'] = f"{PLAN_BASE}/api/v1/lookup/canonical-libs/{self.canonical_lib}"
+        # #951: the categories, each with its url -- the concept_type_url pattern.
+        d['categories'] = [
+            {'guid': c.guid, 'category_name': c.category_name,
+             'url': f"{PLAN_BASE}/api/v1/lookup/concept-categories/{c.guid}"}
+            for c in self.categories]
+        d['import_guid'] = self.import_guid
+        if self.import_guid:
+            d['import_url'] = f"{PLAN_BASE}/api/v1/concept-imports/{self.import_guid}"
         return d
+
+
+# ---------------------------------------------------------------------------
+# #951 -- categories and import provenance
+# ---------------------------------------------------------------------------
+# Two axes kept apart on purpose. `intended_uses` answers "what is this term
+# FOR" and stays untouched (D3, operator 2026-11-06). A CATEGORY answers "where
+# does this term belong / come from" (e.g. a guideline): a third axis beside
+# `concept_type`, which is the KIND of term (measured live 2026-11-17:
+# Observation 71, Diagnosis 19, Medication 9, Procedure 7; D2).
+
+class ConceptCategory(db.Model):
+    """One category. The standard lookup-table shape."""
+    __tablename__ = 'concept_categories'
+
+    id = db.Column(db.Integer, primary_key=True)
+    guid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    category_name = db.Column(db.String(255), unique=True, nullable=False)
+    category_display_text = db.Column(db.String(500), nullable=True)
+    author = db.Column(db.String(255), nullable=True)
+    vers_number = db.Column(db.Integer, default=1)
+    date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    date_valid = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            'guid': self.guid,
+            'url': f"{PLAN_BASE}/api/v1/lookup/concept-categories/{self.guid}",
+            'category_name': self.category_name,
+            'category_display_text': self.category_display_text,
+            'author': self.author,
+            'vers_number': self.vers_number,
+        }
+
+
+class ConceptCategoryLink(db.Model):
+    """Concept <-> category, MANY to MANY (D1). The `valueset_values` shape.
+
+    `import_guid` says which import put the link there; NULL when a person
+    did it by hand. The link is the editable half of D4; the import record
+    below is the immutable half.
+    """
+    __tablename__ = 'concept_category_links'
+
+    id = db.Column(db.Integer, primary_key=True)
+    concept_guid = db.Column(db.String(36), db.ForeignKey('concepts.guid', ondelete='CASCADE'), nullable=False, index=True)
+    category_guid = db.Column(db.String(36), db.ForeignKey('concept_categories.guid'), nullable=False, index=True)
+    import_guid = db.Column(db.String(36), db.ForeignKey('concept_imports.guid'), nullable=True)
+    date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        db.UniqueConstraint('concept_guid', 'category_guid', name='uq_concept_category'),
+    )
+
+
+class ConceptImportImmutable(RuntimeError):
+    """An import record is a fact about the past; it is never edited."""
+
+
+class ConceptImport(db.Model):
+    """One REAL (non-dry-run) run of the concept importer (#951 stage C).
+
+    Persists what `validate_and_import` always computed and then threw away:
+    who, which file (name + sha256), the counts, the categories applied. With
+    `Concept.import_guid` and `ConceptCategoryLink.import_guid` it answers
+    "exactly what did the 2026 diabetes-guideline file produce", which an
+    editable category on the concept alone cannot (D4).
+    """
+    __tablename__ = 'concept_imports'
+
+    id = db.Column(db.Integer, primary_key=True)
+    guid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    operator = db.Column(db.String(255), nullable=False)
+    filename = db.Column(db.String(500), nullable=True)
+    sha256 = db.Column(db.String(64), nullable=True)
+    entry_point = db.Column(db.String(16), nullable=False)   # cli / api / web
+    #: The batch default category names, '; '-joined; NULL when none was given.
+    default_categories = db.Column(db.Text, nullable=True)
+    n_in = db.Column(db.Integer, nullable=False)
+    n_created = db.Column(db.Integer, nullable=False)
+    n_updated = db.Column(db.Integer, nullable=False)
+    n_unchanged = db.Column(db.Integer, nullable=False)
+    n_rejected = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            'guid': self.guid,
+            'url': f"{PLAN_BASE}/api/v1/concept-imports/{self.guid}",
+            'operator': self.operator, 'filename': self.filename, 'sha256': self.sha256,
+            'entry_point': self.entry_point,
+            'default_categories': self.default_categories.split('; ') if self.default_categories else [],
+            'n_in': self.n_in, 'n_created': self.n_created, 'n_updated': self.n_updated,
+            'n_unchanged': self.n_unchanged, 'n_rejected': self.n_rejected,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+@db.event.listens_for(ConceptImport, 'before_update', propagate=True)
+def _import_record_is_immutable(mapper, connection, target):
+    raise ConceptImportImmutable(f'concept import {target.guid} may not be modified')

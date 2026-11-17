@@ -82,6 +82,48 @@ CLI) to validate only — the same report is returned but the
 transaction is rolled back. Use this when handing a catalogue off to
 plan.pdhc for review before committing.
 
+## Categories (#951)
+
+A concept has any number of **categories** (e.g. the guideline its terms came
+from). Categories live in `/api/v1/lookup/concept-categories` (read needs a
+login; a category name can name a guideline) and are created there, never by an
+import.
+
+- `--category NAME[; NAME]` (CLI), form field `category` (API and web page):
+  the batch default for every row without its own cell. An unknown one
+  **refuses the whole file**.
+- optional column `category`: `;`-separated names for that row; it beats the
+  batch default. An unknown one **rejects that row** by name; nothing is created.
+- imports only ADD categories. Replacing the set is a hand edit
+  (`PUT /api/v1/concepts/<guid>` with `categories`, or the edit form).
+- `GET /api/v1/concepts?category=NAME|GUID` filters (several, `;`-joined, = any of);
+  an unknown category is a 400, not an empty list.
+
+Optional column `concept_explain` is importable too: plan's own explanation,
+e.g. the guideline section a term came from.
+
+## Re-import is a no-op (#951 D.3)
+
+A row identical to what plan stores is counted `n_unchanged` and bumps no
+`vers_number`. So export -> re-import changes nothing (tested).
+
+## Export (#951)
+
+`GET /api/v1/concepts/export.xlsx` (role `read_only`) and
+`flask export-concepts out.xlsx [--category X]` write the catalogue in this
+format: template column order, lookups by name, a local concept with a blank
+`canonical_lib`, categories `; `-joined, review columns blank. Takes the list's
+filters. Only plan's own `concept_display_text` is written, never SNOMED text.
+
+## Import record (#951)
+
+Every real (non-dry) run is stored as an immutable `concept_imports` row:
+operator, filename, sha256, entry point (cli/api/web), batch categories and the
+counts. A concept CREATED by an import carries its `import_guid` (an update does
+not move it); each category link carries the import that added it.
+`GET /api/v1/concept-imports` and `/<guid>` (role `read_only`; the latter lists the
+concepts created and links added).
+
 ## Audit
 
 Every import run is logged via `app.logger` with operator, filename,
@@ -100,7 +142,8 @@ from the saved input.
 ## CLI
 
 ```
-flask import-concepts /path/to/file.xlsx [--dry-run] [--json-out] [--operator <id>]
+flask import-concepts /path/to/file.xlsx [--dry-run] [--json-out] [--operator <id>] [--category <name>[; <name>]]
+flask export-concepts /path/to/out.xlsx [--category <name|guid>]
 ```
 
 Exit code `0` on a clean run, `1` when any row was rejected, `2` on

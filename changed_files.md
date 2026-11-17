@@ -1214,3 +1214,16 @@ gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/services/plandef_range.py (NEW) — change one transaction's range in all three copies; review recorded; shared activity refused
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/__init__.py — NEW `flask plandef-set-range` (dry run default)
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_plandef_set_range_987.py (NEW)
+
+## #951 — concept categories, import record, export (2026-11-17)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/models/concept_models.py — ConceptCategory, ConceptCategoryLink, ConceptImport (immutable); Concept.import_guid + categories
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/migrations/versions/f7a8b9c0d1e2_951_concept_categories.py (NEW) — three tables, concepts.import_guid, type rename `Diagnsosis ICD10` -> `Diagnosis`
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/services/concept_categories.py (NEW) — the one category resolver
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/services/concept_export.py (NEW) — .xlsx export in the import format
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/services/concept_importer.py — category, concept_explain, import record, no-op rows unchanged
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/concepts.py — category filter, categories on create/update, export, concept-imports routes
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/lookup_tables.py — /lookup/concept-categories (gated)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/routes/concepts.py; app/templates/concepts/{import,create,edit,view}.html — category on the forms
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/__init__.py — `--category` on import-concepts; NEW `flask export-concepts`
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_concept_categories_951.py (NEW); tests/test_concept_import.py, tests/test_lookup_read_posture_925.py — updated
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/concept_import.md, docs/technical.md
