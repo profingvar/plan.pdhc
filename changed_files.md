@@ -1237,3 +1237,7 @@ gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_diagnosis_review_984.py (NEW)
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/api_reference.md, /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/technical.md, /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/user_manual.md
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/changed_files.md, /Users/martiningvar/T7_sidewinder/plan.pdhc/progress.md
+
+## 2026-11-19 — single-goal inference limited to same-unit transactions
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/plandefinitions.py — _plandef_full_dict
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_single_goal_unit_guard.py (NEW)

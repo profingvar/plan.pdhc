@@ -2168,3 +2168,7 @@ Mutation controls (each restored, sha256 verified identical afterwards):
 
 pytest: 699 → 750 passed. Results: `results/2026-11-17T12-28-10Z_results/`.
 Not committed, not deployed.
+
+## 2026-11-19 — single-goal inference limited to the goal's unit
+- MMD_plan (one goal, cgm_mean_glucose mmol/L) had that goal stamped on every activity and transaction, so gateway stored sleep, blood pressure, anxiety and stress as glucose. Now a transaction gets the single goal only if it IS the goal concept or its concept unit equals the goal concept's unit (fallback: goal target_unit_name); an activity carries the goal only if one of its transactions does. Twin guard in request.pdhc context_service, which also covers already-frozen orders.
+- Test +1 (fails against the old code). Suite 768 passed.

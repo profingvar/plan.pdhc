@@ -82,6 +82,17 @@ def _plandef_full_dict(pd):
     default_goal_guid = goals[0].get('guid') if len(goals) == 1 else None
     default_goal_concept_guid = goals[0].get('concept_guid') if len(goals) == 1 else None
     default_goal_concept_name = goals[0].get('concept_name') if len(goals) == 1 else None
+    # 2026-11-19 (MMD_plan): the single goal is inferred only for a
+    # transaction that measures in the GOAL'S UNIT. Gateway labels a value
+    # with its goal concept, so stamping one goal (cgm_mean_glucose, mmol/L)
+    # on every activity stored sleep (h), blood pressure (mmHg), anxiety and
+    # stress as glucose. A transaction in another unit, or with none, gets no
+    # goal; an activity carries the goal only if one of its transactions does.
+    default_goal_unit = None
+    if default_goal_concept_guid:
+        gc = Concept.query.filter_by(guid=default_goal_concept_guid).first()
+        gu = Unit.query.filter_by(guid=gc.unit).first() if gc and gc.unit else None
+        default_goal_unit = (gu.unit_name if gu else None) or goals[0].get('target_unit_name')
 
     links = PlanDefinitionActivity.query.filter_by(plandefinition_guid=pd.guid) \
         .order_by(PlanDefinitionActivity.sort_order).all()
@@ -91,9 +102,6 @@ def _plandef_full_dict(pd):
         if act:
             d = act.to_dict()
             d['sort_order'] = link.sort_order
-            d['goal_guid'] = default_goal_guid
-            d['goal_concept_guid'] = default_goal_concept_guid
-            d['goal_concept_name'] = default_goal_concept_name
             txns = []
             for t in Transaction.query.filter_by(activity_guid=act.guid).order_by(Transaction.sort_order).all():
                 td = t.to_dict()
@@ -114,11 +122,19 @@ def _plandef_full_dict(pd):
                 # Carry the goal linkage onto the transaction too so
                 # consumers don't have to walk activities → transactions
                 # just to enrich a single observation.
-                td['goal_guid'] = default_goal_guid
-                td['goal_concept_guid'] = default_goal_concept_guid
-                td['goal_concept_name'] = default_goal_concept_name
+                linked = bool(default_goal_concept_guid) and (
+                    t.concept_guid == default_goal_concept_guid
+                    or (default_goal_unit is not None
+                        and td.get('concept_unit_name') == default_goal_unit))
+                td['goal_guid'] = default_goal_guid if linked else None
+                td['goal_concept_guid'] = default_goal_concept_guid if linked else None
+                td['goal_concept_name'] = default_goal_concept_name if linked else None
                 txns.append(td)
             d['transactions'] = txns
+            any_linked = any(x.get('goal_concept_guid') for x in txns)
+            d['goal_guid'] = default_goal_guid if any_linked else None
+            d['goal_concept_guid'] = default_goal_concept_guid if any_linked else None
+            d['goal_concept_name'] = default_goal_concept_name if any_linked else None
             activities.append(d)
     result['activities'] = activities
     return result
