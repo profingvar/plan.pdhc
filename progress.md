@@ -2173,3 +2173,4 @@ Not committed, not deployed.
 - MMD_plan (one goal, cgm_mean_glucose mmol/L) had that goal stamped on every activity and transaction, so gateway stored sleep, blood pressure, anxiety and stress as glucose. Now a transaction gets the single goal only if it IS the goal concept or its concept unit equals the goal concept's unit (fallback: goal target_unit_name); an activity carries the goal only if one of its transactions does. Twin guard in request.pdhc context_service, which also covers already-frozen orders.
 - Test +1 (fails against the old code). Suite 768 passed.
 - DEPLOYED 2026-11-19 (overlay; rollback tag `:pre_goalunit`, files `*.pre_goalunit.<ts>`). Baseline ok, health 200, hashes ok. New MMD values after the deploy arrived correctly labelled.
+- 2026-11-19 (operator: "LOINC sömn"): concept sleep-duration (9bbc1c9e) bound to LOINC 93832-4 (was local, no code); via guard_concept, vers_number 1 -> 2. Dump of concepts first (pre_sleep_loinc_*.pgdump).
