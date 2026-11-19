@@ -142,7 +142,7 @@ def test_subsets_migration_is_the_single_head():
         m = re.search(r"^down_revision = ['\"]([^'\"]+)", t, re.M)
         if m:
             downs.add(m.group(1))
-    assert revs - downs == {'c5d1e2f3a4b7'}
+    assert revs - downs == {'d6e2f3a4b5c8'}
 
 
 # ------------------------------------------------------------------ marked for deletion

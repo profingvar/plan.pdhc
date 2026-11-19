@@ -369,7 +369,7 @@ class Concept(db.Model):
 
     # #951 D4: the import that CREATED this concept, if one did. NULL for every
     # concept made before #951 or by hand -- not knowing is not invented.
-    import_guid = db.Column(db.String(36), db.ForeignKey('concept_imports.guid'), nullable=True)
+    import_guid = db.Column(db.String(36), db.ForeignKey('concept_imports.guid', deferrable=True, initially='DEFERRED'), nullable=True)
 
     # Marked for deletion: a request, not a deletion. The term stays usable
     # until someone deletes it; NULL = not marked.
@@ -501,7 +501,7 @@ class ConceptCategoryLink(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     concept_guid = db.Column(db.String(36), db.ForeignKey('concepts.guid', ondelete='CASCADE'), nullable=False, index=True)
     category_guid = db.Column(db.String(36), db.ForeignKey('concept_categories.guid'), nullable=False, index=True)
-    import_guid = db.Column(db.String(36), db.ForeignKey('concept_imports.guid'), nullable=True)
+    import_guid = db.Column(db.String(36), db.ForeignKey('concept_imports.guid', deferrable=True, initially='DEFERRED'), nullable=True)
     date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
