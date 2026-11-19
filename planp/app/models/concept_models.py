@@ -371,6 +371,11 @@ class Concept(db.Model):
     # concept made before #951 or by hand -- not knowing is not invented.
     import_guid = db.Column(db.String(36), db.ForeignKey('concept_imports.guid'), nullable=True)
 
+    # Marked for deletion: a request, not a deletion. The term stays usable
+    # until someone deletes it; NULL = not marked.
+    marked_for_deletion_at = db.Column(db.DateTime, nullable=True)
+    marked_for_deletion_by = db.Column(db.String(255), nullable=True)
+
     # #951 D1: MANY categories per concept (a diabetes-guideline term may also
     # belong to a cardiovascular one). Read through the link table.
     categories = db.relationship(
@@ -378,6 +383,13 @@ class Concept(db.Model):
         primaryjoin='Concept.guid == ConceptCategoryLink.concept_guid',
         secondaryjoin='ConceptCategoryLink.category_guid == ConceptCategory.guid',
         lazy='selectin', viewonly=True, order_by='ConceptCategory.category_name')
+
+    # Named subsets this concept is marked for (many per concept).
+    subsets = db.relationship(
+        'ConceptSubset', secondary='concept_subset_links',
+        primaryjoin='Concept.guid == ConceptSubsetLink.concept_guid',
+        secondaryjoin='ConceptSubsetLink.subset_guid == ConceptSubset.guid',
+        lazy='selectin', viewonly=True, order_by='ConceptSubset.subset_name')
 
     __table_args__ = (
         db.CheckConstraint(
@@ -494,6 +506,36 @@ class ConceptCategoryLink(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('concept_guid', 'category_guid', name='uq_concept_category'),
+    )
+
+
+class ConceptSubset(db.Model):
+    """A NAMED SUBSET of concepts, e.g. the terms of one scenario or study.
+
+    Not a category: a category says what a term IS (Condition, Symptom), a
+    subset says which piece of work it was picked for. Many per concept, and
+    an operator makes one simply by naming it while marking terms.
+    """
+    __tablename__ = 'concept_subsets'
+
+    id = db.Column(db.Integer, primary_key=True)
+    guid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    subset_name = db.Column(db.String(255), unique=True, nullable=False)
+    author = db.Column(db.String(255), nullable=True)
+    date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class ConceptSubsetLink(db.Model):
+    __tablename__ = 'concept_subset_links'
+
+    id = db.Column(db.Integer, primary_key=True)
+    concept_guid = db.Column(db.String(36), db.ForeignKey('concepts.guid', ondelete='CASCADE'), nullable=False, index=True)
+    subset_guid = db.Column(db.String(36), db.ForeignKey('concept_subsets.guid', ondelete='CASCADE'), nullable=False, index=True)
+    author = db.Column(db.String(255), nullable=True)
+    date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        db.UniqueConstraint('concept_guid', 'subset_guid', name='uq_concept_subset'),
     )
 
 

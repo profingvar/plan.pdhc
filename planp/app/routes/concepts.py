@@ -1,5 +1,6 @@
 import io
 import os
+from datetime import datetime, timezone
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from app.api.auth import sso_login_required
@@ -14,19 +15,140 @@ from app.services.concept_importer import (
 from app.services.save_guard import guard_concept, SaveBlocked  # #521 GA-5
 from app.services.canonical_libs import resolve_or_local
 
-from app.models.concept_models import ConceptCategory
+from app.models.concept_models import (
+    ConceptCategory, ConceptCategoryLink, ConceptSubset, ConceptSubsetLink,
+)
+from app.services import concept_subsets as subset_svc
 from app.services import concept_categories as cat_svc
 
 concepts_web_bp = Blueprint('concepts_web', __name__, url_prefix='/concepts')
 
 
+#: Sortable columns of the concept list: key -> what it sorts on.
+#: `class` is the concept's categories (Condition, Symptom ...): a concept with
+#: several sorts by the first one alphabetically, one with none sorts last.
+SORT_KEYS = ('name', 'created', 'class')
+
+#: The filter value that lists concepts marked for deletion.
+DELETION_FILTER = 'marked-for-deletion'
+
+
+def _list_query(sort, direction, subset_guid):
+    q = Concept.query
+    if subset_guid == DELETION_FILTER:
+        q = q.filter(Concept.marked_for_deletion_at.isnot(None))
+    elif subset_guid:
+        q = q.join(ConceptSubsetLink, ConceptSubsetLink.concept_guid == Concept.guid) \
+             .filter(ConceptSubsetLink.subset_guid == subset_guid)
+    desc = direction == 'desc'
+    if sort == 'created':
+        col = Concept.date_created
+        order = [col.desc().nullslast() if desc else col.asc().nullsfirst()]
+    elif sort == 'class':
+        first_cat = (db.session.query(
+                         ConceptCategoryLink.concept_guid.label('cg'),
+                         db.func.min(ConceptCategory.category_name).label('cat'))
+                     .join(ConceptCategory, ConceptCategory.guid == ConceptCategoryLink.category_guid)
+                     .group_by(ConceptCategoryLink.concept_guid).subquery())
+        q = q.outerjoin(first_cat, first_cat.c.cg == Concept.guid)
+        col = first_cat.c.cat
+        order = [(col.desc() if desc else col.asc()).nullslast()]
+    else:
+        order = [Concept.concept_name.desc() if desc else Concept.concept_name.asc()]
+    # Stable tie-break, so paging through a sort never repeats or skips a row.
+    return q.order_by(*order, Concept.concept_name.asc(), Concept.id.asc())
+
+
 @concepts_web_bp.route('/')
 def list_concepts():
     page = max(1, request.args.get('page', 1, type=int))
-    pagination = Concept.query.order_by(Concept.concept_name).paginate(
+    sort = request.args.get('sort', 'name')
+    if sort not in SORT_KEYS:
+        sort = 'name'
+    direction = 'desc' if request.args.get('dir') == 'desc' else 'asc'
+    subset_guid = request.args.get('subset') or None
+    subsets = ConceptSubset.query.order_by(ConceptSubset.subset_name).all()
+    if subset_guid and subset_guid != DELETION_FILTER and subset_guid not in {s.guid for s in subsets}:
+        subset_guid = None
+    pagination = _list_query(sort, direction, subset_guid).paginate(
         page=page, per_page=50, error_out=False
     )
-    return render_template('concepts/list.html', pagination=pagination)
+    return render_template('concepts/list.html', pagination=pagination,
+                           sort=sort, direction=direction,
+                           subset_guid=subset_guid, subsets=subsets,
+                           deletion_filter=DELETION_FILTER,
+                           n_marked=Concept.query.filter(Concept.marked_for_deletion_at.isnot(None)).count())
+
+
+def _safe_back(default):
+    back = request.form.get('next') or default
+    return back if back.startswith('/') and not back.startswith('//') else default
+
+
+@concepts_web_bp.route('/deletion-marks', methods=['POST'])
+@sso_login_required
+def mark_for_deletion():
+    """Mark (action=mark) or unmark (action=unmark) the ticked concepts for
+    deletion. Nothing is deleted here: deleting stays its own explicit step."""
+    back = _safe_back(url_for('concepts_web.list_concepts'))
+    guids = [g for g in request.form.getlist('concept_guid') if g]
+    if not guids:
+        flash('Tick at least one concept first.', 'error')
+        return redirect(back)
+    by = (session.get('sso_user') or {}).get('email')
+    rows = Concept.query.filter(Concept.guid.in_(guids)).all()
+    if request.form.get('action') == 'unmark':
+        n = sum(1 for c in rows if c.marked_for_deletion_at is not None)
+        for c in rows:
+            c.marked_for_deletion_at = None
+            c.marked_for_deletion_by = None
+        db.session.commit()
+        flash(f'Unmarked {n} concept(s) for deletion.', 'success')
+    else:
+        now = datetime.now(timezone.utc)
+        n = 0
+        for c in rows:
+            if c.marked_for_deletion_at is None:      # keep who marked it first
+                c.marked_for_deletion_at, c.marked_for_deletion_by = now, by
+                n += 1
+        db.session.commit()
+        flash(f'Marked {n} concept(s) for deletion. Nothing is deleted until someone deletes them.', 'success')
+    return redirect(back)
+
+
+@concepts_web_bp.route('/subsets/mark', methods=['POST'])
+@sso_login_required
+def mark_subset():
+    """Mark (or, with action=remove, unmark) the ticked concepts for a named
+    subset. Naming a new subset creates it."""
+    back = _safe_back(url_for('concepts_web.list_concepts'))   # never off-site
+    guids = request.form.getlist('concept_guid')
+    if not guids:
+        flash('Tick at least one concept first.', 'error')
+        return redirect(back)
+    blob = session.get('sso_user') or {}
+    author = blob.get('email')
+    action = request.form.get('action', 'add')
+    try:
+        if action == 'remove':
+            name = (request.form.get('subset_name') or '').strip()
+            subset = ConceptSubset.query.filter_by(subset_name=name).first()
+            if subset is None:
+                flash(f'No subset named {name!r}.' if name else 'Subset name is required.', 'error')
+                return redirect(back)
+            n = subset_svc.unmark(guids, subset)
+            db.session.commit()
+            flash(f'Removed {n} concept(s) from subset "{subset.subset_name}".', 'success')
+        else:
+            subset = subset_svc.get_or_create(request.form.get('subset_name'), author=author)
+            n = subset_svc.mark(guids, subset, author=author)
+            db.session.commit()
+            flash(f'Marked {n} concept(s) for subset "{subset.subset_name}" '
+                  f'({len(guids) - n} already in it or unknown).', 'success')
+    except subset_svc.SubsetError as e:
+        db.session.rollback()
+        flash(str(e), 'error')
+    return redirect(back)
 
 
 @concepts_web_bp.route('/create', methods=['GET', 'POST'])

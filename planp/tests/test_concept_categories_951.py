@@ -280,7 +280,7 @@ def test_one_alembic_head_and_a_short_revision_id():
         if m:
             downs.add(m.group(1))
     heads = revs - downs
-    assert heads == {'f7a8b9c0d1e2'}
+    assert len(heads) == 1, heads   # the head itself is pinned by the newest migration's test
     assert all(len(r) <= 32 for r in revs)
 
 

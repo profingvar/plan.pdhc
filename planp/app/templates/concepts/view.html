@@ -10,6 +10,15 @@
           onsubmit="return confirm('Delete concept &quot;{{ concept.concept_name }}&quot;?');">
       <button type="submit" class="btn btn-danger btn-sm"><i data-lucide="trash-2"></i> Delete</button>
     </form>
+    <form method="post" action="{{ url_for('concepts_web.mark_for_deletion') }}" style="display:inline;">
+      <input type="hidden" name="concept_guid" value="{{ concept.guid }}">
+      <input type="hidden" name="next" value="{{ url_for('concepts_web.view_concept', guid=concept.guid) }}">
+      {% if concept.marked_for_deletion_at %}
+      <button type="submit" name="action" value="unmark" class="btn btn-sm"><i data-lucide="undo-2"></i> Unmark deletion</button>
+      {% else %}
+      <button type="submit" name="action" value="mark" class="btn btn-sm"><i data-lucide="flag"></i> Mark for deletion</button>
+      {% endif %}
+    </form>
     <a href="{{ url_for('concepts_web.list_concepts') }}" class="btn btn-secondary btn-sm"><i data-lucide="arrow-left"></i> Back to list</a>
   </div>
 </div>
@@ -24,6 +33,12 @@
 
     <span class="detail-label">Status</span>
     <span class="detail-value"><span class="badge badge-{{ 'success' if concept.status == 'active' else 'warning' }}">{{ concept.status }}</span></span>
+
+    {% if concept.marked_for_deletion_at %}
+    <span class="detail-label">Marked for deletion</span>
+    <span class="detail-value"><span class="badge badge-danger">to delete</span>
+      {{ concept.marked_for_deletion_at.strftime('%Y-%m-%d') }}{% if concept.marked_for_deletion_by %} by {{ concept.marked_for_deletion_by }}{% endif %}</span>
+    {% endif %}
 
     <span class="detail-label">Canonical Lib</span>
     <span class="detail-value">{{ concept.canonical_lib_rel.canonical_lib_name if concept.canonical_lib_rel else concept.canonical_lib }}</span>

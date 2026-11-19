@@ -10,25 +10,81 @@
   </div>
 </div>
 
+{% macro sort_th(key, label) -%}
+  {%- set active = sort == key -%}
+  {%- set next_dir = 'desc' if (active and direction == 'asc') else 'asc' -%}
+  <th aria-sort="{{ ('ascending' if direction == 'asc' else 'descending') if active else 'none' }}">
+    <a class="sort-link" href="{{ url_for('concepts_web.list_concepts', sort=key, dir=next_dir, subset=subset_guid) }}">{{ label }}{% if active %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a>
+  </th>
+{%- endmacro %}
+
+<style>
+  .subset-bar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin-bottom:.75rem; }
+  .subset-bar input[type=text], .subset-bar select { padding:.3rem .5rem; }
+  .sort-link { color:inherit; text-decoration:none; white-space:nowrap; }
+  .sort-link:hover { text-decoration:underline; }
+  .tag { display:inline-block; font-size:.8em; padding:.05rem .4rem; border-radius:.6rem;
+         background:rgba(127,127,127,.15); margin:0 .2rem .2rem 0; white-space:nowrap; }
+</style>
+
 <div class="card">
+  <form method="get" class="subset-bar" action="{{ url_for('concepts_web.list_concepts') }}">
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="dir" value="{{ direction }}">
+    <label for="subset-filter">Show subset</label>
+    <select id="subset-filter" name="subset" onchange="this.form.submit()">
+      <option value="">All concepts</option>
+      <option value="{{ deletion_filter }}" {% if subset_guid == deletion_filter %}selected{% endif %}>Marked for deletion ({{ n_marked }})</option>
+      {% for s in subsets %}
+      <option value="{{ s.guid }}" {% if s.guid == subset_guid %}selected{% endif %}>{{ s.subset_name }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button class="btn btn-sm" type="submit">Filter</button></noscript>
+  </form>
+
   {% if pagination.items %}
+  <form method="post" action="{{ url_for('concepts_web.mark_subset') }}" id="subset-form">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
+    <div class="subset-bar">
+      <label for="subset-name">Subset</label>
+      <input type="text" id="subset-name" name="subset_name" list="subset-names"
+             placeholder="Existing or new name" required maxlength="255">
+      <datalist id="subset-names">
+        {% for s in subsets %}<option value="{{ s.subset_name }}">{% endfor %}
+      </datalist>
+      <button class="btn btn-primary btn-sm" type="submit" name="action" value="add">Mark ticked</button>
+      <button class="btn btn-sm" type="submit" name="action" value="remove">Remove ticked</button>
+      <span aria-hidden="true">·</span>
+      <button class="btn btn-danger btn-sm" type="submit" name="action" value="mark"
+              formaction="{{ url_for('concepts_web.mark_for_deletion') }}" formnovalidate>Mark ticked for deletion</button>
+      <button class="btn btn-sm" type="submit" name="action" value="unmark"
+              formaction="{{ url_for('concepts_web.mark_for_deletion') }}" formnovalidate>Unmark deletion</button>
+    </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Name</th>
+          <th><input type="checkbox" id="tick-all" aria-label="Tick all on this page"
+                     onclick="document.querySelectorAll('input[name=concept_guid]').forEach(b => b.checked = this.checked)"></th>
+          {{ sort_th('name', 'Name') }}
           <th>Display Text</th>
+          {{ sort_th('class', 'Class') }}
+          <th>Subsets</th>
           <th>Status</th>
           <th>Version</th>
-          <th>Created</th>
+          {{ sort_th('created', 'Created') }}
         </tr>
       </thead>
       <tbody>
         {% for c in pagination.items %}
         <tr>
+          <td><input type="checkbox" name="concept_guid" value="{{ c.guid }}" aria-label="Tick {{ c.concept_name }}"></td>
           <td><a href="{{ url_for('concepts_web.view_concept', guid=c.guid) }}">{{ c.concept_name }}</a></td>
           <td>{{ c.concept_display_text or '—' }}</td>
-          <td><span class="badge badge-{{ 'success' if c.status == 'active' else 'warning' }}">{{ c.status }}</span></td>
+          <td>{% for cat in c.categories %}<span class="tag">{{ cat.category_name }}</span>{% else %}—{% endfor %}</td>
+          <td>{% for s in c.subsets %}<span class="tag">{{ s.subset_name }}</span>{% else %}—{% endfor %}</td>
+          <td><span class="badge badge-{{ 'success' if c.status == 'active' else 'warning' }}">{{ c.status }}</span>
+            {% if c.marked_for_deletion_at %}<span class="badge badge-danger" title="Marked {{ c.marked_for_deletion_at.strftime('%Y-%m-%d') }}{% if c.marked_for_deletion_by %} by {{ c.marked_for_deletion_by }}{% endif %}">to delete</span>{% endif %}</td>
           <td>{{ c.vers_number }}</td>
           <td>{{ c.date_created.strftime('%Y-%m-%d') if c.date_created else '—' }}</td>
         </tr>
@@ -36,17 +92,22 @@
       </tbody>
     </table>
   </div>
+  </form>
   {% if pagination.pages > 1 %}
   <div class="pagination">
     {% for p in pagination.iter_pages() %}
       {% if p %}
-        <a href="?page={{ p }}" {% if p == pagination.page %}class="active"{% endif %}>{{ p }}</a>
+        <a href="{{ url_for('concepts_web.list_concepts', page=p, sort=sort, dir=direction, subset=subset_guid) }}" {% if p == pagination.page %}class="active"{% endif %}>{{ p }}</a>
       {% else %}
         <span>...</span>
       {% endif %}
     {% endfor %}
   </div>
   {% endif %}
+  {% elif subset_guid == deletion_filter %}
+  <div class="empty-state"><p>No concepts are marked for deletion.</p></div>
+  {% elif subset_guid %}
+  <div class="empty-state"><p>No concepts in this subset.</p></div>
   {% else %}
   <div class="empty-state">
     <p>No concepts yet.</p>
