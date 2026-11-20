@@ -10,7 +10,7 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 - Only form and diagnosis-review actions got `timingTiming`; a measurement action (MMD_plan CGM: 4/h, count 400, duration 40 d) was exported with plan.pdhc field names only.
 - `FHIRService.measurement_timing`: same repeat as forms, plus `duration`/`durationUnit` (length of ONE occurrence, UnitsOfTime only); `once` -> `count: 1`. plan.pdhc's own fields stay beside it.
 - Stored `fhir_data` is regenerated on save, so an existing plan shows the new export after its next save.
-- tests/test_fhir_measurement_timing.py (7; mutation-checked). Suite 775 passed. Not yet deployed.
+- tests/test_fhir_measurement_timing.py (7; mutation-checked). Suite 775 passed. Deployed 2026-11-20 (overlay on pdhc_app, rollback tag planp-app:pre_timing); smokes plan/rosetta/gateway green.
 
 ### 1.1 Prerequisites and tooling
 
