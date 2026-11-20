@@ -12,7 +12,7 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 - `app/services/continuous_timing.py`: refuses a continuous activity without a period or an interval (editor flash; API 422 `continuous_timing_invalid`) and clears frequency/cycle/count/per-occurrence duration, so nothing reads it as thousands of orders.
 - FHIR export: `timingTiming {repeat: {count: 1, duration: 40, durationUnit: d}}` (one occurrence lasting the period) + extension `{PLAN_BASE}/fhir/StructureDefinition/expected-sampling-interval` valueDuration.
 - Editor: "Continuous (ordered once, streams data)" with Active period * and Expected interval *; repeat fields hidden. Driven in jsdom: load, switch both ways, collect.
-- 10 tests in tests/test_continuous_timing.py (period gate, normalisation, export mutation-checked). Suite 799 passed. Not deployed. MMD_plan not converted (MMD's plan; operator or explicit request).
+- 10 tests in tests/test_continuous_timing.py (period gate, normalisation, export mutation-checked). Suite 799 passed. Deployed 2026-11-20 (overlay; image tag `planp-app:pre_continuous`; pg_dump in ~/backups/predeploy/continuous_plan/): migration at a1c2e3f4b5d6, both columns present, health 200, hash ok, smoke plan 10/10 and request 8/8 after. MMD_plan not converted (MMD's plan; operator or explicit request).
 
 ### 2026-11-20 — a PlanDefinition's version follows its content
 - Editing rewrote the plan in place and kept `version` as the form sent it back (the stored value): MMD_plan stayed 1.0.0 through every edit, so sim output and analyses could not say which plan version they used.
