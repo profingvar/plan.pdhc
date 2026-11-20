@@ -6,6 +6,14 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 
 ## 1) Environment and infrastructure setup
 
+### 2026-11-20 — #1011 read_shadow: window restarted, every line classified
+- Today's continuous deploy (13:25Z) recreated pdhc_app and wiped the shadow log; the clean week restarts from there (earliest flip ~2026-11-27). Lines so far are archived on miserver in ~/backups/plan_read_shadow/ (mode 600). Copy them out before any plan redeploy.
+- 11 lines, all classified (nginx access.log is local time, +01:00):
+  - 3 = provider.pdhc's smoke (provider1_app, 13:35:42Z): plandefinitions/<fake> x2 (404) + /concepts. BUT provider's REAL client is keyless too: `provider_portal/app/services/plan_client.py:46` sends no headers, and provider1_app has no PLAN_SERVICE_KEY. provider was not in #931's reader list. Flipping /plandefinitions or /concepts before that is fixed makes every guided provider form degrade silently to text boxes (plan_client returns {} on error). Needs: a plan read_only identity for provider.pdhc, the key in provider's env (operator), the client sending plan_read_headers, deploy.
+  - 1 = contract.pdhc's smoke: /concepts/<fake> (404), keyless ON PURPOSE (it asserts the route is auth=False). contract's real client sends its key. That smoke check must be changed at the /concepts flip, or it will fail.
+  - 1 = curl from the Docker network (my post-deploy read check).
+  - 6 = Googlebot (66.249.70.x) crawling /api/v1/termbank/concept/<system>/<code> on plan. Decide whether those pages are meant to be public before gating them.
+
 ### 2026-11-20 — continuous activities (CGM)
 - Operator: ordering CGM is ONE procedure that produces glucose values as long as it is on; MMD_plan's "repeat 4/h, count 410, duration 40 d" was a workaround (ended after ~4.3 days; said each reading lasted 40 days). Period is REQUIRED (operator).
 - New `timing_type = 'continuous'` (measurement activities only): active period = the duration bound (`timing_bounds_mode='duration'` + value/unit, d/wk/mo), expected interval between values = new `sample_interval_value/unit` (s/min/h). Migration a1c2e3f4b5d6 (two nullable columns, additive).
