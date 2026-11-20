@@ -14,7 +14,7 @@ from app.models.concept_models import Concept, Unit
 from app.models.forms_models import FormDefinition
 from app.services.fhir_service import FHIRService
 from app.services import plandef_version
-from app.services import diagnosis_review  # #984
+from app.services import continuous_timing, diagnosis_review  # #984
 from app.services.name_uniqueness import NameUniquenessService
 from app.services.save_guard import guard_plandef, SaveBlocked  # #521 GA-5
 
@@ -31,12 +31,18 @@ PLAN_BASE = "https://plan.pdhc.se"
 
 
 def _diagnosis_review_refusal(actions_data):
-    """#984: a 422 response refusing invalid diagnosis-review steps, or None."""
+    """#984: a 422 response refusing invalid diagnosis-review steps, or None.
+    Also (2026-11-20) refuses a continuous activity without a period or an
+    interval, and normalises valid ones in place before they are stored."""
     issues = diagnosis_review.validate_actions(actions_data)
-    if not issues:
-        return None
-    return jsonify({"error": "diagnosis_review_invalid",
-                    "error_count": len(issues), "issues": issues}), 422
+    if issues:
+        return jsonify({"error": "diagnosis_review_invalid",
+                        "error_count": len(issues), "issues": issues}), 422
+    issues = continuous_timing.validate_actions(actions_data)
+    if issues:
+        return jsonify({"error": "continuous_timing_invalid",
+                        "error_count": len(issues), "issues": issues}), 422
+    return None
 
 plandefinitions_bp = Blueprint('plandefinitions_api', __name__)
 # Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
@@ -281,6 +287,8 @@ def create_plandefinition():
             timing_bounds_count=act_data.get('timing_bounds_count'),
             timing_bounds_duration_value=act_data.get('timing_bounds_duration_value'),
             timing_bounds_duration_unit=act_data.get('timing_bounds_duration_unit'),
+            sample_interval_value=act_data.get('sample_interval_value'),
+            sample_interval_unit=act_data.get('sample_interval_unit'),
             notes=_sanitize(act_data.get('notes')),
         )
         db.session.add(activity)
@@ -434,6 +442,8 @@ def update_plandefinition(guid):
                 activity.timing_bounds_count = act_data.get('timing_bounds_count')
                 activity.timing_bounds_duration_value = act_data.get('timing_bounds_duration_value')
                 activity.timing_bounds_duration_unit = act_data.get('timing_bounds_duration_unit')
+                activity.sample_interval_value = act_data.get('sample_interval_value')
+                activity.sample_interval_unit = act_data.get('sample_interval_unit')
                 Transaction.query.filter_by(activity_guid=activity.guid).delete()
             else:
                 activity = Activity(
@@ -451,6 +461,8 @@ def update_plandefinition(guid):
                     timing_bounds_count=act_data.get('timing_bounds_count'),
                     timing_bounds_duration_value=act_data.get('timing_bounds_duration_value'),
                     timing_bounds_duration_unit=act_data.get('timing_bounds_duration_unit'),
+                    sample_interval_value=act_data.get('sample_interval_value'),
+                    sample_interval_unit=act_data.get('sample_interval_unit'),
                     notes=_sanitize(act_data.get('notes')),
                 )
                 db.session.add(activity)

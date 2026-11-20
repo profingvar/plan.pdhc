@@ -6,6 +6,14 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 
 ## 1) Environment and infrastructure setup
 
+### 2026-11-20 — continuous activities (CGM)
+- Operator: ordering CGM is ONE procedure that produces glucose values as long as it is on; MMD_plan's "repeat 4/h, count 410, duration 40 d" was a workaround (ended after ~4.3 days; said each reading lasted 40 days). Period is REQUIRED (operator).
+- New `timing_type = 'continuous'` (measurement activities only): active period = the duration bound (`timing_bounds_mode='duration'` + value/unit, d/wk/mo), expected interval between values = new `sample_interval_value/unit` (s/min/h). Migration a1c2e3f4b5d6 (two nullable columns, additive).
+- `app/services/continuous_timing.py`: refuses a continuous activity without a period or an interval (editor flash; API 422 `continuous_timing_invalid`) and clears frequency/cycle/count/per-occurrence duration, so nothing reads it as thousands of orders.
+- FHIR export: `timingTiming {repeat: {count: 1, duration: 40, durationUnit: d}}` (one occurrence lasting the period) + extension `{PLAN_BASE}/fhir/StructureDefinition/expected-sampling-interval` valueDuration.
+- Editor: "Continuous (ordered once, streams data)" with Active period * and Expected interval *; repeat fields hidden. Driven in jsdom: load, switch both ways, collect.
+- 10 tests in tests/test_continuous_timing.py (period gate, normalisation, export mutation-checked). Suite 799 passed. Not deployed. MMD_plan not converted (MMD's plan; operator or explicit request).
+
 ### 2026-11-20 — a PlanDefinition's version follows its content
 - Editing rewrote the plan in place and kept `version` as the form sent it back (the stored value): MMD_plan stayed 1.0.0 through every edit, so sim output and analyses could not say which plan version they used.
 - `services/plandef_version.py`: `Snapshot` before an edit, `settle` after it. If the content changed (title, description, status, type, publisher, form link, validity, goals, actions; JSON compared key-order-insensitively) and the editor left the version untouched, the patch level is bumped (1.0.0 -> 1.0.1). A version the editor set wins; an unchanged save keeps the version; a non-numeric version is left alone. Wired into the web edit route and the API PUT, before fhir_data is regenerated, so the FHIR `version` follows.

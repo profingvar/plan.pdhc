@@ -16,7 +16,7 @@ class Activity(db.Model):
     subject_type = db.Column(db.String(100), nullable=True)
 
     # Timing
-    timing_type = db.Column(db.String(20), nullable=True)  # 'once' or 'repeat'
+    timing_type = db.Column(db.String(20), nullable=True)  # 'once', 'repeat' or 'continuous'
     timing_frequency = db.Column(db.Integer, nullable=True)
     timing_period = db.Column(db.Float, nullable=True)
     timing_period_unit = db.Column(db.String(10), nullable=True)  # d, wk, mo
@@ -30,6 +30,12 @@ class Activity(db.Model):
     timing_bounds_count = db.Column(db.Integer, nullable=True)
     timing_bounds_duration_value = db.Column(db.Float, nullable=True)
     timing_bounds_duration_unit = db.Column(db.String(10), nullable=True)
+
+    # timing_type='continuous' (2026-11-20): ordered once, runs for the
+    # duration bound above, and streams data about every sample interval.
+    # See app/services/continuous_timing.py.
+    sample_interval_value = db.Column(db.Float, nullable=True)
+    sample_interval_unit = db.Column(db.String(10), nullable=True)  # s, min, h
 
     notes = db.Column(db.Text, nullable=True)
     date_created = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -62,6 +68,8 @@ class Activity(db.Model):
             'timing_bounds_count': self.timing_bounds_count,
             'timing_bounds_duration_value': self.timing_bounds_duration_value,
             'timing_bounds_duration_unit': self.timing_bounds_duration_unit,
+            'sample_interval_value': self.sample_interval_value,
+            'sample_interval_unit': self.sample_interval_unit,
             'notes': self.notes,
         }
 

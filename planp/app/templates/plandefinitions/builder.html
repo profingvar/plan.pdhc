@@ -425,9 +425,10 @@ function addAction(data) {
           <option value="">None</option>
           <option value="once" ${timingType === 'once' ? 'selected' : ''}>Once</option>
           <option value="repeat" ${timingType === 'repeat' ? 'selected' : ''}>Repeat</option>
+          <option value="continuous" ${timingType === 'continuous' ? 'selected' : ''}>Continuous (ordered once, streams data)</option>
         </select>
       </div>
-      <div class="form-group">
+      <div class="form-group ct-hide" style="display:${timingType === 'continuous' ? 'none' : ''};">
         <label>Duration of activity</label>
         <div style="display:flex; gap:0.5rem;">
           <input type="number" min="1" class="form-control action-duration-value" value="${data.duration_value || ''}" oninput="updatePreview()" style="flex:1;">
@@ -439,12 +440,13 @@ function addAction(data) {
           </select>
         </div>
       </div>
-      <div class="form-group">
+      <div class="form-group ct-hide" style="display:${timingType === 'continuous' ? 'none' : ''};">
         <label>Repeats per cycle</label>
         <input type="number" class="form-control action-timing-freq" value="${data.timing_frequency || ''}" min="1" oninput="updatePreview()">
       </div>
     </div>
-    <div class="form-row">
+    ${continuousRowHtml(data, timingType)}
+    <div class="form-row ct-hide" style="display:${timingType === 'continuous' ? 'none' : ''};">
       <div class="form-group">
         <label>Repeat cycle</label>
         <div style="display:flex; gap:0.5rem;">
@@ -770,6 +772,40 @@ function boundsRowHtml(data, timingType) {
   `;
 }
 
+// 2026-11-20: a continuous activity (e.g. CGM) is ordered once, runs for a
+// REQUIRED active period and streams values about every interval. Measurement
+// actions only; the server refuses one without both.
+function continuousRowHtml(data, timingType) {
+  const pu = data.timing_bounds_duration_unit || 'd';
+  const iu = data.sample_interval_unit || 'min';
+  return `
+    <div class="form-row action-continuous-row" style="display:${timingType === 'continuous' ? '' : 'none'};">
+      <div class="form-group">
+        <label>Active period *</label>
+        <div style="display:flex; gap:0.5rem;">
+          <input type="number" step="any" min="1" class="form-control action-ct-period-value" value="${timingType === 'continuous' ? (data.timing_bounds_duration_value || '') : ''}" placeholder="e.g. 40" oninput="updatePreview()" style="flex:1;">
+          <select class="form-control action-ct-period-unit" onchange="updatePreview()" style="flex:1;">
+            <option value="d" ${pu === 'd' ? 'selected' : ''}>days</option>
+            <option value="wk" ${pu === 'wk' ? 'selected' : ''}>weeks</option>
+            <option value="mo" ${pu === 'mo' ? 'selected' : ''}>months</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Expected interval between values *</label>
+        <div style="display:flex; gap:0.5rem;">
+          <input type="number" step="any" min="1" class="form-control action-ct-interval-value" value="${data.sample_interval_value || ''}" placeholder="e.g. 15" oninput="updatePreview()" style="flex:1;">
+          <select class="form-control action-ct-interval-unit" onchange="updatePreview()" style="flex:1;">
+            <option value="s" ${iu === 's' ? 'selected' : ''}>seconds</option>
+            <option value="min" ${iu === 'min' ? 'selected' : ''}>min</option>
+            <option value="h" ${iu === 'h' ? 'selected' : ''}>hours</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function onBoundsModeChange(sel) {
   const wrapper = sel.parentElement;
   const mode = sel.value;
@@ -782,6 +818,12 @@ function onTimingTypeChange(sel) {
   const boundsRow = row.querySelector('.action-bounds-row');
   if (boundsRow) {
     boundsRow.style.display = (sel.value === 'repeat') ? '' : 'none';
+  }
+  const ctRow = row.querySelector('.action-continuous-row');
+  if (ctRow) {
+    const ct = sel.value === 'continuous';
+    ctRow.style.display = ct ? '' : 'none';
+    row.querySelectorAll('.ct-hide').forEach(el => { el.style.display = ct ? 'none' : ''; });
   }
 }
 
@@ -820,6 +862,18 @@ function collectActions() {
       act.performer_type = row.querySelector('.action-performer')?.value || null;
       act.duration_value = row.querySelector('.action-duration-value')?.value ? parseInt(row.querySelector('.action-duration-value').value) : null;
       act.duration_unit = row.querySelector('.action-duration-unit')?.value || null;
+      if (act.timing_type === 'continuous') {
+        const pv = row.querySelector('.action-ct-period-value')?.value;
+        const iv = row.querySelector('.action-ct-interval-value')?.value;
+        act.timing_bounds_mode = 'duration';
+        act.timing_bounds_count = null;
+        act.timing_bounds_duration_value = pv ? parseFloat(pv) : null;
+        act.timing_bounds_duration_unit = row.querySelector('.action-ct-period-unit')?.value || null;
+        act.sample_interval_value = iv ? parseFloat(iv) : null;
+        act.sample_interval_unit = row.querySelector('.action-ct-interval-unit')?.value || null;
+        act.timing_frequency = null; act.timing_period = null; act.timing_period_unit = null;
+        act.duration_value = null; act.duration_unit = null;
+      }
 
       row.querySelectorAll('.txn-row').forEach(txnRow => {
         const conceptSel = txnRow.querySelector('.txn-concept');
@@ -1000,6 +1054,15 @@ function buildFhirPreview() {
           };
         }
         fhirAction.timingTiming = { repeat };
+      } else if (act.timing_type === 'continuous' && act.timing_bounds_duration_value) {
+        fhirAction.timingTiming = { repeat: { count: 1, duration: act.timing_bounds_duration_value,
+                                              durationUnit: act.timing_bounds_duration_unit || 'd' } };
+        if (act.sample_interval_value) {
+          fhirAction.extension = (fhirAction.extension || []).concat([{
+            url: 'https://plan.pdhc.se/fhir/StructureDefinition/expected-sampling-interval',
+            valueDuration: { value: act.sample_interval_value, unit: act.sample_interval_unit || 'min',
+                             system: 'http://unitsofmeasure.org', code: act.sample_interval_unit || 'min' } }]);
+        }
       } else if (act.timing_type === 'once' && act.duration_value) {
         fhirAction.timingTiming = {
           repeat: { duration: act.duration_value, durationUnit: act.duration_unit || 'min' }

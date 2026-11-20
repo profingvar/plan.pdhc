@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from app.models.concept_models import fhir_canonical_url
 from app.models.forms_models import Questionnaire
-from app.services import diagnosis_review
+from app.services import continuous_timing, diagnosis_review
 
 PLAN_BASE = "https://plan.pdhc.se"
 
@@ -197,7 +197,16 @@ class FHIRService:
                             # fields stay for existing readers; timingTiming
                             # is added beside them.
                             fhir_act = dict(act)
-                            timing = FHIRService.measurement_timing(act)
+                            if continuous_timing.is_continuous(act):
+                                # 2026-11-20: ordered once, lasting the active
+                                # period; the stream's expected interval is an
+                                # extension, never a frequency.
+                                timing = continuous_timing.fhir_timing(act)
+                                ext = continuous_timing.fhir_extension(act)
+                                if ext:
+                                    fhir_act['extension'] = (fhir_act.get('extension') or []) + [ext]
+                            else:
+                                timing = FHIRService.measurement_timing(act)
                             if timing:
                                 fhir_act['timingTiming'] = timing
                             fhir_actions.append(fhir_act)

@@ -16,7 +16,7 @@ from app.models.forms_models import FormDefinition, Questionnaire
 from app.services.save_guard import guard_plandef, SaveBlocked  # #521 GA-5
 from app.services.fhir_service import FHIRService
 from app.services import plandef_version
-from app.services import diagnosis_review  # #984
+from app.services import continuous_timing, diagnosis_review  # #984
 from app.services.name_uniqueness import NameUniquenessService
 
 plandef_web_bp = Blueprint('plandefinitions_web', __name__, url_prefix='/plandefinitions')
@@ -163,6 +163,15 @@ def create_plandef():
             flash(m, 'error')
         return redirect(url_for('plandefinitions_web.builder'))
 
+    # 2026-11-20: a continuous activity needs a period and an interval;
+    # normalised in place, so the stored action JSON is re-serialised.
+    _ct_issues = continuous_timing.validate_actions(actions_data)
+    if _ct_issues:
+        for m in continuous_timing.issue_messages(_ct_issues):
+            flash(m, 'error')
+        return redirect(url_for('plandefinitions_web.builder'))
+    action_json = json.dumps(actions_data)
+
     # #521 GA-5 — fail-closed validation of the plan structure
     _acts = [{"transactions": a.get("transactions") or []}
              for a in (actions_data or []) if isinstance(a, dict)]
@@ -267,6 +276,8 @@ def create_plandef():
             timing_duration_unit=act_data.get('duration_unit'),
             timing_bounds_duration_value=act_data.get('timing_bounds_duration_value'),
             timing_bounds_duration_unit=act_data.get('timing_bounds_duration_unit'),
+            sample_interval_value=act_data.get('sample_interval_value'),
+            sample_interval_unit=act_data.get('sample_interval_unit'),
             notes=act_data.get('notes'),
         )
         db.session.add(activity)
@@ -342,6 +353,14 @@ def edit_plandef(fhir_id):
             flash(m, 'error')
         return redirect(url_for('plandefinitions_web.builder', plandef_id=fhir_id))
 
+    _ct_issues = continuous_timing.validate_actions(actions_data)
+    if _ct_issues:
+        db.session.rollback()
+        for m in continuous_timing.issue_messages(_ct_issues):
+            flash(m, 'error')
+        return redirect(url_for('plandefinitions_web.builder', plandef_id=fhir_id))
+    action_json = json.dumps(actions_data)
+
     plandef.goal = goal_json
     plandef.action = action_json
 
@@ -390,6 +409,8 @@ def edit_plandef(fhir_id):
             activity.timing_duration_unit = act_data.get('duration_unit')
             activity.timing_bounds_duration_value = act_data.get('timing_bounds_duration_value')
             activity.timing_bounds_duration_unit = act_data.get('timing_bounds_duration_unit')
+            activity.sample_interval_value = act_data.get('sample_interval_value')
+            activity.sample_interval_unit = act_data.get('sample_interval_unit')
             # Clear old transactions
             Transaction.query.filter_by(activity_guid=activity.guid).delete()
         else:
@@ -408,6 +429,8 @@ def edit_plandef(fhir_id):
                 timing_duration_unit=act_data.get('duration_unit'),
                 timing_bounds_duration_value=act_data.get('timing_bounds_duration_value'),
                 timing_bounds_duration_unit=act_data.get('timing_bounds_duration_unit'),
+                sample_interval_value=act_data.get('sample_interval_value'),
+                sample_interval_unit=act_data.get('sample_interval_unit'),
                 notes=act_data.get('notes'),
             )
             db.session.add(activity)
