@@ -37,6 +37,33 @@ class FHIRService:
             return {'repeat': repeat}
         return None
 
+    #: Timing.repeat.durationUnit is restricted to these (UnitsOfTime).
+    UNITS_OF_TIME = ('s', 'min', 'h', 'd', 'wk', 'mo', 'a')
+
+    @staticmethod
+    def measurement_timing(act):
+        """timingTiming for a measurement action, or None (2026-11-20).
+
+        The repeat part is exactly what a form gets. `duration_value` /
+        `duration_unit` is how long ONE occurrence lasts, which is what FHIR's
+        `Timing.repeat.duration` means. It is not the length of the plan; that
+        is `boundsDuration` or `count`. A `once` activity is `count: 1`.
+        """
+        timing = FHIRService.form_timing_timing(act)
+        if timing is None and act.get('timing_type') == 'once':
+            timing = {'repeat': {'count': 1}}
+        if timing is None:
+            return None
+        unit = act.get('duration_unit')
+        try:
+            value = float(act.get('duration_value'))
+        except (TypeError, ValueError):
+            value = None
+        if value and value > 0 and unit in FHIRService.UNITS_OF_TIME:
+            timing['repeat']['duration'] = int(value) if value.is_integer() else value
+            timing['repeat']['durationUnit'] = unit
+        return timing
+
     @staticmethod
     def create_fhir_plandefinition(plandef):
         now = datetime.now(timezone.utc).isoformat()
@@ -163,7 +190,17 @@ class FHIRService:
                             fhir_actions.append(diagnosis_review.to_fhir_action(
                                 act, FHIRService.form_timing_timing(act)))
                         else:
-                            fhir_actions.append(act)
+                            # 2026-11-20: a measurement action carried its
+                            # schedule only in plan.pdhc's own fields
+                            # (timing_frequency, timing_bounds_count, ...),
+                            # so a FHIR reader saw no Timing at all. Those
+                            # fields stay for existing readers; timingTiming
+                            # is added beside them.
+                            fhir_act = dict(act)
+                            timing = FHIRService.measurement_timing(act)
+                            if timing:
+                                fhir_act['timingTiming'] = timing
+                            fhir_actions.append(fhir_act)
                     if fhir_actions:
                         resource['action'] = fhir_actions
             except (json.JSONDecodeError, TypeError):
