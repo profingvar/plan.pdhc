@@ -6,6 +6,11 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 
 ## 1) Environment and infrastructure setup
 
+### 2026-11-20 — a PlanDefinition's version follows its content
+- Editing rewrote the plan in place and kept `version` as the form sent it back (the stored value): MMD_plan stayed 1.0.0 through every edit, so sim output and analyses could not say which plan version they used.
+- `services/plandef_version.py`: `Snapshot` before an edit, `settle` after it. If the content changed (title, description, status, type, publisher, form link, validity, goals, actions; JSON compared key-order-insensitively) and the editor left the version untouched, the patch level is bumped (1.0.0 -> 1.0.1). A version the editor set wins; an unchanged save keeps the version; a non-numeric version is left alone. Wired into the web edit route and the API PUT, before fhir_data is regenerated, so the FHIR `version` follows.
+- tests/test_plandef_version_bump.py (14; each route mutation-checked). Suite 789 passed. Not yet deployed.
+
 ### 2026-11-20 — measurement actions export their schedule as FHIR timingTiming
 - Only form and diagnosis-review actions got `timingTiming`; a measurement action (MMD_plan CGM: 4/h, count 400, duration 40 d) was exported with plan.pdhc field names only.
 - `FHIRService.measurement_timing`: same repeat as forms, plus `duration`/`durationUnit` (length of ONE occurrence, UnitsOfTime only); `once` -> `count: 1`. plan.pdhc's own fields stay beside it.

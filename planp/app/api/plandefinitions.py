@@ -13,6 +13,7 @@ from app.models.activity_models import (
 from app.models.concept_models import Concept, Unit
 from app.models.forms_models import FormDefinition
 from app.services.fhir_service import FHIRService
+from app.services import plandef_version
 from app.services import diagnosis_review  # #984
 from app.services.name_uniqueness import NameUniquenessService
 from app.services.save_guard import guard_plandef, SaveBlocked  # #521 GA-5
@@ -333,6 +334,7 @@ def update_plandefinition(guid):
         return jsonify({'error': 'Not found'}), 404
 
     data = request.get_json(silent=True) or {}
+    version_snapshot = plandef_version.Snapshot(pd)
 
     # #521 GA-5 — validate the effective post-update structure before mutating.
     def _existing(col):
@@ -484,6 +486,8 @@ def update_plandefinition(guid):
 
     # Regenerate FHIR JSON
     db.session.flush()
+    # 2026-11-20: the version follows the content (services/plandef_version).
+    version_snapshot.settle(pd)
     pd.fhir_data = FHIRService.create_fhir_plandefinition(pd)
     db.session.commit()
 

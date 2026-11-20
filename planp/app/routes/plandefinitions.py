@@ -15,6 +15,7 @@ from app.models.concept_models import (
 from app.models.forms_models import FormDefinition, Questionnaire
 from app.services.save_guard import guard_plandef, SaveBlocked  # #521 GA-5
 from app.services.fhir_service import FHIRService
+from app.services import plandef_version
 from app.services import diagnosis_review  # #984
 from app.services.name_uniqueness import NameUniquenessService
 
@@ -313,6 +314,7 @@ def view_plandef(fhir_id):
 @sso_login_required
 def edit_plandef(fhir_id):
     plandef = PlanDefinition.query.filter_by(fhir_id=fhir_id).first_or_404()
+    version_snapshot = plandef_version.Snapshot(plandef)
 
     plandef.title = request.form.get('title', plandef.title)
     plandef.description = request.form.get('description', plandef.description)
@@ -440,6 +442,9 @@ def edit_plandef(fhir_id):
             if other_links == 0:
                 Transaction.query.filter_by(activity_guid=old_guid).delete()
                 Activity.query.filter_by(guid=old_guid).delete()
+
+    # 2026-11-20: the version follows the content (services/plandef_version).
+    version_snapshot.settle(plandef)
 
     # Regenerate FHIR JSON
     plandef.fhir_data = FHIRService.create_fhir_plandefinition(plandef)
