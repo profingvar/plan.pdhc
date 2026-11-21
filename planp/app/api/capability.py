@@ -146,8 +146,8 @@ ENDPOINTS = [
     _endpoint('GET', '/CodeSystem/<id>', False,
               'Read the local CodeSystem (id=plan-pdhc-local). codes are Concept.guid (ADR D1).'),
     _endpoint('GET', '/CodeSystem/$lookup', False,
-              'Lookup by query params. system=LOCAL → local Concept (open); system=CanonicalLib URL/name → termbank, for plan pages only (plan session; service keys refused).'),
-    _endpoint('POST', '/CodeSystem/$lookup', False, 'Lookup by Parameters body; same rule: the termbank branch needs a plan session'),
+              'Lookup by query params. system=LOCAL → local Concept (open); system=CanonicalLib URL/name → termbank, for the platform only (plan session or a module service key).'),
+    _endpoint('POST', '/CodeSystem/$lookup', False, 'Lookup by Parameters body; same rule: the termbank branch needs a plan session or a module service key'),
 
     # ConceptMap — the local↔canonical mapping
     _endpoint('GET', '/ConceptMap', False, 'FHIR R5 searchset Bundle (?url=)'),
@@ -158,8 +158,8 @@ ENDPOINTS = [
     _endpoint('POST', '/ConceptMap/$translate', False, 'Translate by Parameters body'),
 
     # Termbank proxies (§0.2 — pre-existing, here for completeness)
-    _endpoint('GET', '/termbank/concept/<system>/<code>', True, 'Same-origin termbank proxy for plan pages only: plan session, no service keys'),
-    _endpoint('GET', '/termbank/search', True, 'Same-origin termbank search proxy for plan pages only: plan session, no service keys'),
+    _endpoint('GET', '/termbank/concept/<system>/<code>', True, 'Same-origin termbank proxy for the platform: plan session or a module service key; never anonymous'),
+    _endpoint('GET', '/termbank/search', True, 'Same-origin termbank search proxy for the platform: plan session or a module service key; never anonymous'),
 
     # Forms (FHIR Questionnaires)
     _endpoint('GET', '/forms', 'API key or SSO', 'List form catalogue (paginated)'),
@@ -479,7 +479,7 @@ def fhir_capability_statement():
                         'and concept_explain as definition. The canonical_lib binding is surfaced '
                         'as concept[].property. External authorities (LOINC, SNOMED, ICD-10, ATC, …) '
                         'are NOT published here as CodeSystems — they live in termbank.pdhc; '
-                        '$lookup with an external system delegates to the cached TermbankClient, for plan pages only (plan session; service keys refused).'
+                        '$lookup with an external system delegates to the cached TermbankClient, for the platform only (plan session or a module service key).'
                     ),
                     'interaction': [
                         {'code': 'read',

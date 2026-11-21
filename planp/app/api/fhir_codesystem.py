@@ -252,8 +252,8 @@ def _do_lookup(system: str, code: str):
 
     # Delegate to termbank — pass the canonical_lib NAME, which is what
     # the existing TermbankClient + the termbank service itself use.
-    # 2026-11-21: termbank is plan-internal only; this branch was an open
-    # door to it (the local-CodeSystem branch above stays as it is).
+    # 2026-11-21: termbank only through plan (plan session or a module's
+    # service key); this branch was an open door to it (the local-CodeSystem branch above stays as it is).
     from app.services import termbank_gate
     refused = termbank_gate.refusal()
     if refused is not None:

@@ -253,9 +253,9 @@ def validate_code():
 # Termbank proxies
 # ---------------------------------------------------------------------------
 def _plan_ui_only(fn):
-    """termbank is reachable ONLY from inside plan.pdhc -- see
-    app/services/termbank_gate.py. These proxies were open and Googlebot
-    crawled termbank through them (2026-11-20)."""
+    """termbank is reachable ONLY through plan.pdhc: a plan session or a
+    module's service key -- see app/services/termbank_gate.py. These proxies
+    were open and Googlebot crawled termbank through them (2026-11-20)."""
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         from app.services import termbank_gate
