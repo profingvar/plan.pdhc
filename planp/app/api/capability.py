@@ -158,8 +158,8 @@ ENDPOINTS = [
     _endpoint('POST', '/ConceptMap/$translate', False, 'Translate by Parameters body'),
 
     # Termbank proxies (§0.2 — pre-existing, here for completeness)
-    _endpoint('GET', '/termbank/concept/<system>/<code>', False, 'Same-origin termbank proxy (TTL cache)'),
-    _endpoint('GET', '/termbank/search', False, 'Same-origin termbank search proxy'),
+    _endpoint('GET', '/termbank/concept/<system>/<code>', True, 'Same-origin termbank proxy for plan pages only: plan session, no service keys'),
+    _endpoint('GET', '/termbank/search', True, 'Same-origin termbank search proxy for plan pages only: plan session, no service keys'),
 
     # Forms (FHIR Questionnaires)
     _endpoint('GET', '/forms', 'API key or SSO', 'List form catalogue (paginated)'),

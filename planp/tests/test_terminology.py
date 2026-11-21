@@ -319,6 +319,14 @@ class TestValidateCode:
 # ---------------------------------------------------------------------------
 # /termbank/concept/<system>/<code> proxy
 # ---------------------------------------------------------------------------
+@pytest.fixture()
+def plan_session(client):
+    # The proxies are plan-pages-only since 2026-11-20 (_plan_ui_only).
+    from tests.conftest import SAMPLE_READONLY_BLOB, set_sso_session
+    set_sso_session(client, SAMPLE_READONLY_BLOB)
+
+
+@pytest.mark.usefixtures("plan_session")
 class TestTermbankConceptProxy:
     def test_success_returns_termbank_payload(self, client, app):
         fake_body = {
@@ -349,6 +357,7 @@ class TestTermbankConceptProxy:
 # ---------------------------------------------------------------------------
 # /termbank/search proxy
 # ---------------------------------------------------------------------------
+@pytest.mark.usefixtures("plan_session")
 class TestTermbankSearchProxy:
     def test_success_passes_through(self, client, app):
         fake = {

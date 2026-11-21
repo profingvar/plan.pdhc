@@ -22,6 +22,8 @@ mutations live here.
 """
 from __future__ import annotations
 
+import functools
+
 from flask import Blueprint, current_app, jsonify, request
 
 from app import db
@@ -250,7 +252,31 @@ def validate_code():
 # ---------------------------------------------------------------------------
 # Termbank proxies
 # ---------------------------------------------------------------------------
+def _plan_ui_only(fn):
+    """termbank is reachable ONLY from inside plan.pdhc (operator, 2026-11-20).
+
+    These proxies were open: Googlebot was crawling
+    /api/v1/termbank/concept/<system>/<code> straight through plan. Now they
+    need a logged-in plan session (any role -- the "View in termbank" panel
+    and the search picker run in plan's own pages and send its cookie), and
+    a service key is refused outright: no other service reads termbank
+    through plan, and a read_only key must not make it a side door.
+    """
+    from app.api.auth import requires_role
+
+    gated = requires_role('read_only')(fn)
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        if (request.headers.get('X-Service-Key') or request.headers.get('X-Source-Service')) \
+                and not current_app.config.get('AUTH_DISABLED'):
+            return jsonify({'error': 'termbank is only available inside plan.pdhc'}), 403
+        return gated(*args, **kwargs)
+    return wrapper
+
+
 @bp.get("/termbank/concept/<string:system>/<path:code>")
+@_plan_ui_only
 def termbank_concept_proxy(system: str, code: str):
     """Proxy ``GET termbank.pdhc/CodeSystem/<system>/<code>``.
 
@@ -276,6 +302,7 @@ def termbank_concept_proxy(system: str, code: str):
 
 
 @bp.get("/termbank/search")
+@_plan_ui_only
 def termbank_search_proxy():
     """Proxy ``GET termbank.pdhc/search?q=&system=&limit=``.
 

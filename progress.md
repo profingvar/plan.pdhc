@@ -6,13 +6,18 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 
 ## 1) Environment and infrastructure setup
 
+### 2026-11-21 — termbank proxies were open to the internet; now plan-pages-only
+- `/api/v1/termbank/concept/<system>/<code>` and `/api/v1/termbank/search` (app/api/terminology.py) had no auth at all, and the capability statement said so (`auth=False`). termbank itself has no vhost, so plan's proxy was the one way in; Googlebot crawled it (6 hits on 2026-11-20 alone).
+- Now `_plan_ui_only`: a logged-in plan session (any role) is required, and a service key is refused even when valid (no other service reads termbank through plan). Plan's own panels (termbank_panel.js, termbank_search_picker.js) fetch same-origin with the session cookie, on pages that already require login, so they are unaffected. Capability statement updated.
+- tests/test_termbank_plan_internal.py (9; both halves mutation-checked); existing proxy tests now run with a session. Suite 808 passed. Not deployed.
+
 ### 2026-11-20 — #1011 read_shadow: window restarted, every line classified
 - Today's continuous deploy (13:25Z) recreated pdhc_app and wiped the shadow log; the clean week restarts from there (earliest flip ~2026-11-27). Lines so far are archived on miserver in ~/backups/plan_read_shadow/ (mode 600). Copy them out before any plan redeploy.
 - 11 lines, all classified (nginx access.log is local time, +01:00):
   - 3 = provider.pdhc's smoke (provider1_app, 13:35:42Z): plandefinitions/<fake> x2 (404) + /concepts. BUT provider's REAL client is keyless too: `provider_portal/app/services/plan_client.py:46` sends no headers, and provider1_app has no PLAN_SERVICE_KEY. provider was not in #931's reader list. Flipping /plandefinitions or /concepts before that is fixed makes every guided provider form degrade silently to text boxes (plan_client returns {} on error). Needs: a plan read_only identity for provider.pdhc, the key in provider's env (operator), the client sending plan_read_headers, deploy.
   - 1 = contract.pdhc's smoke: /concepts/<fake> (404), keyless ON PURPOSE (it asserts the route is auth=False). contract's real client sends its key. That smoke check must be changed at the /concepts flip, or it will fail.
   - 1 = curl from the Docker network (my post-deploy read check).
-  - 6 = Googlebot (66.249.70.x) crawling /api/v1/termbank/concept/<system>/<code> on plan. Decide whether those pages are meant to be public before gating them.
+  - 6 = Googlebot (66.249.70.x) crawling /api/v1/termbank/concept/<system>/<code> on plan. termbank is plan-internal ONLY (operator, standing rule), so this was a leak: fixed below.
 
 ### 2026-11-20 — continuous activities (CGM)
 - Operator: ordering CGM is ONE procedure that produces glucose values as long as it is on; MMD_plan's "repeat 4/h, count 410, duration 40 d" was a workaround (ended after ~4.3 days; said each reading lasted 40 days). Period is REQUIRED (operator).

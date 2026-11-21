@@ -55,6 +55,8 @@ def test_a_set_value_is_used_as_given(monkeypatch):
 def test_the_proxies_answer_503_naming_the_variable(client, monkeypatch):
     monkeypatch.delenv("TERMBANK_BASE_URL", raising=False)
     monkeypatch.setattr(client.application, "termbank_client", TermbankClient())
+    from tests.conftest import SAMPLE_READONLY_BLOB, set_sso_session
+    set_sso_session(client, SAMPLE_READONLY_BLOB)  # plan-pages-only (2026-11-20)
     r = client.get("/api/v1/termbank/concept/loinc/4548-4")
     assert r.status_code == 503
     assert "TERMBANK_BASE_URL" in r.get_data(as_text=True)
