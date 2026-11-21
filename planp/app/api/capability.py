@@ -146,8 +146,8 @@ ENDPOINTS = [
     _endpoint('GET', '/CodeSystem/<id>', False,
               'Read the local CodeSystem (id=plan-pdhc-local). codes are Concept.guid (ADR D1).'),
     _endpoint('GET', '/CodeSystem/$lookup', False,
-              'Lookup by query params. system=LOCAL → local Concept; system=CanonicalLib URL/name → delegates to termbank.'),
-    _endpoint('POST', '/CodeSystem/$lookup', False, 'Lookup by Parameters body'),
+              'Lookup by query params. system=LOCAL → local Concept (open); system=CanonicalLib URL/name → termbank, for plan pages only (plan session; service keys refused).'),
+    _endpoint('POST', '/CodeSystem/$lookup', False, 'Lookup by Parameters body; same rule: the termbank branch needs a plan session'),
 
     # ConceptMap — the local↔canonical mapping
     _endpoint('GET', '/ConceptMap', False, 'FHIR R5 searchset Bundle (?url=)'),
@@ -479,7 +479,7 @@ def fhir_capability_statement():
                         'and concept_explain as definition. The canonical_lib binding is surfaced '
                         'as concept[].property. External authorities (LOINC, SNOMED, ICD-10, ATC, …) '
                         'are NOT published here as CodeSystems — they live in termbank.pdhc; '
-                        '$lookup with an external system delegates to the cached TermbankClient.'
+                        '$lookup with an external system delegates to the cached TermbankClient, for plan pages only (plan session; service keys refused).'
                     ),
                     'interaction': [
                         {'code': 'read',

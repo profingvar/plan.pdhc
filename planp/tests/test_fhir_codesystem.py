@@ -217,6 +217,14 @@ class TestLookupLocal:
 # ---------------------------------------------------------------------------
 # $lookup — EXTERNAL system delegates to TermbankClient
 # ---------------------------------------------------------------------------
+@pytest.fixture()
+def plan_session(client):
+    # termbank is plan-pages-only since 2026-11-21 (app/services/termbank_gate.py)
+    from tests.conftest import SAMPLE_READONLY_BLOB, set_sso_session
+    set_sso_session(client, SAMPLE_READONLY_BLOB)
+
+
+@pytest.mark.usefixtures("plan_session")
 class TestLookupExternalDelegatesToTermbank:
     """Spec §6.3 delegation rule. The TermbankClient is the existing
     in-process TTL cache that already powers /api/v1/termbank/concept/.
@@ -320,6 +328,8 @@ class TestLookupPost:
         FHIRParameters.model_validate(body)
 
     def test_post_external_delegates(self, client, app, cs_concept):
+        from tests.conftest import SAMPLE_READONLY_BLOB, set_sso_session
+        set_sso_session(client, SAMPLE_READONLY_BLOB)  # termbank branch: plan session (2026-11-21)
         fake = {'resourceType': 'Parameters', 'parameter': []}
         with patch.object(
             app.termbank_client, 'lookup', return_value=fake,

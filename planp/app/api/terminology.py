@@ -253,25 +253,14 @@ def validate_code():
 # Termbank proxies
 # ---------------------------------------------------------------------------
 def _plan_ui_only(fn):
-    """termbank is reachable ONLY from inside plan.pdhc (operator, 2026-11-20).
-
-    These proxies were open: Googlebot was crawling
-    /api/v1/termbank/concept/<system>/<code> straight through plan. Now they
-    need a logged-in plan session (any role -- the "View in termbank" panel
-    and the search picker run in plan's own pages and send its cookie), and
-    a service key is refused outright: no other service reads termbank
-    through plan, and a read_only key must not make it a side door.
-    """
-    from app.api.auth import requires_role
-
-    gated = requires_role('read_only')(fn)
-
+    """termbank is reachable ONLY from inside plan.pdhc -- see
+    app/services/termbank_gate.py. These proxies were open and Googlebot
+    crawled termbank through them (2026-11-20)."""
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
-        if (request.headers.get('X-Service-Key') or request.headers.get('X-Source-Service')) \
-                and not current_app.config.get('AUTH_DISABLED'):
-            return jsonify({'error': 'termbank is only available inside plan.pdhc'}), 403
-        return gated(*args, **kwargs)
+        from app.services import termbank_gate
+        out = termbank_gate.refusal()
+        return out if out is not None else fn(*args, **kwargs)
     return wrapper
 
 
