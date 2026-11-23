@@ -12,11 +12,17 @@ from tests.conftest import set_sso_session, SAMPLE_ACCESS_BLOB
 
 
 # ---------------------------------------------------------------------------
-# /forms — public catalogue and read
+# /forms — catalogue and read (gated since #1011 group 4)
 # ---------------------------------------------------------------------------
 class TestFormsCatalogue:
-    def test_list_forms_is_public(self, client):
-        """No auth required — drives the form-picker on builder UIs."""
+    @pytest.fixture(autouse=True)
+    def _reader(self, client):
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)
+
+    def test_list_forms_needs_a_credential(self, client):
+        """Public until #1011; the forms API key, a service key or a session."""
+        fresh = client.application.test_client()
+        assert fresh.get('/api/v1/forms').status_code == 401
         resp = client.get('/api/v1/forms')
         assert resp.status_code == 200
         body = resp.get_json()
@@ -45,10 +51,11 @@ class TestFormsCatalogue:
 
 
 # ---------------------------------------------------------------------------
-# /forms/<guid>/versions — public version-history read
+# /forms/<guid>/versions — version-history read (gated since #1011)
 # ---------------------------------------------------------------------------
 class TestFormVersions:
     def test_versions_endpoint_exists(self, client):
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)  # #1011: gated
         resp = client.get(
             '/api/v1/forms/00000000-0000-0000-0000-000000000000/versions',
         )

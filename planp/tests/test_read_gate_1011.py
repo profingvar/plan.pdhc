@@ -114,6 +114,13 @@ GROUPS['3-plandefinitions'] = [
     '/api/v1/PlanDefinition/{pd_fhir}/$expand',
 ]
 
+# Group 4 — the form catalogue. Reader: request.pdhc's form_service (keyed).
+GROUPS['4-forms'] = [
+    '/api/v1/forms',
+    '/api/v1/forms/{form}',
+    '/api/v1/forms/{form}/versions',
+]
+
 
 @pytest.fixture(scope='module')
 def seeded(app):
@@ -199,3 +206,16 @@ def test_a_forged_key_is_403_and_earns_no_rate_limit_bypass(
     # CONTROL: the bypass is reachable at all, so the two Falses mean something.
     with app.test_request_context(url, headers=_keyed()):
         assert _service_caller() is True
+
+
+def test_the_forms_api_key_still_opens_the_catalogue(app, client):
+    """Group 4 uses the forms door (`require_api_key_or_role`), so the forms
+    API key keeps working alongside service keys and sessions."""
+    old = app.config.get('API_KEY')
+    app.config['API_KEY'] = 'k-forms-test'
+    try:
+        assert client.get('/api/v1/forms').status_code == 401
+        assert client.get('/api/v1/forms', headers={'X-API-Key': 'nope'}).status_code == 401
+        assert client.get('/api/v1/forms', headers={'X-API-Key': 'k-forms-test'}).status_code == 200
+    finally:
+        app.config['API_KEY'] = old or ''

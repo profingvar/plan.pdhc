@@ -32,12 +32,15 @@ def require_api_key_or_role(fn):
 
 
 # ---------------------------------------------------------------------------
-# Builder read endpoints (public, rate-limited)
+# Builder read endpoints — gated since #1011 (group 4), with the same door as
+# /questionnaire and /render-ready below: the forms API key, a service key, or
+# a session. request.pdhc's form_service sends its #931 key on these reads.
 # ---------------------------------------------------------------------------
 
 @forms_bp.route('/forms')
+@require_api_key_or_role
 def list_forms():
-    """GET /api/v1/forms — GetFormCatalogue (public read)"""
+    """GET /api/v1/forms — GetFormCatalogue"""
     status = request.args.get('status', 'active')
     limit = request.args.get('limit', 100, type=int)
     offset = request.args.get('offset', 0, type=int)
@@ -46,8 +49,9 @@ def list_forms():
 
 
 @forms_bp.route('/forms/<form_guid>')
+@require_api_key_or_role
 def get_form(form_guid):
-    """GET /api/v1/forms/<form_guid> — GetFormDefinition (public read)"""
+    """GET /api/v1/forms/<form_guid> — GetFormDefinition"""
     version = request.args.get('version', type=int)
     try:
         return jsonify(get_form_definition(form_guid, version=version))
@@ -56,8 +60,9 @@ def get_form(form_guid):
 
 
 @forms_bp.route('/forms/<form_guid>/versions')
+@require_api_key_or_role
 def get_versions(form_guid):
-    """GET /api/v1/forms/<form_guid>/versions — GetFormVersionHistory (public read)"""
+    """GET /api/v1/forms/<form_guid>/versions — GetFormVersionHistory"""
     try:
         return jsonify(get_form_version_history(form_guid))
     except HistoryError as e:
