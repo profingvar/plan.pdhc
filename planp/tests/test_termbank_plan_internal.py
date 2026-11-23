@@ -98,10 +98,14 @@ def test_lookup_into_termbank_works_with_a_plan_session(client, app, stubbed, ex
     assert _lookup(client, external_lib).status_code == 200
 
 
-def test_local_lookup_is_not_gated(client, app):
-    # cdr and analyse resolve plan's OWN concept names this way, keyed or not
-    # (#1011 decides plan's own reads); it never reaches termbank.
+def test_local_lookup_is_gated_since_1011_but_never_reaches_termbank(client, app, stubbed):
+    # #1011 group 5 gated the whole route; cdr and analyse resolve plan's OWN
+    # concept names here with their #931 keys. The local branch still never
+    # calls termbank.
     from app.api.fhir_codesystem import LOCAL_CS_URL
-    r = client.get("/api/v1/CodeSystem/$lookup",
-                   query_string={"system": LOCAL_CS_URL, "code": "no-such-guid"})
-    assert r.status_code == 404          # not 401: the gate did not run
+    q = {"system": LOCAL_CS_URL, "code": "no-such-guid"}
+    assert client.get("/api/v1/CodeSystem/$lookup", query_string=q).status_code == 401
+    set_sso_session(client, SAMPLE_READONLY_BLOB)
+    r = client.get("/api/v1/CodeSystem/$lookup", query_string=q)
+    assert r.status_code == 404          # the local branch answered
+    app.termbank_client.lookup.assert_not_called()

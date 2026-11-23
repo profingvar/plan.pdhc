@@ -36,6 +36,7 @@ from app.api.fhir_helpers import (
     operation_outcome,
     parse_parameters_body,
 )
+from app.api.auth import requires_role
 from app.api.fhir_valueset import resolve_canonical_lib
 from app.models.concept_models import (
     LOCAL_CODESYSTEM_ID,
@@ -253,7 +254,9 @@ def _do_lookup(system: str, code: str):
     # Delegate to termbank — pass the canonical_lib NAME, which is what
     # the existing TermbankClient + the termbank service itself use.
     # 2026-11-21: termbank only through plan (plan session or a module's
-    # service key); this branch was an open door to it (the local-CodeSystem branch above stays as it is).
+    # service key); this branch was an open door to it. Since #1011 the whole
+    # route is gated, local branch included, so this check is now redundant —
+    # kept so the termbank rule holds even if the route gate is ever relaxed.
     from app.services import termbank_gate
     refused = termbank_gate.refusal()
     if refused is not None:
@@ -277,6 +280,7 @@ def _do_lookup(system: str, code: str):
 # GET /CodeSystem/{id}
 # ---------------------------------------------------------------------------
 @fhir_codesystem_bp.route('/CodeSystem/<id_>', methods=['GET'])
+@requires_role('read_only')  # #1011 group 5: cdr, analyse and dashboard send keys
 def read_codesystem(id_: str):
     if id_ != LOCAL_CODESYSTEM_ID:
         return operation_outcome(
@@ -289,6 +293,7 @@ def read_codesystem(id_: str):
 # GET /CodeSystem — searchset Bundle
 # ---------------------------------------------------------------------------
 @fhir_codesystem_bp.route('/CodeSystem', methods=['GET'])
+@requires_role('read_only')  # #1011 group 5: cdr, analyse and dashboard send keys
 def search_codesystems():
     url_filter = (request.args.get('url') or '').strip() or None
     show = (url_filter is None) or (url_filter == LOCAL_CS_URL)
@@ -316,6 +321,7 @@ def search_codesystems():
 # ---------------------------------------------------------------------------
 @fhir_codesystem_bp.route('/CodeSystem/$lookup', methods=['GET'])
 @fhir_codesystem_bp.route('/CodeSystem/%24lookup', methods=['GET'])
+@requires_role('read_only')  # #1011 group 5: cdr, analyse and dashboard send keys
 def lookup_get():
     system = (request.args.get('system') or '').strip()
     code = (request.args.get('code') or '').strip()
@@ -327,6 +333,7 @@ def lookup_get():
 # ---------------------------------------------------------------------------
 @fhir_codesystem_bp.route('/CodeSystem/$lookup', methods=['POST'])
 @fhir_codesystem_bp.route('/CodeSystem/%24lookup', methods=['POST'])
+@requires_role('read_only')  # #1011 group 5: cdr, analyse and dashboard send keys
 def lookup_post():
     params = parse_parameters_body()
     system = _str_param(params, 'system')

@@ -121,6 +121,19 @@ GROUPS['4-forms'] = [
     '/api/v1/forms/{form}/versions',
 ]
 
+# Group 5 — FHIR CodeSystem and ConceptMap: search, read, $lookup, $translate.
+# Readers: cdr1/2/3 ($lookup, $translate) and analyse ($lookup), all keyed.
+GROUPS['5-codesystem-conceptmap'] = [
+    '/api/v1/CodeSystem',
+    '/api/v1/CodeSystem/{cs_id}',
+    '/api/v1/CodeSystem/$lookup?system={cs_url_q}&code={concept}',
+    '/api/v1/CodeSystem/%24lookup?system={cs_url_q}&code={concept}',
+    '/api/v1/ConceptMap',
+    '/api/v1/ConceptMap/{cm_id}',
+    '/api/v1/ConceptMap/$translate?system={cs_url_q}&code={concept}',
+    '/api/v1/ConceptMap/%24translate?system={cs_url_q}&code={concept}',
+]
+
 
 @pytest.fixture(scope='module')
 def seeded(app):
@@ -152,7 +165,12 @@ def seeded(app):
             form_guid=form_guid, version=1, title=f'g1011 form {tag}',
             status='active', fhir_json={'resourceType': 'Questionnaire'})])
         db.session.commit()
+        from urllib.parse import quote
+        from app.api.fhir_codesystem import LOCAL_CODESYSTEM_ID, LOCAL_CS_URL
+        from app.api.fhir_conceptmap import LOCAL_CONCEPTMAP_ID
         return {
+            'cs_id': LOCAL_CODESYSTEM_ID, 'cm_id': LOCAL_CONCEPTMAP_ID,
+            'cs_url_q': quote(LOCAL_CS_URL, safe=''),
             'lib': lib.guid, 'rt': rt.guid, 'unit': unit.guid, 'pdt': pdt.guid,
             'value': val.guid, 'vs': vs.guid, 'concept': concept.guid,
             'pd': pd.guid, 'pd_fhir': pd.fhir_id, 'form': form_guid,
@@ -219,3 +237,22 @@ def test_the_forms_api_key_still_opens_the_catalogue(app, client):
         assert client.get('/api/v1/forms', headers={'X-API-Key': 'k-forms-test'}).status_code == 200
     finally:
         app.config['API_KEY'] = old or ''
+
+
+#: The two reads that take a FHIR Parameters body by POST (group 5).
+POST_READS = ['/api/v1/CodeSystem/$lookup', '/api/v1/ConceptMap/$translate']
+
+
+def _params(seeded):
+    from app.api.fhir_codesystem import LOCAL_CS_URL
+    return {'resourceType': 'Parameters', 'parameter': [
+        {'name': 'system', 'valueUri': LOCAL_CS_URL},
+        {'name': 'code', 'valueCode': seeded['concept']}]}
+
+
+@pytest.mark.parametrize('path', POST_READS)
+def test_a_POST_read_is_gated_too(client, seeded, provider1_key, path):
+    body = _params(seeded)
+    assert client.post(path, json=body).status_code == 401
+    assert client.post(path, json=body, headers=_keyed('wrong')).status_code == 403
+    assert client.post(path, json=body, headers=_keyed()).status_code == 200

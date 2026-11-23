@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, request
 
 from app import db
+from app.api.auth import requires_role
 from app.api.fhir_valueset import (AmbiguousCanonicalLib,
                                    resolve_canonical_lib)
 from app.api.fhir_helpers import (
@@ -318,6 +319,7 @@ def _translate(
 # GET /ConceptMap/{id}
 # ---------------------------------------------------------------------------
 @fhir_conceptmap_bp.route('/ConceptMap/<id_>', methods=['GET'])
+@requires_role('read_only')  # #1011 group 5: cdr, analyse and dashboard send keys
 def read_conceptmap(id_: str):
     if id_ != LOCAL_CONCEPTMAP_ID:
         return operation_outcome(
@@ -330,6 +332,7 @@ def read_conceptmap(id_: str):
 # GET /ConceptMap — searchset Bundle
 # ---------------------------------------------------------------------------
 @fhir_conceptmap_bp.route('/ConceptMap', methods=['GET'])
+@requires_role('read_only')  # #1011 group 5: cdr, analyse and dashboard send keys
 def search_conceptmaps():
     url_filter = (request.args.get('url') or '').strip() or None
     canonical = fhir_canonical_url('ConceptMap', LOCAL_CONCEPTMAP_ID)
@@ -358,6 +361,7 @@ def search_conceptmaps():
 # ---------------------------------------------------------------------------
 @fhir_conceptmap_bp.route('/ConceptMap/$translate', methods=['GET'])
 @fhir_conceptmap_bp.route('/ConceptMap/%24translate', methods=['GET'])
+@requires_role('read_only')  # #1011 group 5: cdr, analyse and dashboard send keys
 def translate_get():
     system = (request.args.get('system') or '').strip()
     code = (request.args.get('code') or '').strip()
@@ -375,6 +379,7 @@ def translate_get():
 # ---------------------------------------------------------------------------
 @fhir_conceptmap_bp.route('/ConceptMap/$translate', methods=['POST'])
 @fhir_conceptmap_bp.route('/ConceptMap/%24translate', methods=['POST'])
+@requires_role('read_only')  # #1011 group 5: cdr, analyse and dashboard send keys
 def translate_post():
     params = parse_parameters_body()
     system = _str_param(params, 'system')

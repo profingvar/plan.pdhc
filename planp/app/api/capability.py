@@ -146,20 +146,20 @@ ENDPOINTS = [
     _endpoint('POST', '/ValueSet/$validate-code', False, 'Scoped $validate-code by Parameters body'),
 
     # CodeSystem — local concept system + $lookup with termbank delegation
-    _endpoint('GET', '/CodeSystem', False, 'FHIR R5 searchset Bundle (?url=)'),
-    _endpoint('GET', '/CodeSystem/<id>', False,
+    _endpoint('GET', '/CodeSystem', True, 'FHIR R5 searchset Bundle (?url=)'),
+    _endpoint('GET', '/CodeSystem/<id>', True,
               'Read the local CodeSystem (id=plan-pdhc-local). codes are Concept.guid (ADR D1).'),
-    _endpoint('GET', '/CodeSystem/$lookup', False,
-              'Lookup by query params. system=LOCAL → local Concept (open); system=CanonicalLib URL/name → termbank, for the platform only (plan session or a module service key).'),
-    _endpoint('POST', '/CodeSystem/$lookup', False, 'Lookup by Parameters body; same rule: the termbank branch needs a plan session or a module service key'),
+    _endpoint('GET', '/CodeSystem/$lookup', True,
+              'Lookup by query params. system=LOCAL → local Concept; system=CanonicalLib URL/name → termbank. Plan session or a module service key (#1011).'),
+    _endpoint('POST', '/CodeSystem/$lookup', True, 'Lookup by Parameters body; plan session or a module service key (#1011)'),
 
     # ConceptMap — the local↔canonical mapping
-    _endpoint('GET', '/ConceptMap', False, 'FHIR R5 searchset Bundle (?url=)'),
-    _endpoint('GET', '/ConceptMap/<id>', False,
+    _endpoint('GET', '/ConceptMap', True, 'FHIR R5 searchset Bundle (?url=)'),
+    _endpoint('GET', '/ConceptMap/<id>', True,
               'Read the platform ConceptMap (id=plan-pdhc-canonical-bindings).'),
-    _endpoint('GET', '/ConceptMap/$translate', False,
+    _endpoint('GET', '/ConceptMap/$translate', True,
               'Bidirectional translate. system=LOCAL → canonical code; system=CanonicalLib URL/name → local guid.'),
-    _endpoint('POST', '/ConceptMap/$translate', False, 'Translate by Parameters body'),
+    _endpoint('POST', '/ConceptMap/$translate', True, 'Translate by Parameters body'),
 
     # Termbank proxies (§0.2 — pre-existing, here for completeness)
     _endpoint('GET', '/termbank/concept/<system>/<code>', True, 'Same-origin termbank proxy for the platform: plan session or a module service key; never anonymous'),

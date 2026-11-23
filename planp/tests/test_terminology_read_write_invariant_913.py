@@ -293,6 +293,9 @@ class TestOptionThree:
 class TestWhatOptionThreeDoesNOTCover:
     """Measured while building it, and deliberately left alone.
 
+    (#1011 later gated these reads for a different reason — every consumer
+    has a key — so "ungated" below is history; the enumeration is not.)
+
     `GET /api/v1/CodeSystem` and `GET /api/v1/CodeSystem/<id>` call
     `_build_codesystem()`, whose `include_concepts` defaults to **True** —
     so both hand over plan's ENTIRE local Concept catalogue, ungated.
@@ -313,14 +316,15 @@ class TestWhatOptionThreeDoesNOTCover:
     SYSTEM rather than a selection, the question is already written down.
     """
 
-    def test_the_codesystem_search_is_still_ungated_and_still_enumerates(self):
+    def test_the_codesystem_search_still_enumerates_and_is_gated_since_1011(self):
+        """#913 left this open on purpose (PDHC's own concepts, not a licensed
+        selection, and $lookup on cdr's hot path). #1011 gated it anyway, for
+        the reason #931 exists: every consumer holds a key now. It still
+        enumerates — this keeps that fact written down."""
         cs = API / 'fhir_codesystem.py'
         routes = {n: d for n, _m, d in _routes(cs)}
         assert 'search_codesystems' in routes
-        assert not _gated(routes['search_codesystems']), (
-            'the CodeSystem search became gated — if deliberate, good, but '
-            'cdr.pdhc calls $lookup on this blueprint and the note in this '
-            'test needs rewriting rather than deleting')
+        assert _gated(routes['search_codesystems'])
         src = cs.read_text()
         assert 'include_concepts: bool = True' in src, (
             'the default changed — if it is now False the enumeration is '

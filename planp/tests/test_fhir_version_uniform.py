@@ -17,6 +17,16 @@ from app import db as _db
 from app.models.concept_models import CanonicalLib, Concept
 
 
+@pytest.fixture(autouse=True)
+def _reader_session(client):
+    """#1011 group 5: CodeSystem/ConceptMap reads are gated. Every test here
+    reads as a logged-in read_only user; the gate itself is pinned in
+    tests/test_read_gate_1011.py."""
+    from tests.conftest import SAMPLE_READONLY_BLOB, set_sso_session
+    set_sso_session(client, SAMPLE_READONLY_BLOB)
+
+
+
 @pytest.fixture
 def lib_with_concepts(app):
     """Create one CanonicalLib + two Concepts: one with a binding
