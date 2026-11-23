@@ -143,10 +143,11 @@ class TestRoleEnforcement:
         })
         assert resp.status_code == 401
 
-    def test_read_endpoints_are_public(self, client):
-        """GET endpoints should work without authentication."""
-        resp = client.get('/api/v1/lookup/canonical-libs')
-        assert resp.status_code == 200
+    def test_read_endpoints_need_a_credential(self, client):
+        """#1011: GET endpoints were public until every consumer had a key."""
+        assert client.get('/api/v1/lookup/canonical-libs').status_code == 401
+        set_sso_session(client, SAMPLE_READONLY_BLOB)
+        assert client.get('/api/v1/lookup/canonical-libs').status_code == 200
 
 
 class TestHealthEndpoint:

@@ -26,6 +26,11 @@ carries `X-Operator-Session-Id` only — session propagation (#408), not
 authentication. So every internal consumer reads plan unauthenticated BY
 NECESSITY. Gating those four would break deployed services, one of them
 silently. That sequencing is its own ticket.
+
+#1011 (stage 3 of #931): THE FOUR ARE GATED NOW. #931 gave each consumer a
+read_only key, and two days of plan's read_shadow log showed one keyless
+consumer left (provider1.pdhc, keyed by #1011) plus crawlers. So every table
+below is in GATED, and the required parameter is what stays.
 """
 import uuid
 
@@ -34,21 +39,19 @@ import pytest
 from app.api import lookup_tables
 from tests.conftest import SAMPLE_ACCESS_BLOB, set_sso_session
 
-#: Each open table with the consumer that forces it. The reason is in the test
-#: so a future reader who wants to gate one knows what to fix first.
-OPEN_WITH_REASON = [
-    ('canonical-libs',
-     "cdr1's #874 whole-system assertion gate; sends only X-Operator-Session-Id"),
-    ('response-types',
-     "request.pdhc context_service.py:61, headers={'Accept': ...} only"),
-    ('units',
-     "request.pdhc context_service.py:62, headers={'Accept': ...} only"),
-    ('plandef-types',
-     "request.pdhc plan_definition_service.py:96; _headers() LOOKS like a "
-     "credential and is not"),
-]
-
+#: Every table, with why it is gated. The first four were OPEN until #1011,
+#: each forced open by a consumer with no credential; #931 gave those consumers
+#: keys, and the reason now says who reads it with one.
 GATED = [
+    ('canonical-libs',
+     "#1011: was open for cdr1's #874 gate; cdr now reads /whole-system-libs "
+     "with its #931 key, and sim's synthea path sends its key"),
+    ('response-types',
+     "#1011: request.pdhc context_service and provider1 plan_client, keyed"),
+    ('units',
+     "#1011: request.pdhc context_service, keyed (#931)"),
+    ('plandef-types',
+     "#1011: request.pdhc plan_definition_service, keyed (#931)"),
     ('concept-types',
      "sim's only caller targets /api/v1/concept-types without the /lookup "
      "prefix — measured 404, so it is already broken"),
@@ -95,10 +98,11 @@ class TestTheParameterIsRequired:
                 assert 'public_read' in kw, f"{url} registered without a posture"
                 seen[url.lstrip('/')] = kw['public_read'].value
         assert seen == {
-            'canonical-libs': True,
-            'response-types': True,
-            'units': True,
-            'plandef-types': True,
+            # #1011: the four that #925 had to leave open.
+            'canonical-libs': False,
+            'response-types': False,
+            'units': False,
+            'plandef-types': False,
             'concept-types': False,
             'intended-uses': False,
         # #951: a category name can name a guideline; closed by default.
@@ -131,20 +135,8 @@ class TestTheGatedTables:
         assert client.get(f'/api/v1/lookup/{table}').status_code == 200
 
 
-class TestTheOpenTablesStayOpen:
-    """CONTROLS. These are not aspirations — gating any of them breaks a
-    DEPLOYED consumer, and the reason travels with the assertion."""
-
-    @pytest.mark.parametrize("table,why", OPEN_WITH_REASON,
-                             ids=[o[0] for o in OPEN_WITH_REASON])
-    def test_LIST_still_answers_without_a_credential(self, client, table, why):
-        resp = client.get(f'/api/v1/lookup/{table}')
-        assert resp.status_code == 200, (
-            f"/{table} now refuses an unauthenticated read, which breaks: {why}")
-
-
 class TestWritesWereAlwaysGatedAndStillAre:
-    @pytest.mark.parametrize("table", [t for t, _ in OPEN_WITH_REASON + GATED])
+    @pytest.mark.parametrize("table", [t for t, _ in GATED])
     def test_an_unauthenticated_CREATE_is_refused(self, client, table):
         """The original control from #925, kept: it is what made "reads are
         open" evidence rather than a proxy letting everything through."""
@@ -161,113 +153,74 @@ class TestValuesIsTheRouteThatProvedTheIntent:
         assert client.get('/api/v1/lookup/values').status_code == 401
 
     def test_the_factory_now_agrees_with_it_where_it_can(self):
-        """Not all six, because four have uncredentialed deployed consumers —
-        but the two that could be brought in line have been."""
+        """#925 brought two of the six in line; #1011 the other four."""
         import inspect
         src = inspect.getsource(lookup_tables.list_values)
         assert "read_only" in src
 
 
-#: name field per open table, so a test can seed its own row instead of relying
-#: on whatever the rest of the suite happened to leave in the database.
-NAME_FIELD = {
-    'canonical-libs': 'canonical_lib_name',
-    'response-types': 'response_type_name',
-    'units': 'unit_name',
-    'plandef-types': 'plandef_type_name',
-    'intended-uses': 'intended_use_name',
-    'concept-types': 'concept_type_name',
-}
-
-
-def _seed(client, table, name, author='loader.pdhc'):
-    """Create a row carrying `author`, authenticated, and return its guid.
-
-    Seeding matters: the test database holds none of production's rows, so a
-    test that merely asserts `loader.pdhc` is absent passes VACUOUSLY. A
-    mutation proved exactly that — removing the strip failed only 1 of these
-    tests until each one planted the value it is looking for.
-    """
-    set_sso_session(client, SAMPLE_ACCESS_BLOB)
-    resp = client.post(f'/api/v1/lookup/{table}',
-                       json={NAME_FIELD[table]: name, 'author': author})
-    assert resp.status_code == 201, resp.get_data(as_text=True)
-    return resp.get_json()['guid']
-
-
 class TestThePublicProjectionDropsInternalHistory:
-    """#925 decision 3. The DATA is not rewritten — only what is served.
+    """#925 decision 3: a PUBLIC read drops `author`; the DATA is not rewritten.
 
-    Measured in production 2026-11-04, the publicly readable tables served
-    `author` values naming `loader.pdhc` (RETIRED by #736 — no repo, its live
-    never-rotated key destroyed), a migration revision id, and two internal
-    ticket slugs. The ticket proposed correcting the data; rewriting `author`
-    would falsify WHO created the row, which is the same argument CLAUDE.md §2
-    makes for leaving a superseded ticket number in a code comment alone.
+    Since #1011 no registered table is public, so the projection has no live
+    subject — but `public_read=True` is still a legal decision for a future
+    table, and the branch it selects must still behave. These tests register
+    the factory on a THROWAWAY app sharing the test database, so they exercise
+    the real `_crud_routes` without re-opening a production route.
     """
 
-    @pytest.mark.parametrize("table,why", OPEN_WITH_REASON,
-                             ids=[o[0] for o in OPEN_WITH_REASON])
-    def test_a_public_LIST_carries_no_author(self, client, table, why):
-        """Seeds the row it looks for. Without that this asserted over whatever
-        rows the suite happened to leave behind, and a mutation removing the
-        strip failed only one of the four."""
-        _seed(client, table, f'probe925-list-{table}')
-        rows = client.application.test_client().get(
-            f'/api/v1/lookup/{table}').get_json()
-        assert isinstance(rows, list) and rows, "nothing to assert on"
-        for r in rows:
-            assert 'author' not in r, f"/{table} still serves `author`"
+    @pytest.fixture
+    def public_units(self, app):
+        from flask import Blueprint, Flask
+        from app import db
+        from app.models.concept_models import Unit
+        tmp = Flask('probe925')
+        tmp.config.update(SQLALCHEMY_DATABASE_URI=app.config['SQLALCHEMY_DATABASE_URI'],
+                          TESTING=True)
+        db.init_app(tmp)
+        bp = Blueprint('probe925', __name__)
+        lookup_tables._crud_routes(bp, '/units', Unit, 'unit_name',
+                                   'unit_display_text', public_read=True)
+        tmp.register_blueprint(bp, url_prefix='/x')
+        with app.app_context():
+            row = Unit(unit_name=f'probe925-{uuid.uuid4().hex[:6]}',
+                       author='loader.pdhc')
+            db.session.add(row)
+            db.session.commit()
+            guid = row.guid
+        return tmp.test_client(), guid
 
-    def test_a_public_READ_carries_no_author(self, client):
-        set_sso_session(client, SAMPLE_ACCESS_BLOB)
-        created = client.post('/api/v1/lookup/units', json={
-            'unit_name': 'probe925', 'unit_display_text': 'probe',
-            'author': 'probe.pdhc'}).get_json()
-        guid = created['guid']
-        fresh = client.application.test_client()          # unauthenticated
-        body = fresh.get(f'/api/v1/lookup/units/{guid}').get_json()
-        assert body['unit_name'] == 'probe925'
-        assert 'author' not in body
+    def test_a_public_LIST_carries_no_author(self, public_units):
+        c, guid = public_units
+        rows = c.get('/x/units').get_json()
+        assert any(r['guid'] == guid for r in rows), "the seeded row is not there"
+        assert all('author' not in r for r in rows)
 
-    def test_CONTROL_the_DATA_is_still_there(self, client, app):
-        """The projection changed; the record did not. Without this the tests
-        above would pass for a fix that deleted the column's contents."""
-        set_sso_session(client, SAMPLE_ACCESS_BLOB)
-        created = client.post('/api/v1/lookup/units', json={
-            'unit_name': 'probe925b', 'unit_display_text': 'probe',
-            'author': 'probe.pdhc'}).get_json()
+    def test_a_public_READ_carries_no_author(self, public_units):
+        c, guid = public_units
+        body = c.get(f'/x/units/{guid}').get_json()
+        assert body['guid'] == guid and 'author' not in body
+
+    def test_no_retired_identity_is_named_in_a_public_response(self, public_units):
+        """PLANTS the value first — written vacuous once (#925), seeded since."""
+        c, _guid = public_units
+        raw = c.get('/x/units').get_data(as_text=True)
+        assert 'probe925-' in raw
+        for retired in ('loader.pdhc', 'monitor.pdhc', '2gate.pdhc'):
+            assert retired not in raw
+
+    def test_CONTROL_the_DATA_is_still_there(self, app, public_units):
+        _c, guid = public_units
         with app.app_context():
             from app.models.concept_models import Unit
-            row = Unit.query.filter_by(guid=created['guid']).first()
-            assert row is not None
-            assert row.author == 'probe.pdhc', "the data was rewritten, not hidden"
+            assert Unit.query.filter_by(guid=guid).first().author == 'loader.pdhc'
 
-    def test_CONTROL_a_GATED_table_still_serves_author(self, client):
-        """Scoped to PUBLIC reads. A gated table cannot be read anonymously, so
-        there is nothing to hide from — and keeping `author` there proves the
-        strip is a projection choice rather than a blanket removal."""
+    def test_CONTROL_a_GATED_table_serves_author_to_a_reader(self, client):
+        """Scoped to PUBLIC reads: the production tables are gated, so their
+        authenticated readers get the full record."""
         set_sso_session(client, SAMPLE_ACCESS_BLOB)
-        created = client.post('/api/v1/lookup/intended-uses', json={
-            'intended_use_name': 'probe925c', 'author': 'probe.pdhc'}).get_json()
-        body = client.get(
-            f"/api/v1/lookup/intended-uses/{created['guid']}").get_json()
+        created = client.post('/api/v1/lookup/units', json={
+            'unit_name': f'probe925c-{uuid.uuid4().hex[:6]}',
+            'author': 'probe.pdhc'}).get_json()
+        body = client.get(f"/api/v1/lookup/units/{created['guid']}").get_json()
         assert body.get('author') == 'probe.pdhc'
-
-    @pytest.mark.parametrize("table,why", OPEN_WITH_REASON,
-                             ids=[o[0] for o in OPEN_WITH_REASON])
-    def test_no_retired_identity_is_named_in_a_public_response(
-            self, client, table, why):
-        """The specific production finding, asserted by VALUE rather than by
-        field name — and it PLANTS that value first.
-
-        This test was vacuous when written: the test database holds none of
-        production's rows, so "loader.pdhc is absent" was true before the fix
-        and after it. Seeding is what makes it evidence."""
-        _seed(client, table, f'probe925-retired-{table}', author='loader.pdhc')
-        raw = client.application.test_client().get(
-            f'/api/v1/lookup/{table}').get_data(as_text=True)
-        assert 'probe925-retired' in raw, "the seeded row is not in the response"
-        for retired in ('loader.pdhc', 'monitor.pdhc', '2gate.pdhc'):
-            assert retired not in raw, (
-                f"/{table} names the retired identity {retired!r}")

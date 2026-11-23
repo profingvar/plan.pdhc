@@ -34,63 +34,67 @@ ENDPOINTS = [
     _endpoint('GET', '/auth/me', True, 'Get current authenticated user'),
 
     # Canonical Libraries (lookup blueprint, /api/v1/lookup prefix)
-    _endpoint('GET', '/lookup/canonical-libs', False, 'List all canonical libraries'),
+    _endpoint('GET', '/lookup/canonical-libs', True, 'List all canonical libraries'),
     _endpoint('POST', '/lookup/canonical-libs', True, 'Create a canonical library'),
-    _endpoint('GET', '/lookup/canonical-libs/<guid>', False, 'Read a canonical library'),
+    _endpoint('GET', '/lookup/canonical-libs/<guid>', True, 'Read a canonical library'),
     _endpoint('PUT', '/lookup/canonical-libs/<guid>', True, 'Update a canonical library'),
     _endpoint('DELETE', '/lookup/canonical-libs/<guid>', True, 'Delete a canonical library'),
 
+    # #935 narrow read for cdr's whole-system gate; gated by #1011 (cdr sends its key).
+    _endpoint('GET', '/lookup/whole-system-libs', True,
+              'Libraries flagged whole_system_answer_space: name, url, flag'),
+
     # Concept Types
-    _endpoint('GET', '/lookup/concept-types', False, 'List all concept types'),
+    _endpoint('GET', '/lookup/concept-types', True, 'List all concept types'),
     _endpoint('POST', '/lookup/concept-types', True, 'Create a concept type'),
-    _endpoint('GET', '/lookup/concept-types/<guid>', False, 'Read a concept type'),
+    _endpoint('GET', '/lookup/concept-types/<guid>', True, 'Read a concept type'),
     _endpoint('PUT', '/lookup/concept-types/<guid>', True, 'Update a concept type'),
     _endpoint('DELETE', '/lookup/concept-types/<guid>', True, 'Delete a concept type'),
 
     # Response Types
-    _endpoint('GET', '/lookup/response-types', False, 'List all response types'),
+    _endpoint('GET', '/lookup/response-types', True, 'List all response types'),
     _endpoint('POST', '/lookup/response-types', True, 'Create a response type'),
-    _endpoint('GET', '/lookup/response-types/<guid>', False, 'Read a response type'),
+    _endpoint('GET', '/lookup/response-types/<guid>', True, 'Read a response type'),
     _endpoint('PUT', '/lookup/response-types/<guid>', True, 'Update a response type'),
     _endpoint('DELETE', '/lookup/response-types/<guid>', True, 'Delete a response type'),
 
     # Units
-    _endpoint('GET', '/lookup/units', False, 'List all units'),
+    _endpoint('GET', '/lookup/units', True, 'List all units'),
     _endpoint('POST', '/lookup/units', True, 'Create a unit'),
-    _endpoint('GET', '/lookup/units/<guid>', False, 'Read a unit'),
+    _endpoint('GET', '/lookup/units/<guid>', True, 'Read a unit'),
     _endpoint('PUT', '/lookup/units/<guid>', True, 'Update a unit'),
     _endpoint('DELETE', '/lookup/units/<guid>', True, 'Delete a unit'),
 
     # PlanDef Types
-    _endpoint('GET', '/lookup/plandef-types', False, 'List all PlanDefinition types'),
+    _endpoint('GET', '/lookup/plandef-types', True, 'List all PlanDefinition types'),
     _endpoint('POST', '/lookup/plandef-types', True, 'Create a PlanDefinition type'),
-    _endpoint('GET', '/lookup/plandef-types/<guid>', False, 'Read a PlanDefinition type'),
+    _endpoint('GET', '/lookup/plandef-types/<guid>', True, 'Read a PlanDefinition type'),
     _endpoint('PUT', '/lookup/plandef-types/<guid>', True, 'Update a PlanDefinition type'),
     _endpoint('DELETE', '/lookup/plandef-types/<guid>', True, 'Delete a PlanDefinition type'),
 
     # Intended Uses
-    _endpoint('GET', '/lookup/intended-uses', False, 'List all intended uses'),
+    _endpoint('GET', '/lookup/intended-uses', True, 'List all intended uses'),
     _endpoint('POST', '/lookup/intended-uses', True, 'Create an intended use'),
-    _endpoint('GET', '/lookup/intended-uses/<guid>', False, 'Read an intended use'),
+    _endpoint('GET', '/lookup/intended-uses/<guid>', True, 'Read an intended use'),
     _endpoint('PUT', '/lookup/intended-uses/<guid>', True, 'Update an intended use'),
     _endpoint('DELETE', '/lookup/intended-uses/<guid>', True, 'Delete an intended use'),
 
     # Values
-    _endpoint('GET', '/lookup/values', False, 'List all values'),
+    _endpoint('GET', '/lookup/values', True, 'List all values'),
     _endpoint('POST', '/lookup/values', True, 'Create a value'),
-    _endpoint('GET', '/lookup/values/<guid>', False, 'Read a value'),
+    _endpoint('GET', '/lookup/values/<guid>', True, 'Read a value'),
     _endpoint('PUT', '/lookup/values/<guid>', True, 'Update a value'),
     _endpoint('DELETE', '/lookup/values/<guid>', True, 'Delete a value'),
 
     # ValueSets
-    _endpoint('GET', '/lookup/valuesets', False, 'List all valuesets (paginated)'),
+    _endpoint('GET', '/lookup/valuesets', True, 'List all valuesets (paginated)'),
     _endpoint('POST', '/lookup/valuesets', True, 'Create a valueset'),
-    _endpoint('GET', '/lookup/valuesets/<guid>', False, 'Read a valueset'),
+    _endpoint('GET', '/lookup/valuesets/<guid>', True, 'Read a valueset'),
     _endpoint('PUT', '/lookup/valuesets/<guid>', True, 'Update a valueset'),
     _endpoint('DELETE', '/lookup/valuesets/<guid>', True, 'Delete a valueset'),
 
     # ValueSet Membership
-    _endpoint('GET', '/lookup/valuesets/<guid>/values', False, 'List values in a valueset'),
+    _endpoint('GET', '/lookup/valuesets/<guid>/values', True, 'List values in a valueset'),
     _endpoint('POST', '/lookup/valuesets/<guid>/values', True, 'Add a value to a valueset'),
     _endpoint('PUT', '/lookup/valuesets/<guid>/values/<value_guid>', True, 'Update sort order of a value in a valueset'),
     _endpoint('DELETE', '/lookup/valuesets/<guid>/values/<value_guid>', True, 'Remove a value from a valueset'),
@@ -123,10 +127,10 @@ ENDPOINTS = [
 
     # FHIR R5 terminology profile (§6.1-§6.4) — additive; legacy CRUD untouched.
     # ValueSet — FHIR resource + $expand + scoped $validate-code
-    _endpoint('GET', '/ValueSet', False, 'FHIR R5 searchset Bundle (?url=, _count, _offset)'),
-    _endpoint('GET', '/ValueSet/<guid>', False, 'FHIR R5 ValueSet resource'),
-    _endpoint('GET', '/ValueSet/<guid>/$expand', False, 'Expand by id — returns ValueSet with expansion.contains[]'),
-    _endpoint('POST', '/ValueSet/$expand', False, 'Expand by FHIR Parameters body (url or valueSet)'),
+    _endpoint('GET', '/ValueSet', True, 'FHIR R5 searchset Bundle (?url=, _count, _offset)'),
+    _endpoint('GET', '/ValueSet/<guid>', True, 'FHIR R5 ValueSet resource'),
+    _endpoint('GET', '/ValueSet/<guid>/$expand', True, 'Expand by id — returns ValueSet with expansion.contains[]'),
+    _endpoint('POST', '/ValueSet/$expand', True, 'Expand by FHIR Parameters body (url or valueSet)'),
     _endpoint('GET', '/ValueSet/$validate-code', False,
               'Global (no url): the cdr.pdhc adoption-check shim (unchanged). '
               'Scoped (with ?url= or ?valueSet=): FHIR ValueSet/$validate-code. '

@@ -303,6 +303,10 @@ def scoped_validate_code(vs: ValueSet, system: str, code: str) -> dict:
 # GET /ValueSet/{guid}
 # ---------------------------------------------------------------------------
 @fhir_valueset_bp.route('/ValueSet/<guid>', methods=['GET'])
+# #1011: `$expand` and the search were gated by #913 and this read was not,
+# yet `compose.include[].concept` lists every code of the selection — the
+# same enumeration #913 closed, one GUID at a time.
+@requires_role('read_only')
 def read_valueset(guid: str):
     if not _is_valid_uuid(guid):
         return operation_outcome(

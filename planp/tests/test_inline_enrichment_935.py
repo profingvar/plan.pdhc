@@ -123,10 +123,31 @@ class TestConceptTypeNameIsInline:
 
 
 class TestTheNarrowWholeSystemRead:
-    def test_it_answers_without_a_credential(self, client):
-        """PUBLIC by decision. cdr's gate sends only an operator session id."""
+    @pytest.fixture(autouse=True)
+    def _reader(self, client):
+        # #1011: gated. Every test below reads as a logged-in reader; the two
+        # tests right after this fixture pin the gate itself.
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)
+
+    def test_it_refuses_a_bare_read_since_1011(self, client):
+        """Was PUBLIC by decision while cdr's gate sent only an operator
+        session id. cdr sends its #931 read_only key on this call now."""
         fresh = client.application.test_client()
-        assert fresh.get(NARROW).status_code == 200
+        assert fresh.get(NARROW).status_code == 401
+
+    def test_a_cdr_key_reads_it(self, app, client):
+        from app.api.auth import KNOWN_SERVICES
+        for name in ('cdr.pdhc', 'cdr2.pdhc', 'cdr3.pdhc'):
+            var = KNOWN_SERVICES[name][0]
+            old = app.config.get(var)
+            app.config[var] = f'k-{name}'
+            try:
+                fresh = client.application.test_client()
+                r = fresh.get(NARROW, headers={'X-Source-Service': name,
+                                               'X-Service-Key': f'k-{name}'})
+                assert r.status_code == 200, name
+            finally:
+                app.config[var] = old or ''
 
     def test_it_returns_only_the_FLAGGED_libraries(self, client, rows):
         flagged = rows(CanonicalLib, canonical_lib_name=_n('ws935'),

@@ -206,38 +206,20 @@ class TestOptionThree:
         # candidate closed as vocabulary_miss.
         'scoped_validate_code_by_id',
         'scoped_validate_code_by_post',
-        # One resource's metadata, no expansion — a name, not a list.
+    }
+
+    #: #1011 (stage 3 of #931): reads #913 did NOT classify as enumerating and
+    #: left public because their consumers had no credential. Every consumer
+    #: has a read_only key now, so these are gated too — a third tier, kept
+    #: separate so #913's own reasoning above stays readable. `read_valueset`
+    #: exists in both modules: the FHIR read serves `compose.include[].concept`
+    #: (every code of the selection), the native one the valueset row.
+    GATED_BY_1011 = {
         'read_valueset',
         'read_value',
-        # The generic CRUD factory's reads. None carries the restricted
-        # selection.
-        #
-        # THIS COMMENT USED TO SAY the six tables were all public and that
-        # "gating these would have broken" cdr's whole-system gate. #925 gated
-        # TWO of them — `concept-types` and `intended-uses` — so that is no
-        # longer true of those two, and leaving the sentence would have it read
-        # as a reason not to.
-        #
-        # The classification cannot tell them apart, and that is a real limit
-        # worth naming rather than hiding: `_crud_routes` registers all six
-        # tables through ONE pair of function names, so this set is per
-        # FUNCTION and not per table. Which table is gated lives at the
-        # registration line, as `public_read=` (#925) — that is where the
-        # decision is, and this test cannot see it.
-        #
-        # Still true, and the reason the four open ones stay open: cdr.pdhc
-        # reads /api/v1/lookup/canonical-libs on its #874 whole-system gate
-        # with no credential, and request.pdhc reads response-types and units
-        # the same way.
-        'list_items',
+        'list_items',            # the CRUD factory: all seven tables gated
         'read_item',
-        # #935. The three fields cdr's #874 gate actually needs — library
-        # name, canonical url, the flag — and nothing else. It exists so that
-        # gate's dependency on an open read is EXPLICIT rather than
-        # accidental: today it reads the whole table because the table happens
-        # to be open, and gating that would silently degrade a deployed
-        # security control to its hard-coded floor.
-        'list_whole_system_libs',
+        'list_whole_system_libs',  # cdr reads it with its #931 key
     }
 
     def _all(self):
@@ -268,8 +250,28 @@ class TestOptionThree:
                 'candidate.'
             )
 
-    def test_the_two_sets_do_not_overlap(self):
+    @pytest.mark.parametrize('name', sorted(GATED_BY_1011))
+    def test_the_1011_reads_are_gated(self, name):
+        found = [(m, d) for m, n, _meth, d in self._all() if n == name]
+        assert found, f'{name} no longer exists — update GATED_BY_1011'
+        for module, decs in found:
+            if name in ('list_items', 'read_item'):
+                # The factory's gate is a VARIABLE (`_read_gate`) chosen by
+                # `public_read=`, so the decorator name cannot say it; the
+                # registration lines can. Parsed, so prose cannot satisfy it.
+                assert '_read_gate' in decs, decs
+                tree = ast.parse((API / 'lookup_tables.py').read_text())
+                postures = [k.value.value for n in ast.walk(tree)
+                            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                            and n.func.id == '_crud_routes'
+                            for k in n.keywords if k.arg == 'public_read']
+                assert postures and not any(postures), postures
+            else:
+                assert _gated(decs), f'{module}:{name} is ungated again (#1011)'
+
+    def test_the_sets_do_not_overlap(self):
         assert not (self.ENUMERATING & self.PUBLIC_BY_DESIGN)
+        assert not (self.GATED_BY_1011 & (self.ENUMERATING | self.PUBLIC_BY_DESIGN))
 
     def test_every_route_is_classified(self):
         """No route may be neither. A new one has to join a tier, which is
@@ -279,6 +281,7 @@ class TestOptionThree:
             (m, n, sorted(meth)) for m, n, meth, d in self._all()
             if n not in self.ENUMERATING
             and n not in self.PUBLIC_BY_DESIGN
+            and n not in self.GATED_BY_1011
             and not (meth & WRITE_METHODS)
         ]
         assert unclassified == [], (

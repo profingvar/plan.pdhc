@@ -79,6 +79,23 @@ def test_an_unset_provider1_key_admits_nobody(client):
 
 GROUPS: dict[str, list[str]] = {}
 
+# Group 1 — the four lookup tables #925 had to leave open, and every per-GUID
+# lookup read that answered while its LIST was already gated.
+GROUPS['1-lookup'] = [
+    '/api/v1/lookup/canonical-libs',
+    '/api/v1/lookup/canonical-libs/{lib}',
+    '/api/v1/lookup/response-types',
+    '/api/v1/lookup/response-types/{rt}',
+    '/api/v1/lookup/units',
+    '/api/v1/lookup/units/{unit}',
+    '/api/v1/lookup/plandef-types',
+    '/api/v1/lookup/plandef-types/{pdt}',
+    '/api/v1/lookup/whole-system-libs',
+    '/api/v1/lookup/values/{value}',
+    '/api/v1/lookup/valuesets/{vs}',
+    '/api/v1/ValueSet/{vs}',
+]
+
 
 @pytest.fixture(scope='module')
 def seeded(app):

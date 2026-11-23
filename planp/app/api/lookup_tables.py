@@ -244,46 +244,25 @@ def _crud_routes(bp, url, model_class, name_field, display_field=None, *,
 
 
 # Register lookup table CRUD
-# #925: every read posture below is a DECISION with its consumer named. A
-# survey of all 26 repos found who actually calls each path and whether that
-# caller sends a credential; `public_read=True` means a DEPLOYED consumer reads
-# it with none, so gating it would break that consumer — one of them silently.
+# #925 made every read posture a DECISION at its registration line, and
+# recorded why four tables had to stay open: plan had no machine-auth door, so
+# their deployed consumers (cdr's #874 gate, request's context_service, sim's
+# synthea path) read with no credential by necessity.
 #
-# `public_read=False` is the goal state for all six. The blocker is above: plan
-# has no machine-auth door, so these callers have nothing to send. #931 carries
-# it, including a cheaper route for canonical-libs specifically: cdr's gate needs
-# only three fields, so a narrow public endpoint would let the FULL table be
-# gated without giving cdr a credential at all.
-
-# cdr1's whole-system assertion gate (#874) reads this to learn which libraries
-# are whole-system answer spaces, through a client that sends only
-# `X-Operator-Session-Id`. Gating it would degrade a deployed SECURITY control
-# to its floor — it would still refuse `icd11-mms` and `icd10`, but would stop
-# following plan for anything flagged later.
-_crud_routes(lookup_bp, '/canonical-libs', CanonicalLib, 'canonical_lib_name', 'canonical_lib_display_text', public_read=True)
-
-# GATED. The only non-plan reference is `sim.pdhc/concepts/load_to_plan.py:110`,
-# and it calls `/api/v1/concept-types` WITHOUT the `/lookup` prefix — measured
-# 404 in production, alongside `/api/v1/canonical-libs` on the next line of that
-# tool. So that caller is already broken and gating this breaks nothing. (Its
-# own bug is not fixed here; it is not this ticket.)
+# #1011 (stage 3 of #931): ALL SEVEN ARE GATED. #931 gave each consumer a
+# read_only key; two days of plan's read_shadow log showed only one keyless
+# consumer left (provider1.pdhc, which reads response-types and
+# valuesets/<guid> for its guided form, and now has its own key) plus
+# crawlers. `public_read` stays a required keyword so a future table still
+# cannot be registered without someone deciding.
+_crud_routes(lookup_bp, '/canonical-libs', CanonicalLib, 'canonical_lib_name', 'canonical_lib_display_text', public_read=False)
 _crud_routes(lookup_bp, '/concept-types', ConceptType, 'concept_type_name', 'concept_type_display_text', public_read=False)
-
-# request.pdhc's `context_service.py:61-62` reads both of these with
-# `{'Accept': 'application/json'}` and nothing else. Its own comment says a
-# plan failure "doesn't regress every concept to 'text'/no-unit" because of
-# stale-if-error — which means gating these would regress exactly that, SILENTLY,
-# on the next cold start rather than at the moment of the change.
-_crud_routes(lookup_bp, '/response-types', ResponseType, 'response_type_name', 'response_type_display_text', public_read=True)
-_crud_routes(lookup_bp, '/units', Unit, 'unit_name', 'unit_display_text', public_read=True)
-
-# request.pdhc's `plan_definition_service.py:96` sends `_headers()`, which LOOKS
-# like a credential and is not: `{'Accept': ...} | outbound_session_headers()`.
-# I read it as safe to gate on the first pass and was wrong; the difference is
-# worth the comment.
-_crud_routes(lookup_bp, '/plandef-types', PlanDefType, 'plandef_type_name', 'plandef_type_display_text', public_read=True)
-
-# GATED. No consumer in any of the 26 repos, in Python, JS, HTML or shell.
+# request.pdhc's context_service reads these two with its plan key (#931) and
+# provider1's plan_client reads response-types with its own (#1011).
+_crud_routes(lookup_bp, '/response-types', ResponseType, 'response_type_name', 'response_type_display_text', public_read=False)
+_crud_routes(lookup_bp, '/units', Unit, 'unit_name', 'unit_display_text', public_read=False)
+_crud_routes(lookup_bp, '/plandef-types', PlanDefType, 'plandef_type_name', 'plandef_type_display_text', public_read=False)
+# No consumer in any of the 26 repos, in Python, JS, HTML or shell (#925).
 _crud_routes(lookup_bp, '/intended-uses', IntendedUse, 'intended_use_name', 'intended_use_display_text', public_read=False)
 # #951 A.2: GATED. A category name can encode a clinical domain or name a
 # guideline, so a public list would publish which guidelines plan has
@@ -296,10 +275,19 @@ _crud_routes(lookup_bp, '/concept-categories', ConceptCategory, 'category_name',
 # ---------------------------------------------------------------------------
 
 @lookup_bp.route('/whole-system-libs', methods=['GET'])
+@requires_role('read_only')
 def list_whole_system_libs():
-    """The flagged libraries, with the three fields a gate needs. PUBLIC.
+    """The flagged libraries, with the three fields a gate needs.
 
-    DELIBERATELY UNDECORATED, and the reason is the point. cdr1's #874
+    GATED SINCE #1011. Its only caller is cdr's `plan_client`
+    (`whole_system_systems`), which goes through `_get_with_retry` and so sends
+    `plan_read_headers()` — cdr1, cdr2 and cdr3 each carry their own read_only
+    key since #931. A CDR whose key is missing gets 401 here, and the client
+    reads that as "plan did not answer" (None), which keeps the gate on its
+    hard-coded floor rather than opening it; read_shadow names such a caller
+    before the flip. The account below is why it was public until then.
+
+    It was deliberately undecorated, and the reason was the point. cdr1's #874
     whole-system assertion gate reads the full `/canonical-libs` table through
     a client that sends only `X-Operator-Session-Id` — session propagation
     (#408), not authentication. So a DEPLOYED SECURITY CONTROL depends on that
@@ -376,6 +364,7 @@ def create_value():
 
 
 @lookup_bp.route('/values/<guid>', methods=['GET'])
+@requires_role('read_only')  # #1011: the list was gated and this was not
 def read_value(guid):
     if not _is_valid_uuid(guid):
         return jsonify({'error': 'Invalid GUID'}), 400
@@ -487,6 +476,7 @@ def create_valueset():
 
 
 @lookup_bp.route('/valuesets/<guid>', methods=['GET'])
+@requires_role('read_only')  # #1011: the list was gated and this was not
 def read_valueset(guid):
     if not _is_valid_uuid(guid):
         return jsonify({'error': 'Invalid GUID'}), 400

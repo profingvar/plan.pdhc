@@ -37,10 +37,13 @@ class TestEnforcedEndpointReturns429:
     def test_201st_request_is_rate_limited(self, client):
         # 200/minute default — fire 200 (should all succeed), then one more
         # should hit 429.
+        # #1011: /lookup/units is gated now, so an anonymous caller gets 401 —
+        # and a refused read must still COUNT against the limit, or a crawler
+        # could hammer the gate for free. 401 is "answered, not limited".
         ok = 0
         for _ in range(200):
             r = client.get('/api/v1/lookup/units')
-            if r.status_code == 200:
+            if r.status_code == 401:
                 ok += 1
             elif r.status_code == 429:
                 # Already-hit limit due to a non-isolated prior test.

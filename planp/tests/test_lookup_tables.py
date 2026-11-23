@@ -1,5 +1,5 @@
 import pytest
-from tests.conftest import set_sso_session, SAMPLE_ACCESS_BLOB
+from tests.conftest import set_sso_session, SAMPLE_ACCESS_BLOB, SAMPLE_READONLY_BLOB
 
 
 class TestCanonicalLibs:
@@ -51,6 +51,7 @@ class TestCanonicalLibs:
         assert resp.status_code == 409
 
     def test_invalid_uuid(self, client):
+        set_sso_session(client, SAMPLE_READONLY_BLOB)  # #1011: reads are gated
         resp = client.get('/api/v1/lookup/canonical-libs/not-a-uuid')
         assert resp.status_code == 400
 
