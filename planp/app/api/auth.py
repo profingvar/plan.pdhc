@@ -84,6 +84,15 @@ KNOWN_SERVICES = {
     'onboard.pdhc': ('ONBOARD_PDHC_SERVICE_KEY', 'read_only'),
     'contract.pdhc': ('CONTRACT_PDHC_SERVICE_KEY', 'read_only'),
     'analyse.pdhc': ('ANALYSE_PDHC_SERVICE_KEY', 'read_only'),
+    # #1011: the reader #931 missed. provider1's `plan_client` builds the
+    # guided report form from /plandefinitions, /concepts and two lookup
+    # reads, and it sent NO credential — measured in plan's read_shadow log
+    # (75 unkeyed reads in two days, python-requests via the public name).
+    # Its client is FAIL-SOFT, so gating those reads before this entry
+    # existed would have reduced every provider form to text boxes with no
+    # error anywhere. `read_only`, named for the running instance
+    # (provider1), not the repo (provider.pdhc), per the rule above.
+    'provider1.pdhc': ('PROVIDER1_PDHC_SERVICE_KEY', 'read_only'),
 }
 
 #: Shared by both branches of `requires_role`, so the service path and the

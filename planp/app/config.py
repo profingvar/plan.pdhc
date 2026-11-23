@@ -233,6 +233,8 @@ class Config:
     ONBOARD_PDHC_SERVICE_KEY = os.environ.get('ONBOARD_PDHC_SERVICE_KEY', '')
     CONTRACT_PDHC_SERVICE_KEY = os.environ.get('CONTRACT_PDHC_SERVICE_KEY', '')
     ANALYSE_PDHC_SERVICE_KEY = os.environ.get('ANALYSE_PDHC_SERVICE_KEY', '')
+    # #1011: provider1.pdhc's guided report form reads plan (see auth.py).
+    PROVIDER1_PDHC_SERVICE_KEY = os.environ.get('PROVIDER1_PDHC_SERVICE_KEY', '')
 
     # Upstream services
     CONTRACT_BASE_URL = os.environ.get('CONTRACT_BASE_URL', 'http://localhost:9021')

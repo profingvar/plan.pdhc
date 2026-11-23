@@ -38,6 +38,8 @@ def test_loader_is_not_a_known_service():
         'onboard.pdhc': ('ONBOARD_PDHC_SERVICE_KEY', 'read_only'),
         'contract.pdhc': ('CONTRACT_PDHC_SERVICE_KEY', 'read_only'),
         'analyse.pdhc': ('ANALYSE_PDHC_SERVICE_KEY', 'read_only'),
+        # #1011: the reader #931 missed (provider1's guided report form).
+        'provider1.pdhc': ('PROVIDER1_PDHC_SERVICE_KEY', 'read_only'),
     }
 
 
