@@ -100,14 +100,14 @@ ENDPOINTS = [
     _endpoint('DELETE', '/lookup/valuesets/<guid>/values/<value_guid>', True, 'Remove a value from a valueset'),
 
     # Concepts
-    _endpoint('GET', '/concepts', False, 'List/search concepts (paginated, filterable)'),
+    _endpoint('GET', '/concepts', True, 'List/search concepts (paginated, filterable)'),
     _endpoint('POST', '/concepts', True, 'Create a concept'),
-    _endpoint('GET', '/concepts/<guid>', False, 'Read a concept (includes valueset values)'),
+    _endpoint('GET', '/concepts/<guid>', True, 'Read a concept (includes valueset values)'),
     _endpoint('PUT', '/concepts/<guid>', True, 'Update a concept'),
     _endpoint('DELETE', '/concepts/<guid>', True, 'Delete a concept'),
 
     # Concept Values
-    _endpoint('GET', '/concepts/<guid>/values', False, 'List values for a concept'),
+    _endpoint('GET', '/concepts/<guid>/values', True, 'List values for a concept'),
     _endpoint('POST', '/concepts/<guid>/values', True, 'Add a value to a concept\'s valueset'),
     _endpoint('DELETE', '/concepts/<guid>/values/<value_guid>', True, 'Remove a value from a concept\'s valueset'),
 

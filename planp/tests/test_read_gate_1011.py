@@ -96,6 +96,14 @@ GROUPS['1-lookup'] = [
     '/api/v1/ValueSet/{vs}',
 ]
 
+# Group 2 — the concept registry. Readers: request, contract, dashboard, sim
+# (keyed since #931) and provider1 (keyed by #1011).
+GROUPS['2-concepts'] = [
+    '/api/v1/concepts',
+    '/api/v1/concepts/{concept}',
+    '/api/v1/concepts/{concept}/values',
+]
+
 
 @pytest.fixture(scope='module')
 def seeded(app):

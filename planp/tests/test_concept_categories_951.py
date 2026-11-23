@@ -187,6 +187,7 @@ def test_the_filter_returns_the_category_and_ONLY_it_and_unfiltered_returns_both
         _imp(f"{HDR}\n{ROW_A}\n", category='diabetes-2026')
         _imp(f"{HDR}\n{ROW_B}\n")
         guid = ConceptCategory.query.filter_by(category_name='diabetes-2026').one().guid
+    set_sso_session(client, SAMPLE_SU_BLOB)  # #1011: /concepts is gated
     names = lambda q: sorted(c['concept_name'] for c in client.get(f'/api/v1/concepts{q}').get_json()['items'])
     assert names('?category=diabetes-2026') == ['dx-a-951']
     assert names(f'?category={guid}') == ['dx-a-951']                 # guid works too
@@ -198,6 +199,7 @@ def test_the_filter_returns_the_category_and_ONLY_it_and_unfiltered_returns_both
 def test_the_wire_carries_categories_with_urls(app, client):
     with app.app_context():
         _imp(f"{HDR}\n{ROW_A}\n", category='diabetes-2026')
+    set_sso_session(client, SAMPLE_SU_BLOB)  # #1011: /concepts is gated
     item = client.get('/api/v1/concepts?category=diabetes-2026').get_json()['items'][0]
     assert [c['category_name'] for c in item['categories']] == ['diabetes-2026']
     assert item['categories'][0]['url'].endswith(item['categories'][0]['guid'])

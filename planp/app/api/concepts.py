@@ -92,6 +92,7 @@ def filtered_concepts(args):
 
 
 @concepts_bp.route('/concepts', methods=['GET'])
+@requires_role('read_only')  # #1011 group 2: every consumer sends a key or a session
 def list_concepts():
     try:
         query = filtered_concepts(request.args)
@@ -191,6 +192,7 @@ def create_concept():
 
 
 @concepts_bp.route('/concepts/<guid>', methods=['GET'])
+@requires_role('read_only')  # #1011 group 2: every consumer sends a key or a session
 def read_concept(guid):
     if not _is_valid_uuid(guid):
         return jsonify({'error': 'Invalid GUID'}), 400
@@ -370,6 +372,7 @@ def delete_concept(guid):
 # ---------------------------------------------------------------------------
 
 @concepts_bp.route('/concepts/<concept_guid>/values', methods=['GET'])
+@requires_role('read_only')  # #1011 group 2: every consumer sends a key or a session
 def list_concept_values(concept_guid):
     if not _is_valid_uuid(concept_guid):
         return jsonify({'error': 'Invalid GUID'}), 400

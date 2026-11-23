@@ -70,6 +70,11 @@ def rows(client):
 
 
 class TestConceptTypeNameIsInline:
+    @pytest.fixture(autouse=True)
+    def _reader(self, client):
+        # #1011: /concepts is gated; read as a logged-in reader.
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)
+
     def test_the_read_route_resolves_the_name(self, client, rows):
         ct = rows(ConceptType, concept_type_name=_n('Diagnsosis ICD10'))
         lib = rows(CanonicalLib, canonical_lib_name=_n('lib935'))
@@ -88,8 +93,18 @@ class TestConceptTypeNameIsInline:
         lib = rows(CanonicalLib, canonical_lib_name=_n('lib935b'))
         c = rows(Concept, concept_name=_n('probe935b'),
                  canonical_lib=lib.guid, concept_type=ct.guid)
-        fresh = client.application.test_client()          # unauthenticated
-        body = fresh.get(f'/api/v1/concepts/{c.guid}').get_json()
+        # Since #1011 the concept read needs a credential too; sim holds a
+        # read_only key, and this proves ONE keyed call carries the name.
+        from app.api.auth import KNOWN_SERVICES
+        app = client.application
+        var = KNOWN_SERVICES['sim.pdhc'][0]
+        old, app.config[var] = app.config.get(var), 'k-sim-935'
+        try:
+            fresh = app.test_client()
+            body = fresh.get(f'/api/v1/concepts/{c.guid}', headers={
+                'X-Source-Service': 'sim.pdhc', 'X-Service-Key': 'k-sim-935'}).get_json()
+        finally:
+            app.config[var] = old or ''
         assert body['concept_type_name'] == ct.concept_type_name
         assert fresh.get('/api/v1/lookup/concept-types').status_code == 401, (
             'premise of this test: the lookup is gated')

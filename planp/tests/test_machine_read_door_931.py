@@ -74,11 +74,13 @@ def _shadow(caplog, fn):
     return [r.getMessage() for r in caplog.records if r.name == 'plan.read_shadow']
 
 
-def test_an_unauthenticated_open_read_is_LOGGED_not_blocked(client, caplog):
+def test_an_unauthenticated_read_is_LOGGED_and_refused(client, caplog):
     out = {}
     lines = _shadow(caplog, lambda: out.setdefault('r', client.get(
         '/api/v1/concepts', headers={'X-Forwarded-For': '203.0.113.7, 10.0.0.1'})))
-    assert out['r'].status_code == 200, 'shadow only — nothing is gated yet'
+    # #1011: /concepts is gated now. The shadow line is still written, so the
+    # log keeps naming who reads without a credential after the flip.
+    assert out['r'].status_code == 401
     assert len(lines) == 1
     assert 'outcome=none' in lines[0] and 'path=/api/v1/concepts' in lines[0]
     assert 'remote=203.0.113.7' in lines[0]
