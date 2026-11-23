@@ -1241,3 +1241,19 @@ gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
 ## 2026-11-19 — single-goal inference limited to same-unit transactions
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/plandefinitions.py — _plandef_full_dict
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_single_goal_unit_guard.py (NEW)
+
+## #1011 — plan's open API reads gated (stage 3 of #931), 2026-11-23
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/auth.py — KNOWN_SERVICES: provider1.pdhc (read_only)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/config.py, /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/.env.example — PROVIDER1_PDHC_SERVICE_KEY
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/lookup_tables.py — all tables public_read=False; whole-system-libs, values/<g>, valuesets/<g> gated
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_valueset.py — ValueSet/<g> gated
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/concepts.py — list, read, values gated
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/plandefinitions.py, /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_plandefinitions.py — list, read, $expand gated
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/forms.py — catalogue, form, versions behind require_api_key_or_role
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_codesystem.py, /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/fhir_conceptmap.py — search, read, $lookup, $translate gated
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/capability.py — auth_required truthful for every GET; whole-system-libs row
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/read_shadow.py — /endpoints and /docs public by decision
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_read_gate_1011.py (NEW)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_loader_identity_retired.py, test_lookup_read_posture_925.py, test_inline_enrichment_935.py, test_terminology_read_write_invariant_913.py, test_lookup_tables.py, test_auth.py, test_rate_limit.py, test_concept_categories_951.py, test_machine_read_door_931.py, test_plandefinitions.py, test_forms.py, test_fhir_codesystem.py, test_fhir_conceptmap.py, test_fhir_version_uniform.py, test_termbank_plan_internal.py (all under /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/)
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/technical.md — §6 service keys table, open-read set
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/progress.md, /Users/martiningvar/T7_sidewinder/plan.pdhc/changed_files.md

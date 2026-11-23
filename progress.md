@@ -6,6 +6,62 @@ This file tracks progress after each step in the deployment plan (`readme.md`). 
 
 ## 1) Environment and infrastructure setup
 
+### 2026-11-23 — #1011 (stage 3 of #931): plan's open API reads gated, LOCAL ONLY (not deployed)
+- Evidence: production read_shadow, 137 lines 2026-11-21 10:09 -> 11-23 13:00 UTC. 75 unkeyed python-requests reads = provider1's `plan_client` (keyless, fail-soft); 4 reads at plan startup from 172.22.0.1 = the 2026-11-21 post-deploy verification probes (anonymous termbank/concept, termbank/search, external and local $lookup, by curl and python-requests — exactly the four checks recorded in the 11-21 entry below), not code: nothing in this repo calls its own /termbank or /CodeSystem routes (plan's smoke calls termbank directly), and the compose healthcheck is pg_isready. The rest: crawlers.
+- Commits, one per group, each deployable alone: A `provider1.pdhc` read_only identity (`PROVIDER1_PDHC_SERVICE_KEY`); 1 lookup tables (canonical-libs, response-types, units, plandef-types, list+GUID; whole-system-libs; /lookup/values/<g>, /lookup/valuesets/<g>, /ValueSet/<g> — the last served compose.include[].concept, #913's enumeration one GUID at a time); 2 /concepts; 3 /plandefinitions + /PlanDefinition (incl. $expand, a GET that also commits regenerated fhir_data); 4 /forms (forms door: API_KEY, service key or session); 5 CodeSystem + ConceptMap (search, read, $lookup, $translate, GET and POST); 6 termbank was already gated (2026-11-21) — the commit adds the inventory guard and makes /endpoints and /docs public by decision (public GitHub repo content; the web /docs page serves the same files without login).
+- whole-system-libs gated in group 1: its only caller is cdr's plan_client (`whole_system_systems` -> `_get_with_retry`, which always sends `plan_read_headers()`), and cdr1/2/3 hold #931 keys. A CDR without its key gets 401 -> None -> its gate stays on the hard-coded floor (fails closed, not open).
+- Capability statement: every GET row's auth_required now matches; a test enforces it.
+- Tests: tests/test_read_gate_1011.py (166: per path bare 401, crawler UA 401, provider1 key 200, read_only session 200, forged key 403 + no rate-limit bypass; POST $lookup/$translate; the inventory guard + control; capability truth). Existing tests that read anonymously now read with a session; #925/#913/#935 posture tests rewritten to the gated state. Suite 814 before -> 983 after. Every gate mutation-checked (removing it fails the module).
+- Inventory (test client, AUTH_DISABLED=false, every GET rule under /api/, no credential; 72 rules). 41 answered before, 10 after:
+
+| GET rule (no credential) | before | after |
+|---|---|---|
+| `/api/health` | 200 | 200 |
+| `/api/v1/CodeSystem` | 200 | 401 |
+| `/api/v1/CodeSystem/$lookup` | 400 | 401 |
+| `/api/v1/CodeSystem/%24lookup` | 400 | 401 |
+| `/api/v1/CodeSystem/<id_>` | 404 | 401 |
+| `/api/v1/ConceptMap` | 200 | 401 |
+| `/api/v1/ConceptMap/$translate` | 400 | 401 |
+| `/api/v1/ConceptMap/%24translate` | 400 | 401 |
+| `/api/v1/ConceptMap/<id_>` | 404 | 401 |
+| `/api/v1/PlanDefinition` | 200 | 401 |
+| `/api/v1/PlanDefinition/<fhir_id>` | 404 | 401 |
+| `/api/v1/PlanDefinition/<fhir_id>/$expand` | 404 | 401 |
+| `/api/v1/ValueSet/$validate-code` | 400 | 400 |
+| `/api/v1/ValueSet/%24validate-code` | 400 | 400 |
+| `/api/v1/ValueSet/<guid>` | 404 | 401 |
+| `/api/v1/ValueSet/<guid>/$validate-code` | 404 | 404 |
+| `/api/v1/ValueSet/<guid>/%24validate-code` | 404 | 404 |
+| `/api/v1/capability-statement` | 200 | 200 |
+| `/api/v1/concepts` | 200 | 401 |
+| `/api/v1/concepts/<concept_guid>/values` | 404 | 401 |
+| `/api/v1/concepts/<guid>` | 404 | 401 |
+| `/api/v1/docs` | 200 | 200 |
+| `/api/v1/docs/<filename>` | 404 | 404 |
+| `/api/v1/endpoints` | 200 | 200 |
+| `/api/v1/forms` | 200 | 401 |
+| `/api/v1/forms/<form_guid>` | 404 | 401 |
+| `/api/v1/forms/<form_guid>/versions` | 404 | 401 |
+| `/api/v1/lookup/canonical-libs` | 200 | 401 |
+| `/api/v1/lookup/canonical-libs/<guid>` | 404 | 401 |
+| `/api/v1/lookup/plandef-types` | 200 | 401 |
+| `/api/v1/lookup/plandef-types/<guid>` | 404 | 401 |
+| `/api/v1/lookup/response-types` | 200 | 401 |
+| `/api/v1/lookup/response-types/<guid>` | 404 | 401 |
+| `/api/v1/lookup/units` | 200 | 401 |
+| `/api/v1/lookup/units/<guid>` | 404 | 401 |
+| `/api/v1/lookup/values/<guid>` | 404 | 401 |
+| `/api/v1/lookup/valuesets/<guid>` | 404 | 401 |
+| `/api/v1/lookup/whole-system-libs` | 200 | 401 |
+| `/api/v1/metadata` | 200 | 200 |
+| `/api/v1/plandefinitions` | 200 | 401 |
+| `/api/v1/plandefinitions/<guid>` | 404 | 401 |
+
+- MUST happen before deploying groups 2 and 3: contract.pdhc's browser SPA (`app/web/dist/index.html`) fetches `/api/v1/plandefinitions?per_page=200` and `/api/v1/concepts?per_page=500` cross-origin with NO credential (fetch default: no cookies cross-origin) and silently shows empty pickers on a non-200. contract's sibling smoke also probes `/concepts/<g>` keyless and expects 404. Both are contract.pdhc work.
+- Deploy order: pk1 key script (needs commit A live in plan) -> provider1 client -> groups 1, 4, 5 -> contract SPA/smoke fix -> groups 2, 3 -> 6. Copy the read_shadow lines out before each plan recreate.
+- Not fixed, noted: `require_api_key_or_role` compares the forms API_KEY with `==` (not constant-time); simprovider.pdhc (local dev only) reads /plandefinitions keyless; sim's synthea path needs PLAN_PDHC_SIM_KEY set on the Mac.
+
 ### 2026-11-21 — termbank was open to the internet through plan; now platform-only
 - `/api/v1/termbank/concept/<system>/<code>` and `/api/v1/termbank/search` (app/api/terminology.py) had no auth at all, and the capability statement said so (`auth=False`). termbank itself has no vhost, so plan's proxy was the one way in; Googlebot crawled it (6 hits on 2026-11-20 alone).
 - Now gated by `app/services/termbank_gate.refusal()` = `requires_role('read_only')`: a plan session OR a valid service key of any module passes (operator 2026-11-21: "all other modules should be able to reach the terms in the plan module for lookup"); anonymous gets 401, a bad key 403. (A first version refused service keys too; corrected the same day.) Plan's own panels (termbank_panel.js, termbank_search_picker.js) fetch same-origin with the session cookie, on pages that already require login, so they are unaffected. Capability statement updated.

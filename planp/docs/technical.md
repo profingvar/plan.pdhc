@@ -292,18 +292,39 @@ Two paths, both in `app/api/auth.py`.
 ### Service key (trusted siblings)
 
 `X-Source-Service` + `X-Service-Key` headers let a recognised sibling call
-POST/PUT/DELETE without an SSO session (`_service_key_outcome()`). Recognised
-sources (`KNOWN_SERVICES`):
-- ~~`loader.pdhc` → env `PLAN_LOADER_SERVICE_KEY`~~ — **retired 2026-10-05.** It named
-  no repo and held a live, never-rotated key that bypassed SSO. The two bulk
-  loaders that used it are dead; mint a new identity under its own name if
-  bulk loading is needed again.
-- `sim.pdhc` → env `SIM_PDHC_SERVICE_KEY` (concept-GUID resolution at run time)
+without an SSO session (`_service_key_outcome()`). Each entry in
+`KNOWN_SERVICES` maps a name to the config variable holding its key AND the
+role that key grants (#912); the role is compared against `min_role` exactly as
+an SSO user's is. Recognised sources:
 
-An unknown source, missing key, or wrong key returns **403**. Valid-shape
-service-key callers also bypass the rate limiter (`@limiter.request_filter` in
-`app/__init__.py`) so canonicaliser warmup bursts don't trip the default
-`200/minute`.
+| source | env var | role |
+|---|---|---|
+| `sim.pdhc` | `SIM_PDHC_SERVICE_KEY` | read_only |
+| `alert.pdhc` | `ALERT_PDHC_SERVICE_KEY` | read_write |
+| `request.pdhc`, `cdr.pdhc`, `cdr2.pdhc`, `cdr3.pdhc`, `dashboard.pdhc`, `onboard.pdhc`, `contract.pdhc`, `analyse.pdhc` | `<NAME>_PDHC_SERVICE_KEY` | read_only (#931) |
+| `provider1.pdhc` | `PROVIDER1_PDHC_SERVICE_KEY` | read_only (#1011) |
+
+~~`loader.pdhc`~~ was retired 2026-10-05 (no repo, a live never-rotated key).
+
+An unknown source, missing key, or wrong key returns **403**; an unset key
+admits nobody. Only a VERIFIED key bypasses the rate limiter (#931) — a header
+that merely names a known service does not.
+
+### Which reads are open (#1011, stage 3 of #931)
+
+Every API read needs a credential — a session, a service key, or (forms only)
+the forms `API_KEY` — except the set that is public by decision:
+
+`/api/health`, `/api/v1/metadata`, `/api/v1/capability-statement`,
+`/api/v1/endpoints`, `/api/v1/docs[/<file>]`, `/api/v1/auth/*`, and
+`ValueSet/$validate-code` (#913: a yes/no about a code the caller holds).
+
+That set is `PUBLIC_BY_DECISION` in `app/api/read_shadow.py`, and
+`tests/test_read_gate_1011.py` walks every GET rule and fails if anything
+outside it answers without a credential, and if the capability statement's
+`auth_required` disagrees. `read_shadow` still logs every unauthenticated or
+bad-key read (WARNING, logger `plan.read_shadow`), now as the record of who is
+being refused.
 
 ---
 
