@@ -112,16 +112,16 @@ ENDPOINTS = [
     _endpoint('DELETE', '/concepts/<guid>/values/<value_guid>', True, 'Remove a value from a concept\'s valueset'),
 
     # PlanDefinitions (CRUD)
-    _endpoint('GET', '/plandefinitions', False, 'List/search PlanDefinitions (paginated)'),
+    _endpoint('GET', '/plandefinitions', True, 'List/search PlanDefinitions (paginated)'),
     _endpoint('POST', '/plandefinitions', True, 'Create a PlanDefinition with goals and activities'),
-    _endpoint('GET', '/plandefinitions/<guid>', False, 'Read a PlanDefinition with full detail'),
+    _endpoint('GET', '/plandefinitions/<guid>', True, 'Read a PlanDefinition with full detail'),
     _endpoint('PUT', '/plandefinitions/<guid>', True, 'Update a PlanDefinition'),
     _endpoint('DELETE', '/plandefinitions/<guid>', True, 'Delete a PlanDefinition'),
 
     # FHIR PlanDefinition (read-only FHIR format)
-    _endpoint('GET', '/PlanDefinition', False, 'FHIR R5 searchset Bundle'),
-    _endpoint('GET', '/PlanDefinition/<fhir_id>', False, 'FHIR R5 PlanDefinition resource'),
-    _endpoint('GET', '/PlanDefinition/<fhir_id>/$expand', False,
+    _endpoint('GET', '/PlanDefinition', True, 'FHIR R5 searchset Bundle'),
+    _endpoint('GET', '/PlanDefinition/<fhir_id>', True, 'FHIR R5 PlanDefinition resource'),
+    _endpoint('GET', '/PlanDefinition/<fhir_id>/$expand', True,
               'Force regenerate FHIR JSON (note: NOT the FHIR ValueSet $expand — '
               'see /ValueSet/<guid>/$expand below for that)'),
 

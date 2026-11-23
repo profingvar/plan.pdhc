@@ -3,12 +3,14 @@ from app.models.concept_models import fhir_canonical_url
 from app.models.fhir_models import PlanDefinition
 from app.services.fhir_service import FHIRService
 from app import db, limiter
+from app.api.auth import requires_role
 
 fhir_plandef_bp = Blueprint('fhir_plandefinitions', __name__)
 # Rate limiting via global RATELIMIT_DEFAULT in app/__init__.py.
 
 
 @fhir_plandef_bp.route('/PlanDefinition', methods=['GET'])
+@requires_role('read_only')  # #1011 group 3: every consumer sends a key or a session
 def search_plan_definitions():
     """FHIR searchset Bundle for PlanDefinitions."""
     query = PlanDefinition.query
@@ -54,6 +56,7 @@ def search_plan_definitions():
 
 
 @fhir_plandef_bp.route('/PlanDefinition/<fhir_id>', methods=['GET'])
+@requires_role('read_only')  # #1011 group 3: every consumer sends a key or a session
 def read_plan_definition(fhir_id):
     pd = PlanDefinition.query.filter_by(fhir_id=fhir_id).first()
     if not pd:
@@ -72,6 +75,9 @@ def read_plan_definition(fhir_id):
 
 
 @fhir_plandef_bp.route('/PlanDefinition/<fhir_id>/$expand', methods=['GET'])
+# NOTE (#1011): this GET also WRITES — it regenerates and commits fhir_data.
+# Idempotent (a cache of the row), so read_only is kept; anonymous no longer.
+@requires_role('read_only')  # #1011 group 3: every consumer sends a key or a session
 def expand_plan_definition(fhir_id):
     """Force regeneration of FHIR JSON for full expansion."""
     pd = PlanDefinition.query.filter_by(fhir_id=fhir_id).first()

@@ -148,6 +148,7 @@ def _plandef_full_dict(pd):
 
 
 @plandefinitions_bp.route('/plandefinitions', methods=['GET'])
+@requires_role('read_only')  # #1011 group 3: every consumer sends a key or a session
 def list_plandefinitions():
     page = max(1, request.args.get('page', 1, type=int))
     per_page = max(1, min(200, request.args.get('per_page', 20, type=int)))
@@ -323,6 +324,7 @@ def create_plandefinition():
 
 
 @plandefinitions_bp.route('/plandefinitions/<guid>', methods=['GET'])
+@requires_role('read_only')  # #1011 group 3: every consumer sends a key or a session
 def read_plandefinition(guid):
     if not _is_valid_uuid(guid):
         return jsonify({'error': 'Invalid GUID'}), 400

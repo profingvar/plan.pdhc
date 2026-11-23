@@ -4,6 +4,11 @@ from tests.conftest import set_sso_session, SAMPLE_ACCESS_BLOB
 
 
 class TestFHIRPlanDefinitionAPI:
+    @pytest.fixture(autouse=True)
+    def _reader(self, client):
+        # #1011 group 3: the FHIR reads are gated; read as a logged-in user.
+        set_sso_session(client, SAMPLE_ACCESS_BLOB)
+
     def test_search_returns_bundle(self, client):
         resp = client.get('/api/v1/PlanDefinition')
         assert resp.status_code == 200

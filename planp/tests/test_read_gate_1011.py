@@ -104,6 +104,16 @@ GROUPS['2-concepts'] = [
     '/api/v1/concepts/{concept}/values',
 ]
 
+# Group 3 — PlanDefinitions, native and FHIR. Readers: request, dashboard,
+# onboard, sim (keyed since #931) and provider1 (#1011).
+GROUPS['3-plandefinitions'] = [
+    '/api/v1/plandefinitions',
+    '/api/v1/plandefinitions/{pd}',
+    '/api/v1/PlanDefinition',
+    '/api/v1/PlanDefinition/{pd_fhir}',
+    '/api/v1/PlanDefinition/{pd_fhir}/$expand',
+]
+
 
 @pytest.fixture(scope='module')
 def seeded(app):
