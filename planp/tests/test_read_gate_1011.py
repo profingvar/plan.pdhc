@@ -256,3 +256,60 @@ def test_a_POST_read_is_gated_too(client, seeded, provider1_key, path):
     assert client.post(path, json=body).status_code == 401
     assert client.post(path, json=body, headers=_keyed('wrong')).status_code == 403
     assert client.post(path, json=body, headers=_keyed()).status_code == 200
+
+
+# --------------------------------------------------------------- the inventory
+#
+# Group 6 (the termbank proxies) was gated and deployed before this ticket
+# (2026-11-21, tests/test_termbank_plan_internal.py). What remains is the
+# guard that makes stage 3 stick: walk EVERY GET rule under /api/, call it
+# with no credential, and require that the ones that answer are exactly the
+# ones `read_shadow` exempts as public by decision.
+
+def _anonymous_answers(app):
+    import re
+    from app import limiter
+    out = {}
+    c = app.test_client()
+    g = '00000000-0000-4000-8000-000000000000'
+    for rule in app.url_map.iter_rules():
+        if 'GET' not in rule.methods or not rule.rule.startswith('/api/'):
+            continue
+        url = re.sub(r'<(?:[^:>]+:)?([^>]+)>',
+                     lambda m: g if ('guid' in m.group(1) or m.group(1).endswith('id')
+                                     or m.group(1) == 'id_') else 'x', rule.rule)
+        limiter.reset()
+        code = c.get(url).status_code
+        if code not in (401, 403):
+            out[rule.rule] = code
+    return out
+
+
+def test_only_the_public_by_decision_set_answers_without_a_credential(app):
+    from app.api.read_shadow import _is_public
+    answered = _anonymous_answers(app)
+    assert answered, 'nothing answered at all — the probe is broken'
+    leaks = {r: c for r, c in answered.items() if not _is_public(r)}
+    assert leaks == {}, f'answer anonymously but are not public by decision: {leaks}'
+
+
+def test_CONTROL_the_public_set_does_answer(app):
+    """Without this the test above would pass for an app that refused
+    everything, health included."""
+    answered = _anonymous_answers(app)
+    for rule in ('/api/health', '/api/v1/metadata', '/api/v1/capability-statement',
+                 '/api/v1/endpoints', '/api/v1/docs',
+                 '/api/v1/ValueSet/$validate-code'):
+        assert rule in answered, (rule, sorted(answered))
+
+
+def test_the_capability_statement_tells_the_truth_about_every_GET():
+    """Each advertised GET says auth_required exactly when it is not public by
+    decision. Before #1011 twenty rows said `False` over a gated route (and a
+    few the reverse); the statement is what a new consumer reads first."""
+    from app.api.capability import ENDPOINTS
+    from app.api.read_shadow import _is_public
+    wrong = [(e['path'], e['auth_required']) for e in ENDPOINTS
+             if e['method'] == 'GET' and not e['path'].startswith('/api/v1/auth/')
+             and bool(e['auth_required']) == _is_public(e['path'])]
+    assert wrong == [], wrong

@@ -30,7 +30,18 @@ PUBLIC_BY_DECISION = (
     '/api/v1/metadata',
     '/api/v1/capability-statement',
     '/api/v1/auth/',
+    # #1011: the same ENDPOINTS list as capability-statement, flat.
+    '/api/v1/endpoints',
+    # #1011: the documentation catalogue. Every file it serves is in the
+    # PUBLIC plan.pdhc GitHub repo, and the web page /docs serves the same
+    # files without a login; gating the API copy would protect nothing.
+    '/api/v1/docs',
 )
+
+#: #1011: after stage 3 this IS the list of API reads that answer without a
+#: credential — tests/test_read_gate_1011.py walks every GET rule and fails if
+#: anything outside it answers anonymously, so the shadow exemption and the
+#: gate cannot drift apart.
 
 
 def _is_public(path: str) -> bool:
