@@ -2263,3 +2263,9 @@ Not committed, not deployed.
 - DEPLOYED 2026-11-19 (overlay; rollback tag `:pre_goalunit`, files `*.pre_goalunit.<ts>`). Baseline ok, health 200, hashes ok. New MMD values after the deploy arrived correctly labelled.
 - 2026-11-19 (operator: "LOINC sömn"): concept sleep-duration (9bbc1c9e) bound to LOINC 93832-4 (was local, no code); via guard_concept, vers_number 1 -> 2. Dump of concepts first (pre_sleep_loinc_*.pgdump).
 - 2026-11-19 (operator): concept scales widened/added — sleep-duration 0-10 -> 0-24 h (vers 3), anxiety none -> 0-10 (vers 2); via guard_concept, dump of concepts first (pre_scales_*.pgdump). These are what gateway OUT_OF_SCALE checks against.
+
+
+## #1011 DEPLOYED 2026-11-24
+Overlay deploys with auto-rollback, consumer smokes green before and after each step:
+1. plan identity (88a910b) 07:07Z; 2. operator ran pk1 (key fingerprint a66bca9c18b0; keyed 200 / bare 401 / wrong 403 from inside provider1); 3. provider plan_client (2c36fa0), smoke 12/12; 4. plan groups 1+4+5 07:14Z; 5. contract api+web (b4c4de2: editor pickers via contract backend with its key; first run rolled back on a busybox sha256sum flag, rerun clean), contract 6/6 edges; 6. plan groups 2+3 07:50Z; 7. group 6 (read_shadow public set). Also deployed app/concept_urn.py (#942), absent in prod. pdhc_app now equals git d6def06 file for file.
+Loopback probes after: lookup, forms, CodeSystem, ConceptMap, concepts, plandefinitions, PlanDefinition bare 401; health, metadata, endpoints, docs 200. Shadow copies: miserver ~/backups/plan_read_shadow/.
