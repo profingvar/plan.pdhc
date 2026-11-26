@@ -1,3 +1,9 @@
+Current focus (2026-11-26)
+==========================
+#1060: record.pdhc read_only identity written + tested locally (985 passed), NOT deployed.
+Deploy BEFORE record.pdhc's stage-7 export: operator sets RECORD_PDHC_SERVICE_KEY here and
+PLAN_SERVICE_KEY in record's shared/.env (same value), then up -d both. progress.md 2026-11-26.
+
 Current focus
 =============
 

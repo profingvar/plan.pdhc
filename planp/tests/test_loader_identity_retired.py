@@ -40,6 +40,8 @@ def test_loader_is_not_a_known_service():
         'analyse.pdhc': ('ANALYSE_PDHC_SERVICE_KEY', 'read_only'),
         # #1011: the reader #931 missed (provider1's guided report form).
         'provider1.pdhc': ('PROVIDER1_PDHC_SERVICE_KEY', 'read_only'),
+        # #1060: record.pdhc's EEHRxF lab-report export ($translate only).
+        'record.pdhc': ('RECORD_PDHC_SERVICE_KEY', 'read_only'),
     }
 
 

@@ -93,6 +93,13 @@ KNOWN_SERVICES = {
     # error anywhere. `read_only`, named for the running instance
     # (provider1), not the repo (provider.pdhc), per the rule above.
     'provider1.pdhc': ('PROVIDER1_PDHC_SERVICE_KEY', 'read_only'),
+    # #1060 (record.pdhc stage 7, EEHRxF laboratory report): the export reads
+    # ONE thing here -- `ConceptMap/$translate` from a platform concept GUID to
+    # its canonical binding (LOINC / NPU / ...) -- because a result in cdr1
+    # carries only `urn:pdhc:concept|<guid>` and the IG needs the standard
+    # code. Every call is a GET, so read_only. NOT the same value as cdr's
+    # RECORD_PDHC_SERVICE_KEY (record -> cdr1): one key per pair.
+    'record.pdhc': ('RECORD_PDHC_SERVICE_KEY', 'read_only'),
 }
 
 #: Shared by both branches of `requires_role`, so the service path and the

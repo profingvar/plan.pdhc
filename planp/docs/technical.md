@@ -303,6 +303,7 @@ an SSO user's is. Recognised sources:
 | `alert.pdhc` | `ALERT_PDHC_SERVICE_KEY` | read_write |
 | `request.pdhc`, `cdr.pdhc`, `cdr2.pdhc`, `cdr3.pdhc`, `dashboard.pdhc`, `onboard.pdhc`, `contract.pdhc`, `analyse.pdhc` | `<NAME>_PDHC_SERVICE_KEY` | read_only (#931) |
 | `provider1.pdhc` | `PROVIDER1_PDHC_SERVICE_KEY` | read_only (#1011) |
+| `record.pdhc` | `RECORD_PDHC_SERVICE_KEY` | read_only (#1060: `ConceptMap/$translate` for the EEHRxF lab-report export) |
 
 ~~`loader.pdhc`~~ was retired 2026-10-05 (no repo, a live never-rotated key).
 

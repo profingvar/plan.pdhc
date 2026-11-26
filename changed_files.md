@@ -1257,3 +1257,10 @@ gates all hold (concept-types 401, intended-uses 401, the four open ones 200);
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_loader_identity_retired.py, test_lookup_read_posture_925.py, test_inline_enrichment_935.py, test_terminology_read_write_invariant_913.py, test_lookup_tables.py, test_auth.py, test_rate_limit.py, test_concept_categories_951.py, test_machine_read_door_931.py, test_plandefinitions.py, test_forms.py, test_fhir_codesystem.py, test_fhir_conceptmap.py, test_fhir_version_uniform.py, test_termbank_plan_internal.py (all under /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/)
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/technical.md — §6 service keys table, open-read set
 - /Users/martiningvar/T7_sidewinder/plan.pdhc/progress.md, /Users/martiningvar/T7_sidewinder/plan.pdhc/changed_files.md
+
+## 2026-11-26 — #1060 record.pdhc read_only identity
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/api/auth.py — KNOWN_SERVICES['record.pdhc']
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/app/config.py, /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/.env.example — RECORD_PDHC_SERVICE_KEY
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_record_identity_1060.py (NEW), /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/tests/test_loader_identity_retired.py
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/planp/docs/technical.md — service-key table
+- /Users/martiningvar/T7_sidewinder/plan.pdhc/progress.md, /Users/martiningvar/T7_sidewinder/plan.pdhc/changed_files.md, /Users/martiningvar/T7_sidewinder/plan.pdhc/newtask.txt
